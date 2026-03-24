@@ -1111,16 +1111,16 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'ishiyama',      label: '石山オメガさん専用',        stores: ['レークプラザ','ダラムS-1'] },
   { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴','那珂川キング本店1500','メガフェイス朝倉'] },
   { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園町田','エスパス上野新館','エスパス上野本館','ジアス大船','楽園川崎','楽園柏'] },
-  { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT 梅坪','ZENT 豊田本店','メガガイア一宮','リブレ遊援館'] },
+  { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT梅坪','ZENT豊田本店','メガガイア一宮','リブレ遊援館'] },
   { file: 'kowa',          label: '興和商事さん専用',          stores: ['サンコー梅島'] },
   { file: 'minami_ent',    label: 'ミナミ・エンタープライズさん専用', stores: ['マルハン石岡','KING BOSS 1000','スーパーBOSS','ニラク福島瀬上','ZENT海道'] },
   { file: 'kitakami',      label: '北上文化さん専用',          stores: [] },
-  { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: ['GRAND DAMZ竹尾インター本店','GRAND DAMZ小新店','ダイナム糸魚川',"Super D'STATION 上越"] },
+  { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: ['GRAND DAMZ竹尾インター本店','GRAND DAMZ小新店','ダイナム糸魚川',"Super D'STATION上越"] },
   { file: 'nakahara',      label: '中原商事さん専用',          stores: [] },
   { file: 'marusan',       label: '丸三さん専用',              stores: ['ジャンボマックス777出雲'] },
-  { file: 'dynam_kita',    label: 'ダイナム北さん専用',        stores: ['WINS北上ライト館','パチンコ22花巻南'] },
+  { file: 'dynam_kita',    label: 'ダイナム北さん専用',        stores: ['WINS北上ライト館','パチンコ22花巻南','ベガスベガス函館昭和','ベガスベガス函館港','ベガスベガス函館吉川','函館ひまわり'] },
   { file: 'dynam_higashi', label: 'ダイナム東さん専用',        stores: ["D'STATION上田店",'100万ドル上田インター'] },
-  { file: 'dynam_nishi',   label: 'ダイナム西さん専用',        stores: ['ICHI-BAN本店','オーギヤ彦根','エスパス古津賀','K-1 500','ウイング 神辺店','K-1 400'] },
+  { file: 'dynam_nishi',   label: 'ダイナム西さん専用',        stores: ['ICHI-BAN本店','オーギヤ彦根','エスパス古津賀','K-1 500','ウイング神辺','K-1 400'] },
   { file: 'dynam_minami',  label: 'ダイナム南さん専用',        stores: ['メガフェイス朝倉',"D'STATION 39大村"] },
   { file: 'seiki',         label: '21世紀さん専用',            stores: ['八戸ひまわり'] },
 ];
@@ -1522,23 +1522,23 @@ function parseOneFile(file) {
 // 純粋な日付のみ（YYYYMMDD.xlsx）は現在の店舗を使用
 function detectStoreNameFromFilename(filename) {
   const base = filename.replace(/\.[^.]+$/, ''); // 拡張子除去
-  // 6桁年月 + _ + 店舗名（日本語/英数字）+ _ → 月次ファイル
-  let m = base.match(/^\d{6}_([^_\d][^_]*)_/);
+  // 6桁年月 + _ + 店舗名 + _ → 月次ファイル（数字始まりの店舗名も対応）
+  let m = base.match(/^\d{6}_([^_]+)_/);
   if (m) return m[1].trim();
   // 8桁日付 + _ + 店舗名 + _
-  m = base.match(/^\d{8}_([^_\d][^_]*)_/);
+  m = base.match(/^\d{8}_([^_]+)_/);
   if (m) return m[1].trim();
   // 日付のみ → 店舗名なし（現在の店舗を使用）
   return null;
 }
 
-// 店舗名の正規化（全角→半角、スペース統一、不可視文字除去）― 比較用のみ、保存名は変えない
+// 店舗名の正規化 ― 比較用のみ、保存名は変えない
+// NFKC正規化で全角→半角・NFD→NFC・互換文字を一括処理
 function normName(s) {
   return (s || '')
-    .replace(/[\u0000-\u001F\u007F\u200B\u200C\u200D\uFEFF\u00A0]/g, '') // 不可視・制御文字除去
-    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)) // 全角ASCII→半角(数字・英字・記号まとめて)
-    .replace(/\u3000/g, ' ')  // 全角スペース→半角
-    .replace(/[‐‑‒–—―－]/g, '-') // 各種ダッシュ→ハイフン
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001F\u007F\u200B\u200C\u200D\uFEFF]/g, '')
+    .replace(/[‐‑‒–—―]/g, '-')
     .replace(/\s+/g, ' ').trim();
 }
 // デバッグ用：文字コードを16進で表示

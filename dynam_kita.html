@@ -1089,7 +1089,7 @@ const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX
 // ║  ★ 配布設定 ― この3行だけ編集して各担当者に渡してください ★  ║
 // ╚══════════════════════════════════════════════════════════════╝
 // 見られる店舗名をここに列挙。空 [] なら全店舗OK（管理者用）
-const STORE_WHITELIST = ["WINS北上ライト館", "パチンコ22花巻南"];          // 例: ['店舗A', '店舗B']
+const STORE_WHITELIST = ["WINS北上ライト館", "パチンコ22花巻南", "ベガスベガス函館昭和", "ベガスベガス函館港", "ベガスベガス函館吉川", "函館ひまわり"];          // 例: ['店舗A', '店舗B']
 // このファイルを使う人の名前（ヘッダーに表示）
 const USER_LABEL = 'ダイナム北さん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
@@ -1111,16 +1111,16 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'ishiyama',      label: '石山オメガさん専用',        stores: ['レークプラザ','ダラムS-1'] },
   { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴','那珂川キング本店1500','メガフェイス朝倉'] },
   { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園町田','エスパス上野新館','エスパス上野本館','ジアス大船','楽園川崎','楽園柏'] },
-  { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT 梅坪','ZENT 豊田本店','メガガイア一宮','リブレ遊援館'] },
+  { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT梅坪','ZENT豊田本店','メガガイア一宮','リブレ遊援館'] },
   { file: 'kowa',          label: '興和商事さん専用',          stores: ['サンコー梅島'] },
   { file: 'minami_ent',    label: 'ミナミ・エンタープライズさん専用', stores: ['マルハン石岡','KING BOSS 1000','スーパーBOSS','ニラク福島瀬上','ZENT海道'] },
   { file: 'kitakami',      label: '北上文化さん専用',          stores: [] },
-  { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: ['GRAND DAMZ竹尾インター本店','GRAND DAMZ小新店','ダイナム糸魚川',"Super D'STATION 上越"] },
+  { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: ['GRAND DAMZ竹尾インター本店','GRAND DAMZ小新店','ダイナム糸魚川',"Super D'STATION上越"] },
   { file: 'nakahara',      label: '中原商事さん専用',          stores: [] },
   { file: 'marusan',       label: '丸三さん専用',              stores: ['ジャンボマックス777出雲'] },
-  { file: 'dynam_kita',    label: 'ダイナム北さん専用',        stores: ['WINS北上ライト館','パチンコ22花巻南'] },
+  { file: 'dynam_kita',    label: 'ダイナム北さん専用',        stores: ['WINS北上ライト館','パチンコ22花巻南','ベガスベガス函館昭和','ベガスベガス函館港','ベガスベガス函館吉川','函館ひまわり'] },
   { file: 'dynam_higashi', label: 'ダイナム東さん専用',        stores: ["D'STATION上田店",'100万ドル上田インター'] },
-  { file: 'dynam_nishi',   label: 'ダイナム西さん専用',        stores: ['ICHI-BAN本店','オーギヤ彦根','エスパス古津賀','K-1 500','ウイング 神辺店','K-1 400'] },
+  { file: 'dynam_nishi',   label: 'ダイナム西さん専用',        stores: ['ICHI-BAN本店','オーギヤ彦根','エスパス古津賀','K-1 500','ウイング神辺','K-1 400'] },
   { file: 'dynam_minami',  label: 'ダイナム南さん専用',        stores: ['メガフェイス朝倉',"D'STATION 39大村"] },
   { file: 'seiki',         label: '21世紀さん専用',            stores: ['八戸ひまわり'] },
 ];
@@ -1316,24 +1316,25 @@ async function exportUserData() {
   const summary = results.map(f => `${f.name}（${f.storeCount}店舗・${f.recordCount}件）`).join('\n');
   console.log('[export] 書き出し完了:\n' + summary);
 
-  // 未マッチ店舗の警告
+  // 未マッチ店舗の警告＋デバッグログ
   const unmatched = [];
+  console.log('[診断] --- 店舗名マッチング診断 ---');
+  console.log('[診断] システム登録店舗 (normName付き):');
+  allStores.forEach(s => console.log(`  "${s.name}" → norm:"${normName(s.name)}" chars:${debugChars(s.name)}`));
   for (const userConf of USERS_CONFIG) {
     for (const storeName of userConf.stores) {
-      if (!allStores.find(s => normName(s.name) === normName(storeName))) {
+      const matched = allStores.find(s => normName(s.name) === normName(storeName));
+      if (!matched) {
         unmatched.push(`${userConf.file}: 「${storeName}」`);
+        console.warn(`[診断] MISS: ${userConf.file}/"${storeName}" norm:"${normName(storeName)}" chars:${debugChars(storeName)}`);
       }
     }
   }
   if (unmatched.length > 0) {
     const msg = '⚠️ 以下の店舗がシステム内に見つかりません（Excelが未アップまたはファイル名の店舗名が不一致）:\n\n' + unmatched.join('\n');
     alert(msg);
-    console.warn('[export] 未マッチ店舗:\n' + unmatched.join('\n'));
   }
-
-  // 現在登録されている店舗名を一覧表示
-  const storeNames = allStores.map(s => s.name).join('\n');
-  console.log('[export] 現在の登録店舗名一覧:\n' + storeNames);
+  console.log('[診断] --- 診断終了 ---');
 
   showMsg(`✅ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
 }
@@ -1521,24 +1522,27 @@ function parseOneFile(file) {
 // 純粋な日付のみ（YYYYMMDD.xlsx）は現在の店舗を使用
 function detectStoreNameFromFilename(filename) {
   const base = filename.replace(/\.[^.]+$/, ''); // 拡張子除去
-  // 6桁年月 + _ + 店舗名（日本語/英数字）+ _ → 月次ファイル
-  let m = base.match(/^\d{6}_([^_\d][^_]*)_/);
+  // 6桁年月 + _ + 店舗名 + _ → 月次ファイル（数字始まりの店舗名も対応）
+  let m = base.match(/^\d{6}_([^_]+)_/);
   if (m) return m[1].trim();
   // 8桁日付 + _ + 店舗名 + _
-  m = base.match(/^\d{8}_([^_\d][^_]*)_/);
+  m = base.match(/^\d{8}_([^_]+)_/);
   if (m) return m[1].trim();
   // 日付のみ → 店舗名なし（現在の店舗を使用）
   return null;
 }
 
-// 店舗名の正規化（全角→半角、スペース統一）― 比較用のみ、保存名は変えない
+// 店舗名の正規化 ― 比較用のみ、保存名は変えない
+// NFKC正規化で全角→半角・NFD→NFC・互換文字を一括処理
 function normName(s) {
-  return (s || '').trim()
-    .replace(/[　\s]+/g, ' ')
-    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    .replace(/[ａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  return (s || '')
+    .normalize('NFKC')
+    .replace(/[\u0000-\u001F\u007F\u200B\u200C\u200D\uFEFF]/g, '')
+    .replace(/[‐‑‒–—―]/g, '-')
+    .replace(/\s+/g, ' ').trim();
 }
+// デバッグ用：文字コードを16進で表示
+function debugChars(s) { return [...(s||'')].map(c=>`${c}(${c.charCodeAt(0).toString(16)})`).join(''); }
 
 // 店舗名から既存店舗を検索 or 新規作成してIDを返す
 function findOrCreateStore(storeName) {
