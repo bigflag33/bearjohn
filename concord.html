@@ -571,10 +571,7 @@
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-label">推定総粗利</div>
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-        <div class="kpi-value" id="kpi-profit">-</div>
-        <div id="kpi-profit-rate" style="font-size:13px;font-weight:700;color:var(--text2);"></div>
-      </div>
+      <div class="kpi-value" id="kpi-profit">-</div>
       <div class="kpi-sub">期間合計</div>
     </div>
     <div class="kpi-card">
@@ -589,10 +586,7 @@
     </div>
     <div class="kpi-card">
       <div class="kpi-label">1台平均粗利</div>
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-        <div class="kpi-value" id="kpi-avg-profit">-</div>
-        <div id="kpi-coin-profit" style="font-size:13px;font-weight:700;color:var(--text2);"></div>
-      </div>
+      <div class="kpi-value" id="kpi-avg-profit">-</div>
       <div class="kpi-sub">1日平均</div>
     </div>
   </div>
@@ -1089,11 +1083,11 @@ const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX
 // ║  ★ 配布設定 ― この3行だけ編集して各担当者に渡してください ★  ║
 // ╚══════════════════════════════════════════════════════════════╝
 // 見られる店舗名をここに列挙。空 [] なら全店舗OK（管理者用）
-const STORE_WHITELIST = ['テキサス白島', 'スロットテキサス段原', 'テキサス八木', 'アクアプローバ', 'アンジェロレオーネ'];          // 例: ['店舗A', '店舗B']
+const STORE_WHITELIST = ['キクヤ春日井', 'メガコンコルド春日井', 'ZENT木曽川', 'ZENT梅坪', 'ZENT豊田本店', 'メガガイア一宮', 'リブレ遊援館'];          // 例: ['店舗A', '店舗B']
 // このファイルを使う人の名前（ヘッダーに表示）
-const USER_LABEL = '伯和さん専用';               // 例: '田中さん専用'
+const USER_LABEL = 'コンコルドさん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
-const USER_ID = 'hakuwa';             // 例: 'hakuwa' / 'aviva'
+const USER_ID = 'concord';             // 例: 'hakuwa' / 'aviva'
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -1108,21 +1102,21 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'asahikogyo',    label: '朝日興業さん専用',          stores: ['メトロガーデン'] },
   { file: 'aviva',         label: 'アビバさん専用',            stores: ['ジアス大船'] },
   { file: 'concerto',      label: 'コンチェルトさん専用',      stores: ['楽園ハッピーロード大山','ピーアーク北千住SSS'] },
-  { file: 'ishiyama',      label: '石山オメガさん専用',        stores: ['レークプラザ','ダラムS-1'] },
+  { file: 'ishiyama',      label: '石山オメガさん専用',        stores: [] },
   { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴店','那珂川キング本店1500','メガフェイス朝倉'] },
-  { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園町田','エスパス上野新館','エスパス上野本館','ジアス大船','楽園川崎','楽園柏'] },
-  { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT梅坪','ZENT豊田本店','メガガイア一宮','リブレ遊援館'] },
+  { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園町田','エスパス上野新館','エスパス上野本館'] },
+  { file: 'central',       label: 'セントラルさん専用',        stores: [] },
   { file: 'kowa',          label: '興和商事さん専用',          stores: ['サンコー梅島'] },
-  { file: 'minami_ent',    label: 'ミナミ・エンタープライズさん専用', stores: ['マルハン石岡店','KING BOSS 1000','Super BOSS','ニラク福島瀬上','ZENT海道'] },
+  { file: 'minami_ent',    label: 'ミナミ・エンタープライズさん専用', stores: [] },
   { file: 'kitakami',      label: '北上文化さん専用',          stores: [] },
-  { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: ['グランドダムズ竹尾','グランドダムズ小新','ダイナム糸魚川',"Super D'STATION上越"] },
+  { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: [] },
   { file: 'nakahara',      label: '中原商事さん専用',          stores: [] },
-  { file: 'marusan',       label: '丸三さん専用',              stores: ['ジャンボマックス777出雲'] },
-  { file: 'dynam_kita',    label: 'ダイナム北さん専用',        stores: ['WINS北上ライト館','パチンコ22花巻南店'] },
-  { file: 'dynam_higashi', label: 'ダイナム東さん専用',        stores: ["D'STATION上田店",'100万ドル上田インター'] },
-  { file: 'dynam_nishi',   label: 'ダイナム西さん専用',        stores: ['ICHI-BAN本店','オーギヤ彦根','エスパス古津賀','K-1 500','ウイング 神辺店','K-1 400'] },
-  { file: 'dynam_minami',  label: 'ダイナム南さん専用',        stores: ['メガフェイス朝倉',"D'STATION 39大村"] },
-  { file: 'seiki',         label: '21世紀さん専用',            stores: ['八戸ひまわり'] },
+  { file: 'marusan',       label: '丸三さん専用',              stores: [] },
+  { file: 'dynam_kita',   label: 'ダイナム北さん専用',        stores: [] },
+  { file: 'dynam_higashi',label: 'ダイナム東さん専用',        stores: [] },
+  { file: 'dynam_nishi',  label: 'ダイナム西さん専用',        stores: [] },
+  { file: 'dynam_minami', label: 'ダイナム南さん専用',        stores: ['メガフェイス朝倉'] },
+  { file: 'concord',      label: 'コンコルドさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT梅坪','ZENT豊田本店','メガガイア一宮','リブレ遊援館'] },
 ];
 const DEFAULT_STORE = { id: 'default', name: 'デフォルト店舗', key: _NS + 'bi_added_data_default' };
 const BASE_DATES  = [...new Set(RAW_DATA.map(d => d.date))].sort();
@@ -1761,8 +1755,8 @@ function getStores() {
   try {
     const s = JSON.parse(localStorage.getItem(_NS + 'bi_stores') || 'null');
     if (!s || !s.length) return [DEFAULT_STORE];
-    // 旧デフォルト店舗（ueda ID）が残っていたら自動除去
-    const cleaned = s.filter(st => st.id !== 'ueda');
+    // 旧デフォルト店舗（上田インター）が残っていたら自動除去
+    const cleaned = s.filter(st => st.id !== 'ueda' && st.name !== '100万ドル上田インター');
     if (cleaned.length !== s.length) saveStores(cleaned.length ? cleaned : [DEFAULT_STORE]);
     return cleaned.length ? cleaned : [DEFAULT_STORE];
   } catch(e) { return [DEFAULT_STORE]; }
@@ -2288,13 +2282,6 @@ function renderKPIs() {
   kp.textContent = fmtYen(profit);
   kp.className = 'kpi-value ' + (profit >= 0 ? 'green' : 'red');
 
-  const rateEl = document.getElementById('kpi-profit-rate');
-  if (rateEl && sales > 0) {
-    const rate = (profit / sales * 100);
-    rateEl.textContent = `利益率 ${rate.toFixed(1)}%`;
-    rateEl.style.color = rate >= 10 ? 'var(--green)' : rate >= 5 ? 'var(--accent4)' : 'var(--red)';
-  }
-
   document.getElementById('kpi-sales').textContent = fmtYen(sales);
 
   const avgIN = filtered.length > 0 ? Math.round(sum(filtered, 'IN枚数') / filtered.length) : 0;
@@ -2303,13 +2290,6 @@ function renderKPIs() {
   const kap = document.getElementById('kpi-avg-profit');
   kap.textContent = fmtYen(avgProfit);
   kap.className = 'kpi-value ' + (avgProfit >= 0 ? 'green' : 'red');
-
-  const coinEl = document.getElementById('kpi-coin-profit');
-  if (coinEl && avgIN > 0) {
-    const coinProfit = avgProfit / avgIN;
-    coinEl.textContent = `コイン粗利 ${coinProfit.toFixed(2)}円`;
-    coinEl.style.color = coinProfit >= 0 ? 'var(--green)' : 'var(--red)';
-  }
 }
 
 function getThemeColors() {
