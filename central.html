@@ -1089,7 +1089,7 @@ const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX
 // ║  ★ 配布設定 ― この3行だけ編集して各担当者に渡してください ★  ║
 // ╚══════════════════════════════════════════════════════════════╝
 // 見られる店舗名をここに列挙。空 [] なら全店舗OK（管理者用）
-const STORE_WHITELIST = ["キクヤ春日井", "メガコンコルド春日井", "ZENT木曽川", "ZENT梅坪", "ZENT豊田本店", "メガガイア一宮", "リブレ遊援館"];          // 例: ['店舗A', '店舗B']
+const STORE_WHITELIST = ["キクヤ春日井", "メガコンコルド春日井", "ZENT木曽川", "ZENT 梅坪", "ZENT 豊田本店", "メガガイア一宮", "リブレ遊援館"];          // 例: ['店舗A', '店舗B']
 // このファイルを使う人の名前（ヘッダーに表示）
 const USER_LABEL = 'セントラルさん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
@@ -1109,16 +1109,16 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'aviva',         label: 'アビバさん専用',            stores: ['ジアス大船'] },
   { file: 'concerto',      label: 'コンチェルトさん専用',      stores: ['楽園ハッピーロード大山','ピーアーク北千住SSS'] },
   { file: 'ishiyama',      label: '石山オメガさん専用',        stores: ['レークプラザ','ダラムS-1'] },
-  { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴店','那珂川キング本店1500','メガフェイス朝倉'] },
+  { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴','那珂川キング本店1500','メガフェイス朝倉'] },
   { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園町田','エスパス上野新館','エスパス上野本館','ジアス大船','楽園川崎','楽園柏'] },
-  { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT梅坪','ZENT豊田本店','メガガイア一宮','リブレ遊援館'] },
+  { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT 梅坪','ZENT 豊田本店','メガガイア一宮','リブレ遊援館'] },
   { file: 'kowa',          label: '興和商事さん専用',          stores: ['サンコー梅島'] },
-  { file: 'minami_ent',    label: 'ミナミ・エンタープライズさん専用', stores: ['マルハン石岡店','KING BOSS 1000','Super BOSS','ニラク福島瀬上','ZENT海道'] },
+  { file: 'minami_ent',    label: 'ミナミ・エンタープライズさん専用', stores: ['マルハン石岡','KING BOSS 1000','スーパーBOSS','ニラク福島瀬上','ZENT海道'] },
   { file: 'kitakami',      label: '北上文化さん専用',          stores: [] },
-  { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: ['グランドダムズ竹尾','グランドダムズ小新','ダイナム糸魚川',"Super D'STATION上越"] },
+  { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: ['GRAND DAMZ竹尾インター本店','GRAND DAMZ小新店','ダイナム糸魚川',"Super D'STATION 上越"] },
   { file: 'nakahara',      label: '中原商事さん専用',          stores: [] },
   { file: 'marusan',       label: '丸三さん専用',              stores: ['ジャンボマックス777出雲'] },
-  { file: 'dynam_kita',    label: 'ダイナム北さん専用',        stores: ['WINS北上ライト館','パチンコ22花巻南店'] },
+  { file: 'dynam_kita',    label: 'ダイナム北さん専用',        stores: ['WINS北上ライト館','パチンコ22花巻南'] },
   { file: 'dynam_higashi', label: 'ダイナム東さん専用',        stores: ["D'STATION上田店",'100万ドル上田インター'] },
   { file: 'dynam_nishi',   label: 'ダイナム西さん専用',        stores: ['ICHI-BAN本店','オーギヤ彦根','エスパス古津賀','K-1 500','ウイング 神辺店','K-1 400'] },
   { file: 'dynam_minami',  label: 'ダイナム南さん専用',        stores: ['メガフェイス朝倉',"D'STATION 39大村"] },
@@ -1285,7 +1285,7 @@ async function exportUserData() {
     let recordCount = 0;
 
     for (const storeName of userConf.stores) {
-      const store = allStores.find(s => s.name === storeName);
+      const store = allStores.find(s => normName(s.name) === normName(storeName));
       if (store) {
         const records = DB_CACHE[store.key] && DB_CACHE[store.key].length
           ? DB_CACHE[store.key]
@@ -1320,7 +1320,7 @@ async function exportUserData() {
   const unmatched = [];
   for (const userConf of USERS_CONFIG) {
     for (const storeName of userConf.stores) {
-      if (!allStores.find(s => s.name === storeName)) {
+      if (!allStores.find(s => normName(s.name) === normName(storeName))) {
         unmatched.push(`${userConf.file}: 「${storeName}」`);
       }
     }
@@ -1531,10 +1531,19 @@ function detectStoreNameFromFilename(filename) {
   return null;
 }
 
+// 店舗名の正規化（全角→半角、スペース統一）― 比較用のみ、保存名は変えない
+function normName(s) {
+  return (s || '').trim()
+    .replace(/[　\s]+/g, ' ')
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[ａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+}
+
 // 店舗名から既存店舗を検索 or 新規作成してIDを返す
 function findOrCreateStore(storeName) {
   const stores = getStores();
-  const found = stores.find(s => s.name === storeName);
+  const found = stores.find(s => normName(s.name) === normName(storeName));
   if (found) return found;
   // 新規作成
   const id  = 'store_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
