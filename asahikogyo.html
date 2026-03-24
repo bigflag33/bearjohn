@@ -537,6 +537,11 @@
       Excelを追加
     </button>
     <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display:none" onchange="handleUpload(event)">
+    <button id="exportDataBtn" onclick="exportUserData()" style="display:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;align-items:center;gap:6px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      データ配信
+    </button>
+    <span id="remoteDataBadge" style="display:none;font-size:11px;font-weight:700;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.4);border-radius:20px;padding:3px 10px;white-space:nowrap;"></span>
   </div>
 </div>
 <div class="main">
@@ -1088,6 +1093,15 @@ const USER_ID = 'asahikogyo';             // 例: 'hakuwa' / 'aviva'
 // ストレージキーをUSER_IDで名前空間分離
 const _NS = USER_ID + '_';  // 例: 'hakuwa_'
 const STORAGE_KEY = _NS + 'bi_added_data_legacy';
+
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  ★ ユーザー定義（管理者専用）― 担当者を増やす場合に追記      ║
+// ╚══════════════════════════════════════════════════════════════╝
+const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
+  { file: 'hakuwa',     label: '伯和さん専用',    stores: ['テキサス白島','スロットテキサス段原','テキサス八木','アクアプローバ','アンジェロレオーネ'] },
+  { file: 'asahikogyo', label: '朝日興業さん専用', stores: ['メトロガーデン'] },
+  { file: 'aviva',      label: 'アビバさん専用',   stores: ['ジアス大船'] },
+];
 const DEFAULT_STORE = { id: 'default', name: 'デフォルト店舗', key: _NS + 'bi_added_data_default' };
 const BASE_DATES  = [...new Set(RAW_DATA.map(d => d.date))].sort();
 RAW_DATA.forEach(d => { if (d['機種名正式']) d['機種名'] = d['機種名正式']; });
@@ -1205,6 +1219,81 @@ function showMsg(txt, type) {
   el.textContent = txt;
   el.className = 'upload-msg ' + type;
   setTimeout(() => { el.textContent = ''; el.className = ''; }, 4000);
+}
+
+// ── リモートデータ読み込み（ユーザー用 GitHub Pages JSON）──
+async function loadRemoteData() {
+  if (USER_ID === 'admin') return;
+  try {
+    const url = `./${USER_ID}_data.json?t=${Date.now()}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data || !data.stores) return;
+    let total = 0;
+    for (const storeName of Object.keys(data.stores)) {
+      const store = findOrCreateStore(storeName);
+      DB_CACHE[store.key] = data.stores[storeName];
+      total += data.stores[storeName].length;
+    }
+    console.log(`[remote] ${USER_ID}_data.json から ${total}件 ロード完了`);
+    // データ配信済みバッジを表示
+    const badge = document.getElementById('remoteDataBadge');
+    if (badge) {
+      const d = data.generated ? new Date(data.generated) : null;
+      const dateStr = d ? `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '';
+      badge.textContent = `📡 データ配信済み ${dateStr}`;
+      badge.style.display = '';
+    }
+  } catch(e) {
+    console.log('[remote] データファイルなし、ローカルのみ使用');
+  }
+}
+
+// ── 管理者専用：ユーザー別データJSON書き出し ──
+async function exportUserData() {
+  if (!USERS_CONFIG.length) { alert('USERS_CONFIGが設定されていません'); return; }
+  showMsg('⏳ データを書き出し中...', 'ok');
+  const allStores = getStores();
+  const results = [];
+
+  for (const userConf of USERS_CONFIG) {
+    const exportData = { generated: new Date().toISOString(), user: userConf.file, stores: {} };
+    let storeCount = 0;
+    let recordCount = 0;
+
+    for (const storeName of userConf.stores) {
+      const store = allStores.find(s => s.name === storeName);
+      if (store) {
+        const records = DB_CACHE[store.key] && DB_CACHE[store.key].length
+          ? DB_CACHE[store.key]
+          : await _idbGet(store.key);
+        if (records.length > 0) {
+          exportData.stores[storeName] = records;
+          storeCount++;
+          recordCount += records.length;
+        }
+      }
+    }
+    results.push({ name: `${userConf.file}_data.json`, data: exportData, storeCount, recordCount });
+  }
+
+  // ダウンロード
+  for (const f of results) {
+    const blob = new Blob([JSON.stringify(f.data)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = f.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  const summary = results.map(f => `${f.name}（${f.storeCount}店舗・${f.recordCount}件）`).join('\n');
+  showMsg(`✅ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
+  console.log('[export] 書き出し完了:\n' + summary);
 }
 
 function updateDateDots() {
@@ -1561,6 +1650,12 @@ function init() {
 
   buildStoreSelect();
   initTheme();
+
+  // ── 管理者：データ配信ボタンを表示 ──
+  if (USER_ID === 'admin' && USERS_CONFIG.length > 0) {
+    const btn = document.getElementById('exportDataBtn');
+    if (btn) btn.style.display = 'flex';
+  }
 
   // ── USER_LABEL バッジ表示 ──
   if (USER_LABEL) {
@@ -4163,6 +4258,7 @@ async function checkAuth() {
     sessionStorage.setItem(AUTH_KEY, '1');
     document.getElementById('authOverlay').style.display = 'none';
     await initDB();
+    await loadRemoteData();
     init();
   } else {
     const err = document.getElementById('authErr');
@@ -4176,7 +4272,7 @@ async function checkAuth() {
 window.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem(AUTH_KEY) === '1') {
     document.getElementById('authOverlay').style.display = 'none';
-    initDB().then(init).catch(e => { console.error('[initDB]', e); init(); });
+    initDB().then(loadRemoteData).then(init).catch(e => { console.error('[initDB]', e); init(); });
   } else {
     // authOverlayを表示したままにする（init()は呼ばない）
     setTimeout(() => document.getElementById('authInput').focus(), 100);
