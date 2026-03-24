@@ -1089,7 +1089,7 @@ const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX
 // ║  ★ 配布設定 ― この3行だけ編集して各担当者に渡してください ★  ║
 // ╚══════════════════════════════════════════════════════════════╝
 // 見られる店舗名をここに列挙。空 [] なら全店舗OK（管理者用）
-const STORE_WHITELIST = ['メトロガーデン'];          // 例: ['店舗A', '店舗B']
+const STORE_WHITELIST = ["メトロガーデン"];          // 例: ['店舗A', '店舗B']
 // このファイルを使う人の名前（ヘッダーに表示）
 const USER_LABEL = '朝日興業さん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
@@ -1314,8 +1314,28 @@ async function exportUserData() {
   }
 
   const summary = results.map(f => `${f.name}（${f.storeCount}店舗・${f.recordCount}件）`).join('\n');
-  showMsg(`✅ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
   console.log('[export] 書き出し完了:\n' + summary);
+
+  // 未マッチ店舗の警告
+  const unmatched = [];
+  for (const userConf of USERS_CONFIG) {
+    for (const storeName of userConf.stores) {
+      if (!allStores.find(s => s.name === storeName)) {
+        unmatched.push(`${userConf.file}: 「${storeName}」`);
+      }
+    }
+  }
+  if (unmatched.length > 0) {
+    const msg = '⚠️ 以下の店舗がシステム内に見つかりません（Excelが未アップまたはファイル名の店舗名が不一致）:\n\n' + unmatched.join('\n');
+    alert(msg);
+    console.warn('[export] 未マッチ店舗:\n' + unmatched.join('\n'));
+  }
+
+  // 現在登録されている店舗名を一覧表示
+  const storeNames = allStores.map(s => s.name).join('\n');
+  console.log('[export] 現在の登録店舗名一覧:\n' + storeNames);
+
+  showMsg(`✅ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
 }
 
 function updateDateDots() {
