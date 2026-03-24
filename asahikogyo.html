@@ -1639,7 +1639,11 @@ function initTheme() {
 function getStores() {
   try {
     const s = JSON.parse(localStorage.getItem('bi_stores') || 'null');
-    return s && s.length ? s : [DEFAULT_STORE];
+    if (!s || !s.length) return [DEFAULT_STORE];
+    // 旧デフォルト店舗（上田インター）が残っていたら自動除去
+    const cleaned = s.filter(st => st.id !== 'ueda' && st.name !== '100万ドル上田インター');
+    if (cleaned.length !== s.length) saveStores(cleaned.length ? cleaned : [DEFAULT_STORE]);
+    return cleaned.length ? cleaned : [DEFAULT_STORE];
   } catch(e) { return [DEFAULT_STORE]; }
 }
 function saveStores(arr) { localStorage.setItem('bi_stores', JSON.stringify(arr)); }
