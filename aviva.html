@@ -4149,7 +4149,7 @@ function renderDayCharts() {
 
 // ─── 認証 ───
 const PW_HASH = 'bb6e19dc1ff502174e86c7a6706e68bace834694c4cfe31fc4bbc950f168f55a';
-const AUTH_KEY = _NS + 'bi_auth_bearjon';
+const AUTH_KEY = 'bi_auth_bearjon';  // サイト共通（ユーザー別にしない）
 
 async function sha256(str) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
