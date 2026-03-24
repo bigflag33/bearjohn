@@ -1316,24 +1316,25 @@ async function exportUserData() {
   const summary = results.map(f => `${f.name}（${f.storeCount}店舗・${f.recordCount}件）`).join('\n');
   console.log('[export] 書き出し完了:\n' + summary);
 
-  // 未マッチ店舗の警告
+  // 未マッチ店舗の警告＋デバッグログ
   const unmatched = [];
+  console.log('[診断] --- 店舗名マッチング診断 ---');
+  console.log('[診断] システム登録店舗 (normName付き):');
+  allStores.forEach(s => console.log(`  "${s.name}" → norm:"${normName(s.name)}" chars:${debugChars(s.name)}`));
   for (const userConf of USERS_CONFIG) {
     for (const storeName of userConf.stores) {
-      if (!allStores.find(s => normName(s.name) === normName(storeName))) {
+      const matched = allStores.find(s => normName(s.name) === normName(storeName));
+      if (!matched) {
         unmatched.push(`${userConf.file}: 「${storeName}」`);
+        console.warn(`[診断] MISS: ${userConf.file}/"${storeName}" norm:"${normName(storeName)}" chars:${debugChars(storeName)}`);
       }
     }
   }
   if (unmatched.length > 0) {
     const msg = '⚠️ 以下の店舗がシステム内に見つかりません（Excelが未アップまたはファイル名の店舗名が不一致）:\n\n' + unmatched.join('\n');
     alert(msg);
-    console.warn('[export] 未マッチ店舗:\n' + unmatched.join('\n'));
   }
-
-  // 現在登録されている店舗名を一覧表示
-  const storeNames = allStores.map(s => s.name).join('\n');
-  console.log('[export] 現在の登録店舗名一覧:\n' + storeNames);
+  console.log('[診断] --- 診断終了 ---');
 
   showMsg(`✅ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
 }
@@ -1531,14 +1532,17 @@ function detectStoreNameFromFilename(filename) {
   return null;
 }
 
-// 店舗名の正規化（全角→半角、スペース統一）― 比較用のみ、保存名は変えない
+// 店舗名の正規化（全角→半角、スペース統一、不可視文字除去）― 比較用のみ、保存名は変えない
 function normName(s) {
-  return (s || '').trim()
-    .replace(/[　\s]+/g, ' ')
-    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    .replace(/[Ａ-Ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
-    .replace(/[ａ-ｚ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
+  return (s || '')
+    .replace(/[\u0000-\u001F\u007F\u200B\u200C\u200D\uFEFF\u00A0]/g, '') // 不可視・制御文字除去
+    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)) // 全角ASCII→半角(数字・英字・記号まとめて)
+    .replace(/\u3000/g, ' ')  // 全角スペース→半角
+    .replace(/[‐‑‒–—―－]/g, '-') // 各種ダッシュ→ハイフン
+    .replace(/\s+/g, ' ').trim();
 }
+// デバッグ用：文字コードを16進で表示
+function debugChars(s) { return [...(s||'')].map(c=>`${c}(${c.charCodeAt(0).toString(16)})`).join(''); }
 
 // 店舗名から既存店舗を検索 or 新規作成してIDを返す
 function findOrCreateStore(storeName) {
