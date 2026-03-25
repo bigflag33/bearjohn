@@ -1035,6 +1035,17 @@
     <div style="position:relative;height:300px;margin-top:10px;">
       <canvas id="storeCmpChart"></canvas>
     </div>
+
+    <!-- 疑似AI分析 -->
+    <div class="pin-ai-box" id="cmpAIBox" style="margin-top:20px;">
+      <div class="pin-ai-header">
+        <div class="pin-ai-title">🤖 店舗比較AI分析（ルールベース自動生成）</div>
+        <button class="pin-ai-btn" id="cmpAIBtn" onclick="generateStoreCmpAdvice()">✨ 分析する</button>
+      </div>
+      <div class="pin-ai-content" id="cmpAIContent">
+        <span style="color:var(--text2);font-size:12px;">▶ 店舗 A・B を選択後、「分析する」を押すと機種別の比較レポートを自動生成します。</span>
+      </div>
+    </div>
   </div>
 
   <!-- ▼ ピンポイント分析・比較（別ベクトル機能）▼ -->
@@ -5017,6 +5028,12 @@ function renderStoreCmp() {
 
   sumEl.innerHTML = _cmpBuildSummary(nameA, nameB, mapA, mapB);
 
+  // AI エリアをリセット（店舗が変わったら再分析を促す）
+  const aiArea = document.getElementById('cmpAIContent');
+  const aiBtn  = document.getElementById('cmpAIBtn');
+  if (aiArea) aiArea.innerHTML = '<span style="color:var(--text2);font-size:12px;">▶ 「分析する」を押すと機種別の比較レポートを自動生成します。</span>';
+  if (aiBtn)  { aiBtn.disabled = false; aiBtn.innerHTML = '✨ 分析する'; }
+
   const metric = _cmpMetric;
   const isRate = metric === 'rate';
   const unit   = isRate ? '%' : metric === 'inmai' ? '枚' : '円';
@@ -5113,6 +5130,141 @@ function initStoreCmp() {
   buildStoreCmpSelects();
   buildCmpTargetSelect();
   renderStoreCmp();
+}
+
+// ══════════════════════════════════════
+//  店舗比較 疑似AI分析
+// ══════════════════════════════════════
+function generateStoreCmpAdvice() {
+  const btn  = document.getElementById('cmpAIBtn');
+  const area = document.getElementById('cmpAIContent');
+  if (!btn || !area) return;
+
+  const selA = document.getElementById('cmpStoreA');
+  const selB = document.getElementById('cmpStoreB');
+  const keyA = selA?.value, keyB = selB?.value;
+  const stores = getStores();
+  const nameA = stores.find(s => s.key === keyA)?.name || keyA || '店舗A';
+  const nameB = stores.find(s => s.key === keyB)?.name || keyB || '店舗B';
+
+  if (!keyA || !keyB || keyA === keyB) {
+    area.innerHTML = '<span style="color:#ff6b6b;">異なる店舗 A・B を選択してください。</span>';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="ai-spinner"></span> 分析中...';
+  area.innerHTML = '<span class="ai-spinner"></span> データを解析しています...';
+
+  setTimeout(() => {
+    try {
+      area.innerHTML = _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB);
+    } catch(e) {
+      area.innerHTML = '<span style="color:#ff6b6b;">分析エラー: ' + e.message + '</span>';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '🔄 再分析';
+  }, 600);
+}
+
+function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
+  // ─── 機種別集計（全期間、5台以上のみ対象）───
+  const rowsA = DB_CACHE[keyA] || [];
+  const rowsB = DB_CACHE[keyB] || [];
+
+  const aggModel = (rows) => {
+    const m = {};
+    rows.forEach(r => {
+      const k = r['機種名'] || '不明';
+      if (!m[k]) m[k] = { profit:0, sales:0, inmai:0, count:0 };
+      m[k].profit += r['台粗利'] || 0;
+      m[k].sales  += r['台売上'] || 0;
+      m[k].inmai  += r['IN枚数'] || 0;
+      m[k].count  += 1;
+    });
+    return m;
+  };
+
+  const mA = aggModel(rowsA);
+  const mB = aggModel(rowsB);
+
+  // 両店共通 かつ 合計5台以上の機種のみ対象
+  const MIN_COUNT = 5;
+  const common = Object.keys(mA).filter(k =>
+    mB[k] && (mA[k].count + mB[k].count) >= MIN_COUNT
+  );
+
+  if (!common.length) {
+    return '<span style="color:var(--text2);">共通機種が少なすぎるため分析できません（合計5台以上の共通機種が必要です）。</span>';
+  }
+
+  // 各機種の1台平均を計算
+  const perMachine = (d) => ({
+    inmai:  d.count > 0 ? d.inmai  / d.count : 0,
+    profit: d.count > 0 ? d.profit / d.count : 0,
+    rate:   d.sales > 0 ? d.profit / d.sales * 100 : 0,
+    count:  d.count,
+  });
+
+  // diff = A - B (台粗利ベースでランク付け)
+  const diffs = common.map(model => {
+    const pA = perMachine(mA[model]);
+    const pB = perMachine(mB[model]);
+    return {
+      model,
+      inmaiA: pA.inmai,  inmaiB: pB.inmai,  inmaiDiff: pA.inmai  - pB.inmai,
+      profitA: pA.profit, profitB: pB.profit, profitDiff: pA.profit - pB.profit,
+      countA: mA[model].count, countB: mB[model].count,
+    };
+  }).sort((a, b) => b.profitDiff - a.profitDiff);
+
+  const top3   = diffs.slice(0, 3);
+  const worst3 = diffs.slice(-3).reverse();
+
+  // ─── ヘルパー ───
+  const sec = t => `<div class="ai-section-head">${t}</div>`;
+  const row = (icon, txt) => `<div class="ai-row"><span>${icon}</span><span>${txt}</span></div>`;
+  const sgn  = (v, unit) => (v >= 0 ? '<span class="ai-up">+' : '<span class="ai-down">') + Math.round(v).toLocaleString() + unit + '</span>';
+  const sgnF = (v, unit) => (v >= 0 ? '<span class="ai-up">+' : '<span class="ai-down">') + v.toFixed(1) + unit + '</span>';
+  const fmtV = (v, unit) => Math.round(v).toLocaleString() + unit;
+
+  let h = `<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">対象共通機種: ${common.length}機種 ／ 集計期間: 全データ</div>`;
+
+  // ── 全体サマリー（IN枚数・台粗利の平均差）──
+  const allInDiff  = diffs.reduce((s,d) => s + d.inmaiDiff,  0) / diffs.length;
+  const allProfDiff = diffs.reduce((s,d) => s + d.profitDiff, 0) / diffs.length;
+  h += sec('📊 全体概況（共通機種 平均）');
+  h += row('🎰', `1台平均IN枚数の差（A−B）：${sgn(allInDiff,'枚')} — ${nameA}が${allInDiff >= 0 ? '多い' : '少ない'}`);
+  h += row('💰', `台粗利の差（A−B）：${sgn(allProfDiff,'円')} — ${nameA}が${allProfDiff >= 0 ? '稼げている' : '下回っている'}`);
+
+  // ── 上位3機種（A が B より台粗利が高い機種）──
+  h += sec(`🏆 上位3機種 — ${nameA} が有利な機種`);
+  top3.forEach((d, i) => {
+    const medal = ['🥇','🥈','🥉'][i];
+    h += row(medal, `<strong>${d.model}</strong>（A:${d.countA}台 / B:${d.countB}台）`);
+    h += row('  ', `IN枚数 差: ${sgn(d.inmaiDiff,'枚')} &nbsp;|&nbsp; 台粗利 差: ${sgn(d.profitDiff,'円')}`);
+    h += row('  ', `A: <span class="ai-up">${fmtV(d.profitA,'円')}</span> &nbsp;/&nbsp; B: <span class="${d.profitB>=0?'ai-up':'ai-down'}">${fmtV(d.profitB,'円')}</span>`);
+  });
+
+  // ── ワースト3機種（B が A より台粗利が高い機種）──
+  h += sec(`⚠️ ワースト3機種 — ${nameB} が有利な機種`);
+  worst3.forEach((d, i) => {
+    const icon = ['📉','📉','📉'][i];
+    h += row(icon, `<strong>${d.model}</strong>（A:${d.countA}台 / B:${d.countB}台）`);
+    h += row('  ', `IN枚数 差: ${sgn(d.inmaiDiff,'枚')} &nbsp;|&nbsp; 台粗利 差: ${sgn(d.profitDiff,'円')}`);
+    h += row('  ', `A: <span class="${d.profitA>=0?'ai-up':'ai-down'}">${fmtV(d.profitA,'円')}</span> &nbsp;/&nbsp; B: <span class="ai-up">${fmtV(d.profitB,'円')}</span>`);
+  });
+
+  // ── IN枚数 差異が大きい機種TOP3 ──
+  const byInDiff = [...diffs].sort((a,b) => Math.abs(b.inmaiDiff) - Math.abs(a.inmaiDiff)).slice(0, 3);
+  h += sec('🎰 IN枚数 差異が最も大きい機種 TOP3');
+  byInDiff.forEach(d => {
+    const winner = d.inmaiDiff >= 0 ? nameA : nameB;
+    h += row('📌', `<strong>${d.model}</strong>: ${sgn(d.inmaiDiff,'枚')} → ${winner}優位`);
+  });
+
+  h += `<div style="margin-top:14px;font-size:11px;color:var(--text2);">🤖 台粗利・IN枚数は「1台平均値」。設置台数が極端に異なる機種は参考値として扱ってください。</div>`;
+  return h;
 }
 
 </script>
