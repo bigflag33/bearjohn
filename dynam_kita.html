@@ -4955,36 +4955,43 @@ function _cmpBuildSummary(nameA, nameB, mapA, mapB) {
   const metric = _cmpMetric;
   const allDates = [...new Set([...Object.keys(mapA), ...Object.keys(mapB)])].sort();
 
+  // 利益率以外は日次平均、利益率だけは期間合計profit÷期間合計salesで正確に計算
   let totA = 0, totB = 0, cntA = 0, cntB = 0;
+  let sumProfitA = 0, sumSalesA = 0, sumProfitB = 0, sumSalesB = 0;
   allDates.forEach(d => {
     const vA = _cmpVal(mapA[d], metric), vB = _cmpVal(mapB[d], metric);
     if (vA !== null) { totA += vA; cntA++; }
     if (vB !== null) { totB += vB; cntB++; }
+    if (mapA[d]) { sumProfitA += mapA[d].profit; sumSalesA += mapA[d].sales; }
+    if (mapB[d]) { sumProfitB += mapB[d].profit; sumSalesB += mapB[d].sales; }
   });
 
-  const avgA    = cntA ? totA / cntA : 0;
-  const avgB    = cntB ? totB / cntB : 0;
+  const isRate = metric === 'rate';
+  // 利益率は Σ台粗利 ÷ Σ台売上 × 100（台数・日数で重みを正確に反映）
+  const avgA    = isRate ? (sumSalesA > 0 ? sumProfitA / sumSalesA * 100 : 0) : (cntA ? totA / cntA : 0);
+  const avgB    = isRate ? (sumSalesB > 0 ? sumProfitB / sumSalesB * 100 : 0) : (cntB ? totB / cntB : 0);
   const diffAvg = avgA - avgB;
-  const isRate  = metric === 'rate';
   const unit    = isRate ? '%' : metric === 'inmai' ? '枚' : '円';
   const fmt  = v => isRate ? v.toFixed(1) + unit : Math.round(v).toLocaleString() + unit;
   const fmtD = v => (v >= 0 ? '+' : '') + (isRate ? v.toFixed(1) + unit : Math.round(v).toLocaleString() + unit);
+  const subA = isRate ? `期間合計 / ${cntA}日分` : `1日平均 / ${cntA}日分`;
+  const subB = isRate ? `期間合計 / ${cntB}日分` : `1日平均 / ${cntB}日分`;
 
   return `
     <div class="cmp-stat-box box-a">
       <div class="cmp-stat-label">🔵 ${nameA}</div>
       <div class="cmp-stat-val ca">${fmt(avgA)}</div>
-      <div class="cmp-stat-sub">1日平均 / ${cntA}日分</div>
+      <div class="cmp-stat-sub">${subA}</div>
     </div>
     <div class="cmp-stat-box box-b">
       <div class="cmp-stat-label">🟡 ${nameB}</div>
       <div class="cmp-stat-val cb">${fmt(avgB)}</div>
-      <div class="cmp-stat-sub">1日平均 / ${cntB}日分</div>
+      <div class="cmp-stat-sub">${subB}</div>
     </div>
     <div class="cmp-stat-box box-diff">
       <div class="cmp-stat-label">差（A − B）</div>
       <div class="cmp-stat-val cd ${diffAvg < 0 ? 'neg' : ''}">${fmtD(diffAvg)}</div>
-      <div class="cmp-stat-sub">1日平均の差</div>
+      <div class="cmp-stat-sub">${isRate ? '期間利益率の差' : '1日平均の差'}</div>
     </div>`;
 }
 
