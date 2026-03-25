@@ -911,6 +911,16 @@
         <tbody id="calDayBody"></tbody>
       </table>
     </div>
+    <!-- カレンダー月次AIサマリー -->
+    <div class="pin-ai-box" id="calAIBox" style="margin-top:18px;">
+      <div class="pin-ai-header">
+        <div class="pin-ai-title">🤖 月次サマリー（自動分析）</div>
+        <button class="pin-ai-btn" id="calAIBtn" onclick="generateCalMonthAdvice()">✨ この月を分析</button>
+      </div>
+      <div class="pin-ai-content" id="calAIContent">
+        <span style="color:var(--text2);font-size:12px;">▶ 「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>
+      </div>
+    </div>
   </div>
 
   <!-- ▼ ピンポイント分析・比較（別ベクトル機能）▼ -->
@@ -2824,12 +2834,171 @@ function calNavMonth(delta) {
   _calCurrentYM = _calAvailableMonths[newIdx];
   const filteredDates = [...new Set(filtered.map(d => d.date))].sort();
   _renderCalendarMonth(_calCurrentYM, filteredDates);
+  // 月が変わったらAIをリセット
+  const area = document.getElementById('calAIContent');
+  const btn  = document.getElementById('calAIBtn');
+  if (area) area.innerHTML = '<span style="color:var(--text2);font-size:12px;">▶ 「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>';
+  if (btn)  { btn.disabled = false; btn.innerHTML = '✨ この月を分析'; }
 }
 
 function calJumpToMonth(ym) {
   _calCurrentYM = ym;
   const filteredDates = [...new Set(filtered.map(d => d.date))].sort();
   _renderCalendarMonth(ym, filteredDates);
+  // 月が変わったらAIをリセット
+  const area = document.getElementById('calAIContent');
+  const btn  = document.getElementById('calAIBtn');
+  if (area) area.innerHTML = '<span style="color:var(--text2);font-size:12px;">▶ 「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>';
+  if (btn)  { btn.disabled = false; btn.innerHTML = '✨ この月を分析'; }
+}
+
+function generateCalMonthAdvice() {
+  const btn  = document.getElementById('calAIBtn');
+  const area = document.getElementById('calAIContent');
+  if (!_calCurrentYM) { area.innerHTML = '<span style="color:#ff6b6b;">月データが見つかりません。</span>'; return; }
+  btn.disabled = true;
+  btn.innerHTML = '<span class="ai-spinner"></span> 分析中...';
+  area.innerHTML = '<span class="ai-spinner"></span> データを解析しています...';
+  setTimeout(() => {
+    try {
+      area.innerHTML = _buildCalMonthAdviceHTML(_calCurrentYM);
+    } catch(e) {
+      area.innerHTML = '<span style="color:#ff6b6b;">分析中にエラーが発生しました: ' + e.message + '</span>';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '🔄 再分析';
+  }, 700);
+}
+
+function _buildCalMonthAdviceHTML(ym) {
+  const [y, m] = ym.split('-').map(Number);
+  const monthLabel = `${y}年${m}月`;
+  const allData = loadAllData();
+  const monthData = allData.filter(r => r.date.startsWith(ym));
+  if (!monthData.length) return `<span style="color:var(--text2);">${monthLabel}のデータがありません。</span>`;
+
+  // 日別集計
+  const byDate = {};
+  monthData.forEach(r => {
+    if (!byDate[r.date]) byDate[r.date] = { profit:0, sales:0, inmai:0, count:0 };
+    byDate[r.date].profit += r['台粗利']||0;
+    byDate[r.date].sales  += r['台売上']||0;
+    byDate[r.date].inmai  += r['IN枚数']||0;
+    byDate[r.date].count  += 1;
+  });
+  const dayEntries = Object.entries(byDate).sort((a,b)=>a[0].localeCompare(b[0]));
+  const days = dayEntries.length;
+  const totalProfit = dayEntries.reduce((s,[,v])=>s+v.profit,0);
+  const totalSales  = dayEntries.reduce((s,[,v])=>s+v.sales,0);
+  const totalIn     = dayEntries.reduce((s,[,v])=>s+v.inmai,0);
+  const avgProfit   = days > 0 ? totalProfit/days : 0;
+  const avgIn       = monthData.length > 0 ? totalIn/monthData.length : 0;
+  const profitRate  = totalSales > 0 ? totalProfit/totalSales*100 : 0;
+  const DOW = ['日','月','火','水','木','金','土'];
+
+  // 最高・最低・最高アウト・ワーストアウト日
+  const bestDay  = dayEntries.reduce((a,b)=>b[1].profit>a[1].profit?b:a);
+  const hasRedDay = dayEntries.some(([,v])=>v.profit<0);
+  const worstDay = hasRedDay
+    ? dayEntries.filter(([,v])=>v.profit<0).reduce((a,b)=>b[1].profit<a[1].profit?b:a)
+    : dayEntries.reduce((a,b)=>b[1].profit<a[1].profit?b:a);
+  const worstDayLabel = hasRedDay ? '最高赤字日' : '最低粗利日';
+  const bestOut  = dayEntries.reduce((a,b)=>b[1].inmai>a[1].inmai?b:a);
+  const worstOut = dayEntries.reduce((a,b)=>b[1].inmai<a[1].inmai?b:a);
+  const fmtDate  = d => { const dt=new Date(d+'T00:00:00'); return `${dt.getMonth()+1}/${dt.getDate()}(${DOW[dt.getDay()]})`; };
+
+  // 曜日別集計
+  const byDow = {};
+  dayEntries.forEach(([d,v]) => {
+    const dw = new Date(d+'T00:00:00').getDay();
+    if (!byDow[dw]) byDow[dw] = { profit:0, count:0 };
+    byDow[dw].profit += v.profit; byDow[dw].count++;
+  });
+  const dowAvg = Object.entries(byDow).map(([dw,v])=>({ dw:Number(dw), avg: v.profit/v.count, count: v.count }));
+  const bestDow  = dowAvg.length ? dowAvg.reduce((a,b)=>b.avg>a.avg?b:a) : null;
+  const worstDow = dowAvg.length ? dowAvg.reduce((a,b)=>b.avg<a.avg?b:a) : null;
+
+  // 機種別（月間）
+  const byModel = {};
+  monthData.forEach(r => {
+    const k = r['機種名']||'不明';
+    if (!byModel[k]) byModel[k] = { profit:0, inmai:0, count:0 };
+    byModel[k].profit += r['台粗利']||0;
+    byModel[k].inmai  += r['IN枚数']||0;
+    byModel[k].count  ++;
+  });
+  const modelArr = Object.entries(byModel).filter(([,v])=>v.count>=5);
+  const mvpModel  = modelArr.length ? [...modelArr].sort((a,b)=>b[1].profit-a[1].profit)[0] : null;
+  const outModel  = modelArr.length ? [...modelArr].sort((a,b)=>(b[1].inmai/b[1].count)-(a[1].inmai/a[1].count))[0] : null;
+  const lameModel = modelArr.length ? [...modelArr].sort((a,b)=>a[1].profit-b[1].profit)[0] : null;
+
+  // 前月データ
+  const prevYm = m===1 ? `${y-1}-12` : `${y}-${String(m-1).padStart(2,'0')}`;
+  const prevData = allData.filter(r=>r.date.startsWith(prevYm));
+  const prevProfit = prevData.reduce((s,r)=>s+(r['台粗利']||0),0);
+  const prevDays   = [...new Set(prevData.map(r=>r.date))].length;
+  const prevAvg    = prevDays > 0 ? prevProfit/prevDays : null;
+
+  // ── HTML構築 ──
+  const sec = t => `<div class="ai-section-head">${t}</div>`;
+  const row = (icon, txt) => `<div class="ai-row"><span>${icon}</span><span>${txt}</span></div>`;
+  const chip = (txt, cls) => `<span class="ai-chip ${cls}">${txt}</span>`;
+  const clr = v => v>=0?'ai-up':'ai-down';
+  const sgn = v => (v>=0?'+':'')+Math.round(v).toLocaleString();
+
+  let h = '';
+
+  // ① 月全体パフォーマンス
+  h += sec(`📊 ${monthLabel} 全体パフォーマンス（${days}営業日）`);
+  const rateChip = profitRate>=15 ? chip(`利益率${profitRate.toFixed(1)}%`,'ai-chip-green')
+                 : profitRate>=8  ? chip(`利益率${profitRate.toFixed(1)}%`,'ai-chip-yellow')
+                 :                  chip(`利益率${profitRate.toFixed(1)}%`,'ai-chip-red');
+  h += row('💰', `月間推定粗利 <span class="${clr(totalProfit)}">${Math.round(totalProfit).toLocaleString()}円</span> ${rateChip}`);
+  h += row('📈', `1日平均粗利 <span class="${clr(avgProfit)}">${sgn(avgProfit)}円</span>`);
+  h += row('🎰', `月間平均アウト（1台平均） <strong>${Math.round(avgIn).toLocaleString()}枚</strong>`);
+  if (prevAvg !== null && prevDays > 0) {
+    const diff = avgProfit - prevAvg;
+    const pct  = prevAvg !== 0 ? diff/Math.abs(prevAvg)*100 : 0;
+    const comment = pct >= 20 ? '大幅に改善しました！'
+                  : pct >= 5  ? 'ちょっと上がりました'
+                  : pct >= -5 ? 'ほぼ横ばいでした'
+                  : pct >= -20? '微減しました'
+                  : '大幅に減少しました';
+    h += row('🔄', `前月日平均比 <span class="${clr(diff)}">${sgn(diff)}円 (${pct>=0?'+':''}${pct.toFixed(1)}%)</span> <em style="font-size:12px;color:var(--text2);">${comment}</em>`);
+  }
+
+  // ② 日別ハイライト
+  h += sec('🏆 日別ハイライト');
+  h += row('🥇', `最高粗利日： <strong>${fmtDate(bestDay[0])}</strong> <span class="ai-up">${Math.round(bestDay[1].profit).toLocaleString()}円</span>`);
+  h += row('📉', `${worstDayLabel}： <strong>${fmtDate(worstDay[0])}</strong> <span class="${clr(worstDay[1].profit)}">${Math.round(worstDay[1].profit).toLocaleString()}円</span>`);
+  h += row('🎰', `最高アウト日： <strong>${fmtDate(bestOut[0])}</strong> ${Math.round(bestOut[1].inmai).toLocaleString()}枚`);
+  h += row('📉', `ワーストアウト日： <strong>${fmtDate(worstOut[0])}</strong> ${Math.round(worstOut[1].inmai).toLocaleString()}枚`);
+
+  // ③ 曜日傾向
+  if (bestDow && worstDow && bestDow.dw !== worstDow.dw) {
+    h += sec('📅 曜日傾向');
+    h += row('😊', `調子がよい曜日： <strong>${DOW[bestDow.dw]}曜日</strong> 平均 <span class="ai-up">${sgn(bestDow.avg)}円</span>`);
+    h += row('😓', `苦手な曜日： <strong>${DOW[worstDow.dw]}曜日</strong> 平均 <span class="${clr(worstDow.avg)}">${sgn(worstDow.avg)}円</span>`);
+  }
+
+  // ④ 機種ハイライト
+  if (mvpModel || outModel) {
+    h += sec('🎮 機種ハイライト（5台以上）');
+    if (mvpModel) {
+      const avgP = Math.round(mvpModel[1].profit/mvpModel[1].count);
+      h += row('🏆', `月間MVP： <strong>${mvpModel[0]}</strong> 粗利合計 <span class="ai-up">${Math.round(mvpModel[1].profit).toLocaleString()}円</span>（1台平均 ${sgn(avgP)}円）`);
+    }
+    if (outModel && outModel[0] !== (mvpModel&&mvpModel[0])) {
+      const avgO = Math.round(outModel[1].inmai/outModel[1].count);
+      h += row('🎰', `アウトMVP： <strong>${outModel[0]}</strong> 1台平均 ${avgO.toLocaleString()}枚`);
+    }
+    if (lameModel && lameModel[1].profit < 0) {
+      h += row('⚠️', `要注意機種： <strong>${lameModel[0]}</strong> 月間粗利 <span class="ai-down">${Math.round(lameModel[1].profit).toLocaleString()}円</span>`);
+    }
+  }
+
+  h += `<div style="margin-top:14px;font-size:11px;color:var(--text2);">🤖 このサマリーはルールベース自動生成です。実際の判断は現場スタッフの経験と合わせてご活用ください。</div>`;
+  return h;
 }
 
 
