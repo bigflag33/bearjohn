@@ -482,6 +482,25 @@
   }
   .ts-chart-wrap { position: relative; height: 220px; }
 
+  /* ── AI挨拶バー ── */
+  .ai-greeting-bar {
+    background: linear-gradient(90deg, rgba(108,99,255,0.10), rgba(67,233,123,0.07));
+    border: 1px solid rgba(108,99,255,0.22);
+    border-radius: 10px;
+    padding: 8px 16px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    line-height: 1.5;
+  }
+  [data-theme="light"] .ai-greeting-bar {
+    background: linear-gradient(90deg, rgba(91,82,232,0.07), rgba(22,163,74,0.05));
+    border-color: rgba(91,82,232,0.18);
+  }
+
 </style>
 </head>
 <body>
@@ -563,6 +582,8 @@
     <button class="filter-btn" onclick="applyFilter()">適用</button>
     <button class="filter-btn reset" onclick="resetFilter()">リセット</button>
   </div>
+
+  <div id="aiGreetingBar" class="ai-greeting-bar" style="display:none;"></div>
 
   <div id="dateDots" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center;">
     <span style="font-size:11px;color:var(--text2);font-weight:600;margin-right:4px;">読込済み日付:</span>
@@ -1116,7 +1137,7 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'minami_ent',    label: 'ミナミ・エンタープライズさん専用', stores: ['マルハン石岡','KING BOSS 1000','スーパーBOSS','ニラク福島瀬上','ZENT海道'] },
   { file: 'kitakami',      label: '北上文化さん専用',          stores: [] },
   { file: 'mid_japan',     label: 'エム・アイ・ディ ジャパンさん専用', stores: ['GRAND DAMZ竹尾インター本店','GRAND DAMZ小新店','ダイナム糸魚川',"Super D'STATION上越"] },
-  { file: 'nakahara',      label: '中原商事さん専用',          stores: [] },
+  { file: 'nakahara',      label: '中原商事さん専用',          stores: ['ニラク福島瀬上'] },
   { file: 'marusan',       label: '丸三さん専用',              stores: ['ジャンボマックス777出雲'] },
   { file: 'dynam_kita',    label: 'ダイナム北さん専用',        stores: ['WINS北上ライト館','パチンコ22花巻南','ベガスベガス函館昭和','ベガスベガス函館港','ベガスベガス函館吉川','函館ひまわり'] },
   { file: 'dynam_higashi', label: 'ダイナム東さん専用',        stores: ["D'STATION上田店",'100万ドル上田インター'] },
@@ -1654,6 +1675,150 @@ async function handleUpload(event) {
   }
 }
 
+function renderAIGreeting() {
+  const el = document.getElementById('aiGreetingBar');
+  if (!el) return;
+
+  // ── 挨拶 ──
+  const now = new Date();
+  const h = now.getHours();
+  const greeting = h < 11 ? 'おはようございます' : h < 17 ? 'こんにちは' : 'こんばんは';
+
+  // ── カレンダーイベント ──
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dd0 = String(now.getDate()).padStart(2,'0');
+  const todayKey = `${mm}/${dd0}`;
+  const CALENDAR = {
+    '01/01':'元旦おめでとうございます🎍','01/07':'七草の日🌿','01/11':'鏡開きの日',
+    '02/03':'節分の日👹','02/14':'バレンタインデー🍫','02/22':'猫の日🐱',
+    '03/03':'ひな祭り🎎','03/14':'ホワイトデー🍬',
+    '04/01':'エイプリルフール🤡',
+    '05/05':'こどもの日🎏',
+    '07/07':'七夕ですね⭐',
+    '08/11':'山の日','08/13':'お盆シーズン入りです',
+    '09/09':'重陽の節句',
+    '10/31':'ハロウィン🎃',
+    '11/03':'文化の日','11/15':'七五三👘','11/23':'勤労感謝の日',
+    '12/24':'クリスマスイブ🎄','12/25':'メリークリスマス🎄🎅','12/31':'大晦日です🎆',
+  };
+  const SEASONAL = [null,
+    ['新年の幕開けです','寒さが続きますがお体に気をつけて'],
+    ['立春が過ぎ、春の気配も感じられます','まだまだ寒い日が続きますね'],
+    ['春の訪れを感じる季節ですね🌸','卒業・異動シーズン、何かと慌ただしい時期です'],
+    ['桜の季節ですね🌸','新年度スタートです、気持ち新たに'],
+    ['ゴールデンウィーク時期、お客様の入りはいかがでしょう','気持ちのいい季節になりました'],
+    ['梅雨入りの季節ですね☔','じめじめした日が続きますが頑張りましょう'],
+    ['夏本番ですね☀️','暑い日が続いています、水分補給を忘れずに'],
+    ['お盆シーズン、賑わいが期待できます','厳しい暑さが続いていますね'],
+    ['秋の気配が漂ってきました🍂','残暑もそろそろ落ち着いてきますね'],
+    ['秋が深まってきました🍁','ハロウィンシーズン、にぎやかですね'],
+    ['紅葉シーズンですね🍂','冬の足音が近づいてきました'],
+    ['師走ですね、年の瀬が迫ってきました','クリスマスシーズン真っ盛りです🎄'],
+  ];
+  const calEvent = CALENDAR[todayKey];
+  const seasonal = SEASONAL[now.getMonth()+1] || [];
+  const contextMsg = calEvent
+    ? `今日は${calEvent}`
+    : (seasonal.length ? seasonal[Math.floor(Math.random()*seasonal.length)] : '');
+
+  // ── データインサイト ──
+  const allStores = getStores();
+  const allRecords = [];
+  allStores.forEach(s => { (DB_CACHE[s.key]||[]).forEach(r => allRecords.push({...r, _sn: s.name})); });
+
+  let insightHtml = '';
+  if (allRecords.length) {
+    const allDates = [...new Set(allRecords.map(d => d.date))].sort();
+    const latestDate = allDates[allDates.length - 1];
+    const latestRecs = allRecords.filter(r => r.date === latestDate);
+    const dd2 = new Date(latestDate + 'T00:00:00');
+    const dow2 = ['日','月','火','水','木','金','土'][dd2.getDay()];
+    const dateLabel = `${dd2.getMonth()+1}/${dd2.getDate()}(${dow2})`;
+
+    const insights = [];
+    const thisMonth = latestDate.slice(0,7);
+    const monthRecs = allRecords.filter(r => r.date.startsWith(thisMonth));
+
+    // ── 今月 日別粗利ランク ──
+    const byDateProfit = {}, byDateOut = {};
+    monthRecs.forEach(r => {
+      byDateProfit[r.date] = (byDateProfit[r.date]||0) + (r['台粗利']||0);
+      byDateOut[r.date]    = (byDateOut[r.date]||0)    + (r['IN枚数']||0);
+    });
+    const rankedP = Object.entries(byDateProfit).sort((a,b)=>b[1]-a[1]);
+    const rankedO = Object.entries(byDateOut).sort((a,b)=>b[1]-a[1]);
+    const totalDays = rankedP.length;
+    const profitRank = rankedP.findIndex(([d])=>d===latestDate)+1;
+    const outRank    = rankedO.findIndex(([d])=>d===latestDate)+1;
+    if (profitRank && totalDays > 1) {
+      const m = profitRank===1?'🥇':profitRank===2?'🥈':profitRank===3?'🥉':'';
+      insights.push(`${dateLabel}は今月${totalDays}日中 粗利<strong>${profitRank}位</strong>の成績でした ${m}`);
+    }
+    if (outRank && totalDays > 1) {
+      const m = outRank===1?'🥇':outRank===2?'🥈':outRank===3?'🥉':'';
+      insights.push(`${dateLabel}は今月${totalDays}日中 アウト<strong>${outRank}位</strong>の賑わいでした ${m}`);
+    }
+
+    // ── 店舗別コメント（赤字／薄利／抜く） ──
+    const byStore = {};
+    latestRecs.forEach(r => {
+      const sn = r._sn||'不明';
+      if (!byStore[sn]) byStore[sn] = {profit:0, sales:0};
+      byStore[sn].profit += r['台粗利']||0;
+      byStore[sn].sales  += r['台売上']||0;
+    });
+    const storeArr = Object.entries(byStore).filter(([,v])=>v.sales>0);
+    const multiStore = storeArr.length > 1;
+    storeArr.forEach(([name, v]) => {
+      const rate = v.profit / v.sales * 100;
+      const who = multiStore ? `<strong>${name}</strong>` : '昨日';
+      if (v.profit < 0) {
+        insights.push(`${dateLabel}の${who}は赤字でした 😔`);
+      } else if (rate < 8) {
+        insights.push(`${dateLabel}の${who}はちょっと薄利営業でした（利益率 ${rate.toFixed(1)}%）`);
+      } else if (rate >= 15) {
+        insights.push(`${dateLabel}の${who}は抜きましたね💪（利益率 ${rate.toFixed(1)}%）`);
+      }
+    });
+
+    // ── 機種別（5台以上・バラエティ除外） ──
+    const MIN_U = 5;
+    const byModel = {};
+    latestRecs.forEach(r => {
+      const m = r['機種名']||''; if (!m) return;
+      if (!byModel[m]) byModel[m] = {profit:0, inCount:0, count:0};
+      byModel[m].profit  += r['台粗利']||0;
+      byModel[m].inCount += r['IN枚数']||0;
+      byModel[m].count++;
+    });
+    const validModels = Object.entries(byModel).filter(([,v])=>v.count>=MIN_U);
+
+    // 粗利TOP機種
+    const profitTopM = [...validModels].sort((a,b)=>(b[1].profit/b[1].count)-(a[1].profit/a[1].count));
+    if (profitTopM.length) {
+      const [name, v] = profitTopM[0];
+      const avgP = Math.round(v.profit/v.count);
+      insights.push(`${dateLabel}は<strong>${name}</strong>が活躍しました（1台平均 ${(avgP>=0?'+':'')}${avgP.toLocaleString()}円）`);
+    }
+
+    // アウトTOP機種
+    const outTopM = [...validModels].sort((a,b)=>(b[1].inCount/b[1].count)-(a[1].inCount/a[1].count));
+    if (outTopM.length) {
+      const [name, v] = outTopM[0];
+      const avgOut = Math.round(v.inCount/v.count);
+      insights.push(`${dateLabel}のアウトトップは<strong>${name}</strong>でした（1台平均 ${avgOut.toLocaleString()}枚）`);
+    }
+
+    if (insights.length) {
+      insightHtml = ' <span style="color:var(--text2);">｜</span> ' + insights[Math.floor(Math.random()*insights.length)];
+    }
+  }
+
+  if (!contextMsg && !insightHtml) { el.style.display='none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = `<span style="font-size:15px;flex-shrink:0;">🐻</span><span><strong>${greeting}！</strong>${contextMsg}${insightHtml}</span>`;
+}
+
 function reloadAll() {
   const all = loadAllData();
   filtered = [...all];
@@ -1669,6 +1834,7 @@ function reloadAll() {
     document.getElementById('dateTo').value = allDates[allDates.length-1];
   }
   document.getElementById('dataRange').textContent = `データ期間: ${allDates[0]} 〜 ${allDates[allDates.length-1]}`;
+  renderAIGreeting();
   applyFilter();
 }
 
