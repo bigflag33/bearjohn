@@ -678,7 +678,7 @@
     <div class="dow-title">
       <div class="dot" style="background:var(--accent4)"></div>
       曜日分析
-      <span class="dow-sub">※日数が少ない曜日は参考値</span>
+      <span class="dow-sub">※日数が少ない曜日は参考値　<span style="color:var(--accent);font-weight:600;">曜日をクリックすると詳細データが出ます</span></span>
     </div>
 
     <!-- 曜日サマリーバッジ -->
@@ -758,7 +758,7 @@
     <div class="dow-title">
       <div class="dot" style="background:#a78bfa"></div>
       特定日分析（日の末尾数字別）
-      <span class="dow-sub">※末尾0=10・20・30日　末尾1=1・11・21・31日　など</span>
+      <span class="dow-sub">※末尾0=10・20・30日　末尾1=1・11・21・31日　など　<span style="color:var(--accent);font-weight:600;">特定日をクリックすると詳細データが出ます</span></span>
     </div>
     <div class="dow-badges digit-badges" id="digitBadges"></div>
     <!-- 特定日詳細パネル（クリック時表示） -->
@@ -943,7 +943,10 @@
         </div>
         <div class="pin-kpi">
           <div class="pin-kpi-label">推定粗利<span id="pin-profit-weather" style="font-size:18px;margin-left:6px;" title="当月平均比"></span></div>
-          <div class="pin-kpi-val" id="pin-profit">-</div>
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+            <div class="pin-kpi-val" id="pin-profit">-</div>
+            <div id="pin-profit-rate" style="font-size:12px;font-weight:700;color:var(--text2);"></div>
+          </div>
           <div class="pin-badges" id="pin-profit-badges"></div>
         </div>
         <div class="pin-kpi">
@@ -3081,6 +3084,60 @@ let pinBarChart, pinRadarChart, pinTrendChart;
 
 // ─── ピンポイント機種別内訳 ビュー切り替え ───
 let _pinModelRows = [];
+let _pinModelSort = { key: 'inmai', dir: -1 }; // 初期ソート: IN枚数降順
+
+function renderPinModelTable(rows) {
+  if (!rows || !rows.length) return;
+  const { key, dir } = _pinModelSort;
+  const sorted = [...rows].sort((a, b) => {
+    const av = a[key] ?? 0, bv = b[key] ?? 0;
+    return typeof av === 'string' ? av.localeCompare(bv) * dir : (bv - av) * -dir;
+  });
+  const thBase = 'padding:7px 10px;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;';
+  const thS  = k => `style="${thBase}text-align:right;${_pinModelSort.key===k?'color:var(--accent);':''}" onclick="sortPinModel('${k}')"`;
+  const thSL = k => `style="${thBase}text-align:left;${_pinModelSort.key===k?'color:var(--accent);':''}" onclick="sortPinModel('${k}')"`;
+  const arrow = k => _pinModelSort.key===k ? (_pinModelSort.dir===-1?' ▼':' ▲') : '';
+  const tdS  = (extra='') => `style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;${extra}"`;
+  const tdSL = `style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:600;"`;
+
+  document.getElementById('pinModelHead').innerHTML = `<tr>
+    <th ${thSL('name')}>機種名${arrow('name')}</th>
+    <th ${thS('count')}>稼働台数${arrow('count')}</th>
+    <th ${thS('avgIn')}>1台平均IN${arrow('avgIn')}</th>
+    <th ${thS('inmai')}>IN枚数合計${arrow('inmai')}</th>
+    <th ${thS('sales')}>推定売上合計${arrow('sales')}</th>
+    <th ${thS('profit')}>推定粗利合計${arrow('profit')}</th>
+    <th ${thS('avgProfit')}>台粗利${arrow('avgProfit')}</th>
+    <th ${thS('profitRate')}>利益率${arrow('profitRate')}</th>
+  </tr>`;
+
+  document.getElementById('pinModelBody').innerHTML = sorted.map(r => {
+    const rateStr = r.profitRate != null ? r.profitRate.toFixed(1) + '%' : '-';
+    const rateCol = r.profitRate != null ? (r.profitRate >= 15 ? 'var(--green)' : r.profitRate >= 0 ? 'var(--text2)' : 'var(--red)') : 'var(--text2)';
+    const profCol = r.profit >= 0 ? 'var(--green)' : 'var(--red)';
+    const avgPCol = r.avgProfit >= 0 ? 'var(--green)' : 'var(--red)';
+    const avgPStr = (r.avgProfit >= 0 ? '+' : '') + r.avgProfit.toLocaleString() + '円';
+    return `<tr>
+      <td ${tdSL}>${r.name}</td>
+      <td ${tdS()}>${r.count}台</td>
+      <td ${tdS('color:var(--accent4);')}>${r.avgIn.toLocaleString()}</td>
+      <td ${tdS('color:var(--accent4);')}>${r.inmai.toLocaleString()}</td>
+      <td ${tdS()}>${r.sales.toLocaleString()}円</td>
+      <td ${tdS('color:' + profCol + ';')}>${r.profit.toLocaleString()}円</td>
+      <td ${tdS('color:' + avgPCol + ';font-weight:700;')}>${avgPStr}</td>
+      <td ${tdS('color:' + rateCol + ';')}>${rateStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+function sortPinModel(key) {
+  if (_pinModelSort.key === key) {
+    _pinModelSort.dir *= -1;
+  } else {
+    _pinModelSort = { key, dir: -1 };
+  }
+  renderPinModelTable(_pinModelRows);
+}
 
 function setPinModelView(mode) {
   document.getElementById('pinModelTableView').style.display = mode === 'table' ? '' : 'none';
@@ -3088,6 +3145,7 @@ function setPinModelView(mode) {
   document.getElementById('pinModelBtnTable').classList.toggle('active', mode === 'table');
   document.getElementById('pinModelBtnChart').classList.toggle('active', mode === 'chart');
   if (mode === 'chart' && _pinModelRows.length) renderPinModelCharts(_pinModelRows);
+  if (mode === 'table' && _pinModelRows.length) renderPinModelTable(_pinModelRows);
 }
 
 function renderPinModelCharts(rows) {
@@ -3270,6 +3328,15 @@ function runPinpoint() {
   setKPI('pin-sales',  'pin-sales-badges',  curr.sales,  '円', curr.sales);
   setKPI('pin-profit', 'pin-profit-badges', curr.profit, '円', curr.profit);
   setKPI('pin-count',  'pin-count-badges',  curr.count,  '台', curr.count);
+  // 利益率
+  const rateEl = document.getElementById('pin-profit-rate');
+  if (rateEl) {
+    if (curr.sales > 0) {
+      const rate = curr.profit / curr.sales * 100;
+      rateEl.textContent = `利益率 ${rate.toFixed(1)}%`;
+      rateEl.style.color = rate >= 15 ? 'var(--green)' : rate >= 8 ? 'var(--text2)' : 'var(--red)';
+    } else { rateEl.textContent = ''; }
+  }
 
   // グラフ用データ
   const gridColor  = getComputedStyle(document.documentElement).getPropertyValue('--border').trim()  || '#2d3154';
@@ -3460,41 +3527,12 @@ function runPinpoint() {
     }))
     .sort((a, b) => b.inmai - a.inmai);
 
-  const thS = 'style="padding:7px 10px;text-align:right;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;"';
-  const thSL = 'style="padding:7px 10px;text-align:left;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border);white-space:nowrap;"';
-  const tdS  = (extra='') => `style="padding:6px 10px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;${extra}"`;
-  const tdSL = `style="padding:6px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;font-weight:600;"`;
+  // avgProfit（台粗利）をrowsに追加
+  modelRows.forEach(r => { r.avgProfit = r.count > 0 ? Math.round(r.profit / r.count) : 0; });
 
-  document.getElementById('pinModelHead').innerHTML = `<tr>
-    <th ${thSL}>機種名</th>
-    <th ${thS}>稼働台数</th>
-    <th ${thS}>1台平均IN</th>
-    <th ${thS}>IN枚数合計</th>
-    <th ${thS}>推定売上合計</th>
-    <th ${thS}>推定粗利合計</th>
-    <th ${thS}>利益率</th>
-    <th ${thS}>差枚合計</th>
-  </tr>`;
-
-  document.getElementById('pinModelBody').innerHTML = modelRows.map(r => {
-    const rateStr  = r.profitRate != null ? r.profitRate.toFixed(1) + '%' : '-';
-    const rateCol  = r.profitRate != null && r.profitRate >= 0 ? 'var(--green)' : 'var(--red)';
-    const profCol  = r.profit >= 0 ? 'var(--green)' : 'var(--red)';
-    const diffCol  = r.diff   >= 0 ? 'var(--green)' : 'var(--red)';
-    return `<tr>
-      <td ${tdSL}>${r.name}</td>
-      <td ${tdS()}>${r.count}台</td>
-      <td ${tdS('color:var(--accent4);')}>${r.avgIn.toLocaleString()}</td>
-      <td ${tdS('color:var(--accent4);')}>${r.inmai.toLocaleString()}</td>
-      <td ${tdS()}>${r.sales.toLocaleString()}円</td>
-      <td ${tdS('color:' + profCol + ';')}>${r.profit.toLocaleString()}円</td>
-      <td ${tdS('color:' + rateCol + ';')}>${rateStr}</td>
-      <td ${tdS('color:' + diffCol + ';')}>${r.diff.toLocaleString()}</td>
-    </tr>`;
-  }).join('');
-
-  // 機種別グラフ用データ保存 → グラフ描画
+  // 機種別グラフ用データ保存 → テーブル＆グラフ描画
   _pinModelRows = modelRows;
+  renderPinModelTable(modelRows);
   setPinModelView('chart'); // デフォルトグラフ表示
 
   // AIアドバイス用にデータを保存、パネルをリセット
