@@ -695,7 +695,7 @@
       <div class="chart-wrapper"><canvas id="modelProfitChart"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title"><div class="dot" style="background:var(--accent4)"></div>機種別 IN枚数 TOP15</div>
+      <div class="chart-title"><div class="dot" style="background:var(--accent4)"></div><span class="in-label" data-s="機種別 IN枚数 TOP15" data-p="機種別 アウト TOP15">機種別 IN枚数 TOP15</span></div>
       <div class="chart-wrapper"><canvas id="modelINChart"></canvas></div>
     </div>
   </div>
@@ -732,7 +732,7 @@
           <div style="position:relative;height:180px;"><canvas id="dayRateChart2"></canvas></div>
         </div>
         <div class="day-chart-box">
-          <div class="day-chart-label">1台平均IN枚数</div>
+          <div class="day-chart-label in-label" data-s="1台平均IN枚数" data-p="1台平均アウト">1台平均IN枚数</div>
           <div style="position:relative;height:180px;"><canvas id="dayINChart2"></canvas></div>
         </div>
       </div>
@@ -780,7 +780,7 @@
       <div id="dowDetailChartView" style="display:none;">
         <div class="model-charts-grid">
           <div class="model-chart-box">
-            <div class="model-chart-label">1台平均IN枚数</div>
+            <div class="model-chart-label in-label" data-s="1台平均IN枚数" data-p="1台平均アウト">1台平均IN枚数</div>
             <div class="model-chart-scroll" id="dowDetailINWrap"><canvas id="dowDetailINChart"></canvas></div>
           </div>
           <div class="model-chart-box">
@@ -806,7 +806,7 @@
         <div class="dow-chart-wrap"><canvas id="dowProfitChart"></canvas></div>
       </div>
       <div class="dow-chart-box">
-        <div class="dow-chart-label">曜日別 1台平均IN枚数</div>
+        <div class="dow-chart-label in-label" data-s="曜日別 1台平均IN枚数" data-p="曜日別 1台平均アウト">曜日別 1台平均IN枚数</div>
         <div class="dow-chart-wrap"><canvas id="dowINChart"></canvas></div>
       </div>
       <div class="dow-chart-box">
@@ -858,7 +858,7 @@
       <div id="digitDetailChartView" style="display:none;">
         <div class="model-charts-grid">
           <div class="model-chart-box">
-            <div class="model-chart-label">1台平均IN枚数</div>
+            <div class="model-chart-label in-label" data-s="1台平均IN枚数" data-p="1台平均アウト">1台平均IN枚数</div>
             <div class="model-chart-scroll" id="digitDetailINWrap"><canvas id="digitDetailINChart"></canvas></div>
           </div>
           <div class="model-chart-box">
@@ -882,7 +882,7 @@
         <div class="dow-chart-wrap"><canvas id="digitProfitChart"></canvas></div>
       </div>
       <div class="dow-chart-box">
-        <div class="dow-chart-label">末尾数字別 1台平均IN枚数</div>
+        <div class="dow-chart-label in-label" data-s="末尾数字別 1台平均IN枚数" data-p="末尾数字別 1台平均アウト">末尾数字別 1台平均IN枚数</div>
         <div class="dow-chart-wrap"><canvas id="digitINChart"></canvas></div>
       </div>
       <div class="dow-chart-box">
@@ -922,7 +922,7 @@
     <div id="modelAggChartView" style="display:none;">
       <div class="model-charts-grid">
         <div class="model-chart-box">
-          <div class="model-chart-label">📊 1台平均IN枚数（枚/台）</div>
+          <div class="model-chart-label in-label" data-s="📊 1台平均IN枚数（枚/台）" data-p="📊 1台平均アウト（発/台）">📊 1台平均IN枚数（枚/台）</div>
           <div class="model-chart-scroll" id="modelAggINWrap"><canvas id="modelAggINChart"></canvas></div>
         </div>
         <div class="model-chart-box">
@@ -1142,7 +1142,7 @@
         <div id="pinModelChartView">
           <div class="model-charts-grid">
             <div class="model-chart-box">
-              <div class="model-chart-label">📊 1台平均IN枚数（稼働）</div>
+              <div class="model-chart-label in-label" data-s="📊 1台平均IN枚数（稼働）" data-p="📊 1台平均アウト（稼働）">📊 1台平均IN枚数（稼働）</div>
               <div class="model-chart-scroll" id="pinMcINWrap"><canvas id="pinMcINChart"></canvas></div>
             </div>
             <div class="model-chart-box">
@@ -2174,13 +2174,19 @@ function _isPachinkoStore(store) {
 
 // IN枚数 or アウト のどちらのラベルを使うか返す
 function _inLabel(short) {
-  if (_isPachinkoStore()) return short ? 'アウト' : 'アウト';
+  if (_isPachinkoStore()) return 'アウト';
   return short ? 'IN枚数' : 'IN枚数（アウト）';
 }
+// 枚 or 発 の単位を返す（アウト値の表示単位）
+function _inUnit() { return _isPachinkoStore() ? '発' : '枚'; }
+// アウト/IN枚数 値を適切な単位でフォーマット
+function _fmtInVal(v) { return Math.round(v).toLocaleString() + _inUnit(); }
 
 // パチンコ/スロットに応じてUIラベルを一括更新
 function _refreshInLabels() {
   const isPachi = _isPachinkoStore();
+  const unit    = isPachi ? '発' : '枚';
+
   // メトリクスセレクトのIN枚数オプション
   const metSel = document.getElementById('metricFilter');
   if (metSel) {
@@ -2188,13 +2194,21 @@ function _refreshInLabels() {
       if (opt.value === 'IN枚数') opt.textContent = isPachi ? 'アウト' : 'IN枚数（アウト）';
     }
   }
-  // KPIラベル
+  // data-in-label 属性を持つ要素（KPIラベル等）
   document.querySelectorAll('[data-in-label]').forEach(el => {
     el.textContent = isPachi ? el.dataset.inLabelP || 'アウト' : el.dataset.inLabel || 'IN枚数（アウト）';
   });
-  // チャートタイトルなどテキストノードを持つ要素（class="in-label"）
+  // class="in-label" を持つ要素（静的HTMLラベル）
   document.querySelectorAll('.in-label').forEach(el => {
     el.textContent = isPachi ? (el.dataset.p || 'アウト') : (el.dataset.s || 'IN枚数');
+  });
+  // 特定IDの要素を直接書き換え
+  const idMap = {
+    'modelINChartTitle':   isPachi ? '機種別 アウト TOP15'              : '機種別 IN枚数 TOP15',
+    'cmpBtnIn':            isPachi ? '1台平均アウト'                     : '1台平均IN枚数',
+  };
+  Object.entries(idMap).forEach(([id, text]) => {
+    const el = document.getElementById(id); if (el) el.textContent = text;
   });
 }
 
@@ -2209,7 +2223,10 @@ function switchStore(id) {
 function openStoreModal() {
   const inp = document.getElementById('storeNameInput');
   const sel = document.getElementById('storeNameSelect');
-  document.getElementById('storeDelBtn').style.display = 'none';
+  // デフォルト店舗以外が選択中なら削除ボタンを表示
+  const activeId = getActiveStoreId();
+  document.getElementById('storeDelBtn').style.display =
+    (activeId && activeId !== DEFAULT_STORE.id) ? 'inline-block' : 'none';
 
   if (STORE_WHITELIST.length > 0) {
     // ホワイトリストあり → ドロップダウン表示
@@ -2449,11 +2466,11 @@ function runDateComparison() {
 
   // ── サマリーカード ──
   const fmtV = (v, unit) => v == null ? 'データなし'
-    : unit === '円' ? Math.round(v).toLocaleString()+'円' : Math.round(v).toLocaleString()+'枚/台';
+    : unit === '円' ? Math.round(v).toLocaleString()+'円' : Math.round(v).toLocaleString()+_inUnit()+'/台';
   const metrics = [
     { key:'sales',  label:'推定売上',     unit:'円', icon:'💰', color:'#60a5fa' },
     { key:'profit', label:'推定粗利',     unit:'円', icon:'📈', color:'#34d399' },
-    { key:'inmai',  label:'1台平均IN枚数', unit:'枚', icon:'🎰', color:'#f7971e' },
+    { key:'inmai',  label:'1台平均'+_inLabel(true), unit:_inUnit(), icon:'🎰', color:'#f7971e' },
   ];
   const days_suffix = n => n > 1 ? `（${n}日平均）` : '';
   document.getElementById('dcSummaryGrid').innerHTML = metrics.map(m => {
@@ -2527,7 +2544,7 @@ function renderDcTable({ models }) {
     { key:'name',        label:'機種名',    diff:false, ratio:false },
     { key:'countDiff',   label:'台数差',    diff:true,  ratio:false, ratioKey:'countRatio',  unit:'台' },
     { key:'countRatio',  label:'台数比%',   diff:false, ratio:true  },
-    { key:'inmaiDiff',   label:'アウト差',  diff:true,  ratio:false, ratioKey:'inmaiRatio',  unit:'枚' },
+    { key:'inmaiDiff',   label:'アウト差',  diff:true,  ratio:false, ratioKey:'inmaiRatio',  unit:_inUnit() },
     { key:'inmaiRatio',  label:'アウト比%', diff:false, ratio:true  },
     { key:'salesDiff',   label:'売上差',    diff:true,  ratio:false, ratioKey:'salesRatio',  unit:'円' },
     { key:'salesRatio',  label:'売上比%',   diff:false, ratio:true  },
@@ -2557,7 +2574,7 @@ function renderDcTable({ models }) {
   const fmtDiff = (v, unit) => {
     if (v == null) return '-';
     const sign = v >= 0 ? '+' : '';
-    const fmt  = unit === '円' ? Math.round(v).toLocaleString()+'円' : unit === '台' ? Math.round(v).toLocaleString()+'台' : Math.round(v).toLocaleString()+'枚';
+    const fmt  = unit === '円' ? Math.round(v).toLocaleString()+'円' : unit === '台' ? Math.round(v).toLocaleString()+'台' : Math.round(v).toLocaleString()+unit;
     return sign + fmt;
   };
   const fmtRatio = (v) => v == null ? '-' : v.toFixed(1) + '%';
@@ -2568,7 +2585,7 @@ function renderDcTable({ models }) {
     ${tdL(m.name)}
     ${tdR(fmtDiff(m.countDiff,'台'),  ds(m.countDiff))}
     ${tdR(fmtRatio(m.countRatio),     rs(m.countRatio))}
-    ${tdR(fmtDiff(m.inmaiDiff,'枚'),  ds(m.inmaiDiff))}
+    ${tdR(fmtDiff(m.inmaiDiff,_inUnit()),  ds(m.inmaiDiff))}
     ${tdR(fmtRatio(m.inmaiRatio),     rs(m.inmaiRatio))}
     ${tdR(fmtDiff(m.salesDiff,'円'),  ds(m.salesDiff))}
     ${tdR(fmtRatio(m.salesRatio),     rs(m.salesRatio))}
@@ -2583,7 +2600,7 @@ function renderDcChart() {
   const metaMap = {
     salesDiff:  { label:'売上差(円)',    fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+'円' },
     profitDiff: { label:'粗利差(円)',    fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+'円' },
-    inmaiDiff:  { label:'アウト差(枚)',  fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+'枚' },
+    inmaiDiff:  { label:'アウト差('+_inUnit()+')',  fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+_inUnit() },
     countDiff:  { label:'台数差',       fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+'台' },
   };
   const meta = metaMap[_dcChartMetric] || metaMap.salesDiff;
@@ -2817,7 +2834,7 @@ function renderCharts() {
     type: 'bar',
     data: {
       labels: top15in.map(d => d[0].replace(/^[LS]B?/,'')),
-      datasets: [{ label: 'IN枚数', data: top15in.map(d => Math.round(d[1].inmai)),
+      datasets: [{ label: _inLabel(true), data: top15in.map(d => Math.round(d[1].inmai)),
         backgroundColor: 'rgba(247,151,30,0.7)', borderRadius: 4 }]
     },
     options: { indexAxis:'y', responsive:true, maintainAspectRatio:false,
@@ -2931,7 +2948,7 @@ function _renderCalendarMonth(ym, filteredDates) {
         <div class="cal-date" style="color:${dayColor}">${cur.getDate()}日</div>
         <div class="cal-metric">粗利 <span class="${profitColor}">${Math.round(metric.profit).toLocaleString()}円</span></div>
         <div class="cal-metric">売上 <span>${Math.round(metric.sales).toLocaleString()}円</span></div>
-        <div class="cal-metric">1台平均IN <span class="yellow">${Math.round(metric.inmai/(metric.count||1)).toLocaleString()}</span></div>
+        <div class="cal-metric">${'1台平均'+_inLabel(true)} <span class="yellow">${_fmtInVal(metric.inmai/(metric.count||1))}</span></div>
         <div class="cal-metric">利益率 <span class="${rateColor}">${profitRate}%</span></div>
       `;
     } else {
@@ -2974,7 +2991,7 @@ function _renderCalendarMonth(ym, filteredDates) {
         datasets: [
           { label: '推定粗利', data: profits, backgroundColor: profits.map(v => v >= 0 ? 'rgba(67,233,123,0.7)' : 'rgba(255,77,109,0.7)'), borderRadius: 3, yAxisID: 'yYen' },
           { label: '推定売上', data: sales, backgroundColor: 'rgba(96,165,250,0.4)', borderRadius: 3, yAxisID: 'yYen' },
-          { label: '1台平均IN', data: avgIn, type: 'line', borderColor: '#f7971e', backgroundColor: 'transparent', pointRadius: 3, tension: 0.3, yAxisID: 'yIn' }
+          { label: '1台平均'+_inLabel(true), data: avgIn, type: 'line', borderColor: '#f7971e', backgroundColor: 'transparent', pointRadius: 3, tension: 0.3, yAxisID: 'yIn' }
         ]
       },
       options: {
@@ -2983,7 +3000,7 @@ function _renderCalendarMonth(ym, filteredDates) {
         scales: {
           x: { ticks: { color: tc.tick, font: { size: 9 }, maxRotation: 45 }, grid: { color: tc.grid } },
           yYen: { position: 'left', ticks: { color: tc.tick, font: { size: 9 }, callback: v => Math.abs(v)>=1e6?(v/1e6).toFixed(1)+'M':v.toLocaleString()+'円' }, grid: { color: tc.grid } },
-          yIn:  { position: 'right', ticks: { color: '#f7971e', font: { size: 9 }, callback: v => v.toLocaleString()+'枚' }, grid: { display: false } }
+          yIn:  { position: 'right', ticks: { color: '#f7971e', font: { size: 9 }, callback: v => v.toLocaleString()+_inUnit() }, grid: { display: false } }
         }
       }
     });
@@ -3010,7 +3027,7 @@ function _renderCalendarMonth(ym, filteredDates) {
   // ── テーブルビュー ──
   if (calViewMode === 'table') {
     document.getElementById('calDayHead').innerHTML = `
-      <tr><th style="text-align:left;">日付</th><th>曜日</th><th>推定粗利</th><th>推定売上</th><th>利益率</th><th>1台平均IN</th></tr>`;
+      <tr><th style="text-align:left;">日付</th><th>曜日</th><th>推定粗利</th><th>推定売上</th><th>利益率</th><th>${'1台平均'+_inLabel(true)}</th></tr>`;
     const fmtY = v => Math.round(v).toLocaleString() + '円';
     document.getElementById('calDayBody').innerHTML = monthDates.map(d => {
       const rate = d.sales ? (d.profit/d.sales*100).toFixed(1) : '0.0';
@@ -3023,7 +3040,7 @@ function _renderCalendarMonth(ym, filteredDates) {
         <td class="${pc}">${fmtY(d.profit)}</td>
         <td>${fmtY(d.sales)}</td>
         <td class="${rc}">${rate}%</td>
-        <td class="yellow">${Math.round(d.inmai/(d.count||1)).toLocaleString()}枚</td>
+        <td class="yellow">${_fmtInVal(d.inmai/(d.count||1))}</td>
       </tr>`;
     }).join('');
   }
@@ -3157,7 +3174,7 @@ function _buildCalMonthAdviceHTML(ym) {
                  :                  chip(`利益率${profitRate.toFixed(1)}%`,'ai-chip-red');
   h += row('💰', `月間推定粗利 <span class="${clr(totalProfit)}">${Math.round(totalProfit).toLocaleString()}円</span> ${rateChip}`);
   h += row('📈', `1日平均粗利 <span class="${clr(avgProfit)}">${sgn(avgProfit)}円</span>`);
-  h += row('🎰', `月間平均アウト（1台平均） <strong>${Math.round(avgIn).toLocaleString()}枚</strong>`);
+  h += row('🎰', `月間平均アウト（1台平均） <strong>${_fmtInVal(avgIn)}</strong>`);
   if (prevAvg !== null && prevDays > 0) {
     const diff = avgProfit - prevAvg;
     const pct  = prevAvg !== 0 ? diff/Math.abs(prevAvg)*100 : 0;
@@ -3173,8 +3190,8 @@ function _buildCalMonthAdviceHTML(ym) {
   h += sec('🏆 日別ハイライト');
   h += row('🥇', `最高粗利日： <strong>${fmtDate(bestDay[0])}</strong> <span class="ai-up">${Math.round(bestDay[1].profit).toLocaleString()}円</span>`);
   h += row('📉', `${worstDayLabel}： <strong>${fmtDate(worstDay[0])}</strong> <span class="${clr(worstDay[1].profit)}">${Math.round(worstDay[1].profit).toLocaleString()}円</span>`);
-  h += row('🎰', `最高アウト日： <strong>${fmtDate(bestOut[0])}</strong> ${Math.round(bestOut[1].inmai).toLocaleString()}枚`);
-  h += row('📉', `ワーストアウト日： <strong>${fmtDate(worstOut[0])}</strong> ${Math.round(worstOut[1].inmai).toLocaleString()}枚`);
+  h += row('🎰', `最高アウト日： <strong>${fmtDate(bestOut[0])}</strong> ${_fmtInVal(bestOut[1].inmai)}`);
+  h += row('📉', `ワーストアウト日： <strong>${fmtDate(worstOut[0])}</strong> ${_fmtInVal(worstOut[1].inmai)}`);
 
   // ③ 曜日傾向
   if (bestDow && worstDow && bestDow.dw !== worstDow.dw) {
@@ -3192,7 +3209,7 @@ function _buildCalMonthAdviceHTML(ym) {
     }
     if (outModel && outModel[0] !== (mvpModel&&mvpModel[0])) {
       const avgO = Math.round(outModel[1].inmai/outModel[1].count);
-      h += row('🎰', `アウトMVP： <strong>${outModel[0]}</strong> 1台平均 ${avgO.toLocaleString()}枚`);
+      h += row('🎰', `アウトMVP： <strong>${outModel[0]}</strong> 1台平均 ${_fmtInVal(avgO)}`);
     }
     if (lameModel && lameModel[1].profit < 0) {
       h += row('⚠️', `要注意機種： <strong>${lameModel[0]}</strong> 月間粗利 <span class="ai-down">${Math.round(lameModel[1].profit).toLocaleString()}円</span>`);
@@ -3312,7 +3329,7 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
   h += `<div class="ai-row">推定粗利 <strong style="color:${curr.profit>=0?'#43e97b':'#ff6b6b'}">${Math.round(curr.profit).toLocaleString()}円</strong>`;
   h += ` ／ 推定売上 <strong>${Math.round(curr.sales).toLocaleString()}円</strong>`;
   h += ` ／ 利益率 <span class="${profitRate>=10?'ai-up':profitRate>=5?'ai-neu':'ai-down'}">${profitRate.toFixed(1)}%</span></div>`;
-  h += `<div class="ai-row">設置台数 <strong>${curr.count}台</strong> ／ 1台平均IN枚数 <span class="ai-warn">${Math.round(curr.inmai).toLocaleString()}枚</span></div>`;
+  h += `<div class="ai-row">設置台数 <strong>${curr.count}台</strong> ／ 1台平均${_inLabel(true)} <span class="ai-warn">${_fmtInVal(curr.inmai)}</span></div>`;
 
   // ② 対比分析
   h += `<div class="ai-section-head">📈 対比分析</div>`;
@@ -3326,7 +3343,7 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
     h += `<div class="ai-row"><span class="ai-chip ai-chip-purple">先週同日</span>`;
     h += `粗利 <span class="${pCls}">${pDir} ${fmtS(curr.profit - pw.data.profit)} (${fmtP(pwPct)})</span>`;
     if (pwInPct !== null) {
-      h += ` ／ IN枚数 <span class="${iCls}">${iDir} ${fmtP(pwInPct)}</span>`;
+      h += ` ／ ${_inLabel(true)} <span class="${iCls}">${iDir} ${fmtP(pwInPct)}</span>`;
     }
     // コメント
     if (Math.abs(pwPct) >= 20) {
@@ -3401,7 +3418,7 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
     redMachines.forEach(r => {
       h += `<div class="ai-row" style="margin-left:20px;">🔴 ${r.name.replace(/^[LS]B?/,'')}`;
       h += ` ／ 粗利 <span class="ai-down">${Math.round(r.profit).toLocaleString()}円</span>`;
-      h += ` ／ IN枚数 ${Math.round(r.avgIn).toLocaleString()}枚/台</div>`;
+      h += ` ／ ${_inLabel(true)} ${_fmtInVal(r.avgIn)}/台</div>`;
     });
   }
 
@@ -3423,7 +3440,7 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
   if (pwPct !== null && pwPct < -15)
     actions.push('📉 先週同日比で粗利が大幅ダウンしています。稼働数・回転数の変化を確認してください。');
   if (pwInPct !== null && pwInPct < -10)
-    actions.push('🪙 IN枚数（稼働）が先週より落ちています。集客施策・イベントの効果を見直しましょう。');
+    actions.push('🪙 '+_inLabel(true)+'（稼働）が先週より落ちています。集客施策・イベントの効果を見直しましょう。');
   if (profitRate < 5)
     actions.push('⚠️ 利益率が5%を下回っています。出玉設定・還元率の見直しが必要かもしれません。');
   if (profitRate > 20)
@@ -3431,7 +3448,7 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
   if (redMachines.length >= 3)
     actions.push(`🔴 ${redMachines.length}機種が赤字です。特に「${redMachines[0].name.replace(/^[LS]B?/,'')}」の稼働状況を重点チェックしてください。`);
   if (inefficient.length)
-    actions.push(`🔎 「${inefficient[0].name.replace(/^[LS]B?/,'')}」はIN枚数が多いのに利益率が低め。設定・釘の確認を推奨します。`);
+    actions.push(`🔎 「${inefficient[0].name.replace(/^[LS]B?/,'')}」は${_inLabel(true)}が多いのに利益率が低め。設定・釘の確認を推奨します。`);
   if (maPct !== null && maPct > 20)
     actions.push('🎉 当月日平均を大きく上回っています。好調の要因（イベント・曜日・天候等）を記録しておきましょう。');
   if (actions.length === 0)
@@ -3474,8 +3491,8 @@ function renderPinModelTable(rows) {
   document.getElementById('pinModelHead').innerHTML = `<tr>
     <th ${thSL('name')}>機種名${arrow('name')}</th>
     <th ${thS('count')}>稼働台数${arrow('count')}</th>
-    <th ${thS('avgIn')}>1台平均IN${arrow('avgIn')}</th>
-    <th ${thS('inmai')}>IN枚数合計${arrow('inmai')}</th>
+    <th ${thS('avgIn')}>${'1台平均'+_inLabel(true)}${arrow('avgIn')}</th>
+    <th ${thS('inmai')}>${_inLabel(true)+'合計'}${arrow('inmai')}</th>
     <th ${thS('sales')}>推定売上合計${arrow('sales')}</th>
     <th ${thS('profit')}>推定粗利合計${arrow('profit')}</th>
     <th ${thS('avgProfit')}>台粗利${arrow('avgProfit')}</th>
@@ -3522,7 +3539,7 @@ function setPinModelView(mode) {
 function renderPinModelCharts(rows) {
   const tc = getThemeColors();
   const fmtYen = v => (Math.abs(v) >= 1e6 ? (v/1e6).toFixed(1)+'M' : Math.round(v).toLocaleString()) + '円';
-  const fmtEnum= v => v.toLocaleString() + '枚';
+  const fmtEnum= v => _fmtInVal(v);
   const fmtPct = v => (v != null ? v.toFixed(1) : '0') + '%';
   const greenRed = v => v >= 0 ? 'rgba(67,233,123,0.75)' : 'rgba(255,77,109,0.75)';
   const orange   = () => 'rgba(247,151,30,0.75)';
@@ -3647,7 +3664,7 @@ function runPinpoint() {
       ? Math.round(displayVal).toLocaleString() + '円'
       : unit === '台'
       ? Math.round(displayVal).toLocaleString() + '台'
-      : Math.round(displayVal).toLocaleString() + '枚';
+      : _fmtInVal(displayVal);
     el.className = 'pin-kpi-val ' + (
       valId === 'pin-in'     ? 'yellow' :
       valId === 'pin-sales'  ? 'blue' :
@@ -3695,7 +3712,7 @@ function runPinpoint() {
   };
 
   // IN枚数は1台平均で比較、売上・粗利は店舗合計で比較
-  setKPI('pin-in',     'pin-in-badges',     curr.inmai,  '枚', curr.inmai);
+  setKPI('pin-in',     'pin-in-badges',     curr.inmai,  _inUnit(), curr.inmai);
   setKPI('pin-sales',  'pin-sales-badges',  curr.sales,  '円', curr.sales);
   setKPI('pin-profit', 'pin-profit-badges', curr.profit, '円', curr.profit);
   setKPI('pin-count',  'pin-count-badges',  curr.count,  '台', curr.count);
@@ -3745,7 +3762,7 @@ function runPinpoint() {
     data: {
       labels: barPeriods,
       datasets: [
-        { label:'1台平均IN枚数(枚)', data: barSets3.map(d=>d?Math.round(d.inmai):null),
+        { label:'1台平均'+_inLabel(true)+'('+_inUnit()+')', data: barSets3.map(d=>d?Math.round(d.inmai):null),
           backgroundColor: barPeriodColors, borderColor: barPeriodBorder,
           borderWidth:1.5, borderRadius:5, yAxisID:'yIn' },
         { label:'推定売上(円)', data: barSets3.map(d=>d?Math.round(d.sales):null),
@@ -3778,7 +3795,7 @@ function runPinpoint() {
     const mn=Math.min(...valid), mx=Math.max(...valid);
     return vals.map(v=>v==null?0: mx===mn?50:Math.round((v-mn)/(mx-mn)*100));
   };
-  const radarLabels = ['1台平均IN','売上','粗利','台数'];
+  const radarLabels = ['1台平均'+_inLabel(true),'売上','粗利','台数'];
   const radarDatasets = barLabels.map((lbl, i) => {
     const d = allSets[i];
     return {
@@ -3969,7 +3986,7 @@ function renderDayTable() {
   thead.innerHTML = `<tr>
     <th class="${thClass('date')}"      onclick="setDaySort('date')">日付</th>
     <th class="${thClass('count')}"     onclick="setDaySort('count')">稼働台数</th>
-    <th class="highlight ${thClass('avgIn')}"      onclick="setDaySort('avgIn')">1台平均IN枚数</th>
+    <th class="highlight ${thClass('avgIn')}"      onclick="setDaySort('avgIn')">${'1台平均'+_inLabel(true)}</th>
     <th class="${thClass('profit')}"    onclick="setDaySort('profit')">推定粗利合計</th>
     <th class="${thClass('avgProfit')}" onclick="setDaySort('avgProfit')">1台平均粗利</th>
     <th class="${thClass('sales')}"     onclick="setDaySort('sales')">推定売上合計</th>
@@ -4043,7 +4060,7 @@ function renderModelAggCharts() {
     });
   }
   const fmtYen = v => (Math.abs(v)>=1e6?(v/1e6).toFixed(1)+'M':Math.round(v).toLocaleString())+'円';
-  const fmtEnum= v => v.toLocaleString()+'枚';
+  const fmtEnum= v => _fmtInVal(v);
   const fmtPct = v => v.toFixed(1)+'%';
   const greenRed = v => v>=0 ? 'rgba(67,233,123,0.75)' : 'rgba(255,77,109,0.75)';
   const blueBar  = () => 'rgba(247,151,30,0.75)';
@@ -4084,7 +4101,7 @@ function renderModelTable() {
     <th>機種名</th>
     <th>営業日数</th>
     <th>平均台数</th>
-    <th class="highlight">1台平均IN枚数</th>
+    <th class="highlight">${'1台平均'+_inLabel(true)}</th>
     <th>推定粗利合計</th>
     <th>1台平均粗利</th>
     <th>推定売上合計</th>
@@ -4267,7 +4284,7 @@ function renderTsChart(canvasId, boxId, titleId, titleText, datesArr) {
 
   const box = document.getElementById(boxId);
   box.style.display = '';
-  document.getElementById(titleId).textContent = titleText + '  の時系列推移（売上・粗利・1台平均IN枚数）';
+  document.getElementById(titleId).textContent = titleText + '  の時系列推移（売上・粗利・1台平均'+_inLabel(true)+'）';
 
   const tc = getThemeColors();
   const labels  = data.map(d => d.label);
@@ -4306,7 +4323,7 @@ function renderTsChart(canvasId, boxId, titleId, titleText, datesArr) {
         },
         {
           type: 'line',
-          label: '1台平均IN枚数',
+          label: '1台平均'+_inLabel(true),
           data: inmais,
           borderColor: '#f7971e',
           backgroundColor: 'rgba(247,151,30,0.1)',
@@ -4340,7 +4357,7 @@ function renderTsChart(canvasId, boxId, titleId, titleText, datesArr) {
         },
         yIn: {
           position: 'right',
-          ticks: { color: '#f7971e', callback: v => v.toLocaleString()+'枚' },
+          ticks: { color: '#f7971e', callback: v => v.toLocaleString()+_inUnit() },
           grid: { display: false },
           title: { display: true, text: '枚/台', color: '#f7971e', font: { size: 10 } }
         }
@@ -4443,8 +4460,8 @@ function _renderDetailKPIHtml(kpi) {
       <div class="dow-detail-kpi-val">${kpi.avgSales.toLocaleString()}円</div>
     </div>
     <div class="dow-detail-kpi-item">
-      <div class="dow-detail-kpi-label">1台平均IN枚数</div>
-      <div class="dow-detail-kpi-val" style="color:var(--accent4)">${kpi.avgIN.toLocaleString()}枚</div>
+      <div class="dow-detail-kpi-label in-label" data-s="1台平均IN枚数" data-p="1台平均アウト">1台平均IN枚数</div>
+      <div class="dow-detail-kpi-val" style="color:var(--accent4)">${_fmtInVal(kpi.avgIN)}</div>
     </div>
     <div class="dow-detail-kpi-item">
       <div class="dow-detail-kpi-label">利益率</div>
@@ -4461,14 +4478,14 @@ function _renderDetailTable(headId, bodyId, rows) {
   const cc = v => v>=0 ? 'style="color:var(--green)"' : 'style="color:var(--red)"';
   document.getElementById(headId).innerHTML = `<tr>
     <th>機種名</th>
-    <th>1台平均IN</th>
+    <th>${'1台平均'+_inLabel(true)}</th>
     <th>1台平均粗利</th>
     <th>1日平均粗利合計</th>
     <th>利益率</th>
   </tr>`;
   document.getElementById(bodyId).innerHTML = rows.map(r => `<tr>
     <td>${r.name}</td>
-    <td class="highlight">${r.avgIn.toLocaleString()}枚</td>
+    <td class="highlight">${_fmtInVal(r.avgIn)}</td>
     <td ${cc(r.avgProfit)}>${fmtYen(r.avgProfit)}</td>
     <td ${cc(r.totalProfit)}>${fmtYen(r.totalProfit)}</td>
     <td ${cc(r.rate)}>${r.rate>=0?'+':''}${r.rate}%</td>
@@ -4480,7 +4497,7 @@ function _makeDetailCharts(prefix, wrapSuffix, rows) {
   const h = Math.max(200, rows.length * 22 + 40);
   const tc = getThemeColors();
   const fmtYen = v => (Math.abs(v)>=1e6?(v/1e6).toFixed(1)+'M':Math.round(v).toLocaleString())+'円';
-  const fmtEnum= v => v.toLocaleString()+'枚';
+  const fmtEnum= v => _fmtInVal(v);
   const fmtPct = v => (v>=0?'+':'')+v.toFixed(1)+'%';
   const greenRed = v => v>=0 ? 'rgba(67,233,123,0.75)' : 'rgba(255,77,109,0.75)';
   const orange   = () => 'rgba(247,151,30,0.75)';
@@ -4718,7 +4735,7 @@ function renderDOW() {
       labels,
       datasets:[
         { label:'平均粗利', data:nProfit, borderColor:'rgba(67,233,123,0.9)', backgroundColor:'rgba(67,233,123,0.15)', pointBackgroundColor:'#43e97b', borderWidth:2, pointRadius:4 },
-        { label:'IN枚数',   data:nIN,     borderColor:'rgba(247,151,30,0.9)',  backgroundColor:'rgba(247,151,30,0.1)',  pointBackgroundColor:'#f7971e', borderWidth:2, pointRadius:4 },
+        { label:_inLabel(true),   data:nIN,     borderColor:'rgba(247,151,30,0.9)',  backgroundColor:'rgba(247,151,30,0.1)',  pointBackgroundColor:'#f7971e', borderWidth:2, pointRadius:4 },
         { label:'利益率',   data:nRate,   borderColor:'rgba(108,99,255,0.9)', backgroundColor:'rgba(108,99,255,0.1)', pointBackgroundColor:'#6c63ff', borderWidth:2, pointRadius:4 },
       ]
     },
@@ -4865,7 +4882,7 @@ function renderDayCharts() {
     data: {
       labels,
       datasets: [{
-        label: '1台平均IN',
+        label: '1台平均'+_inLabel(true),
         data: avgIN,
         backgroundColor: rows.map(r => {
           const dow = new Date(r[0]).getDay();
@@ -5044,7 +5061,7 @@ function _cmpBuildSummary(nameA, nameB, mapA, mapB) {
   const avgA    = isRate ? (sumSalesA > 0 ? sumProfitA / sumSalesA * 100 : 0) : (cntA ? totA / cntA : 0);
   const avgB    = isRate ? (sumSalesB > 0 ? sumProfitB / sumSalesB * 100 : 0) : (cntB ? totB / cntB : 0);
   const diffAvg = avgA - avgB;
-  const unit    = isRate ? '%' : metric === 'inmai' ? '枚' : '円';
+  const unit    = isRate ? '%' : metric === 'inmai' ? _inUnit() : '円';
   const fmt  = v => isRate ? v.toFixed(1) + unit : Math.round(v).toLocaleString() + unit;
   const fmtD = v => (v >= 0 ? '+' : '') + (isRate ? v.toFixed(1) + unit : Math.round(v).toLocaleString() + unit);
   const subA = isRate ? `期間合計 / ${cntA}日分` : `1日平均 / ${cntA}日分`;
@@ -5314,7 +5331,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   const allInDiff  = diffs.reduce((s,d) => s + d.inmaiDiff,  0) / diffs.length;
   const allProfDiff = diffs.reduce((s,d) => s + d.profitDiff, 0) / diffs.length;
   h += sec('📊 全体概況（共通機種 平均）');
-  h += row('🎰', `1台平均IN枚数の差（A−B）：${sgn(allInDiff,'枚')} — ${nameA}が${allInDiff >= 0 ? '多い' : '少ない'}`);
+  h += row('🎰', `1台平均${_inLabel(true)}の差（A−B）：${sgn(allInDiff,_inUnit())} — ${nameA}が${allInDiff >= 0 ? '多い' : '少ない'}`);
   h += row('💰', `台粗利の差（A−B）：${sgn(allProfDiff,'円')} — ${nameA}が${allProfDiff >= 0 ? '稼げている' : '下回っている'}`);
 
   // ── 上位3機種（A が B より台粗利が高い機種）──
