@@ -671,7 +671,7 @@
       <div class="kpi-sub">期間合計</div>
     </div>
     <div class="kpi-card">
-      <div class="kpi-label">IN枚数（アウト）平均</div>
+      <div class="kpi-label" data-in-label="IN枚数（アウト）平均" data-in-label-p="アウト平均">IN枚数（アウト）平均</div>
       <div class="kpi-value yellow" id="kpi-machines">-</div>
       <div class="kpi-sub">1台1日平均</div>
     </div>
@@ -1067,7 +1067,7 @@
       <!-- KPIカード×4 -->
       <div class="pin-kpi-grid">
         <div class="pin-kpi">
-          <div class="pin-kpi-label">IN枚数（アウト）<span id="pin-in-weather" style="font-size:18px;margin-left:6px;" title="当月平均比"></span></div>
+          <div class="pin-kpi-label" data-in-label="IN枚数（アウト）" data-in-label-p="アウト">IN枚数（アウト）<span id="pin-in-weather" style="font-size:18px;margin-left:6px;" title="当月平均比"></span></div>
           <div class="pin-kpi-val yellow" id="pin-in">-</div>
           <div class="pin-badges" id="pin-in-badges"></div>
         </div>
@@ -1269,7 +1269,7 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'concerto',      label: 'コンチェルトさん専用',      stores: ['楽園ハッピーロード大山','ピーアーク北千住SSS'] },
   { file: 'ishiyama',      label: '石山オメガさん専用',        stores: ['レークプラザ','ダラムS-1'] },
   { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴','メガフェイス朝倉'] },
-  { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園町田','エスパス上野新館','エスパス上野本館','ジアス大船','楽園川崎','楽園柏'] },
+  { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園アメ横（4P）','楽園町田','楽園町田（4P）','エスパス上野新館','エスパス上野新館（4P）','エスパス上野本館','エスパス上野本館（4P）','ジアス大船','ジアス大船（4P）','楽園川崎','楽園川崎（4P）','楽園柏','楽園柏（4P）'] },
   { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT梅坪','ZENT豊田本店','メガガイア一宮','リブレ遊援館'] },
   { file: 'kowa',          label: '興和商事さん専用',          stores: ['サンコー梅島'] },
   { file: 'minami_ent',    label: 'ミナミ・エンタープライズさん専用', stores: ['マルハン石岡','KING BOSS 1000','スーパーBOSS','ニラク福島瀬上','ZENT海道'] },
@@ -1607,6 +1607,13 @@ function parseOneFile(file) {
         const firstData = rows.find((r, i) => i > 0 && r && r[0]);
         const isMonthly = firstData && isDateValue(firstData[0]);
 
+        // パチンコ判定：ヘッダー行に「アウト」または「差玉」があれば4円P形式
+        const headerRow = rows[0] || [];
+        const isPachinko = headerRow.some(h => {
+          const v = String(h || '').trim();
+          return v === 'アウト' || v === '差玉';
+        });
+
         const newRecords = [];
         const currentAdded = getAddedData();
         const addedDatesSet = new Set();
@@ -1642,20 +1649,38 @@ function parseOneFile(file) {
           const nameSite     = String(r[col + 1] || '').trim();
           const modelName    = nameOfficial || nameSite;
 
-          newRecords.push({
-            date,
-            '台番':       num,
-            '機種名':     modelName,        // 正式名を採用
-            '機種名正式': nameOfficial,
-            '差枚':       Number(r[col + 3]) || 0,
-            'BB':         Number(r[col + 4]) || 0,
-            'RB':         Number(r[col + 5]) || 0,
-            'ART':        Number(r[col + 6]) || 0,
-            'G数':        Number(r[col + 7]) || 0,
-            'IN枚数':     Number(r[col + 8]) || 0,
-            '台売上':     Number(r[col + 9]) || 0,
-            '台粗利':     Number(r[col + 10]) || 0,
-          });
+          if (isPachinko) {
+            // 4円パチンコ形式: 差玉(+3), 大当り(+4), 初当り(+5), 回転数(+6), アウト(+7), 台売上(+8), 台粗利(+9)
+            newRecords.push({
+              date,
+              '台番':       num,
+              '機種名':     modelName,
+              '機種名正式': nameOfficial,
+              '差枚':       Number(r[col + 3]) || 0,  // 差玉
+              'BB':         Number(r[col + 4]) || 0,  // 大当り
+              'RB':         Number(r[col + 5]) || 0,  // 初当り
+              'ART':        0,
+              'G数':        Number(r[col + 6]) || 0,  // 回転数
+              'IN枚数':     Number(r[col + 7]) || 0,  // アウト（表示時は「アウト」ラベル）
+              '台売上':     Number(r[col + 8]) || 0,
+              '台粗利':     Number(r[col + 9]) || 0,
+            });
+          } else {
+            newRecords.push({
+              date,
+              '台番':       num,
+              '機種名':     modelName,        // 正式名を採用
+              '機種名正式': nameOfficial,
+              '差枚':       Number(r[col + 3]) || 0,
+              'BB':         Number(r[col + 4]) || 0,
+              'RB':         Number(r[col + 5]) || 0,
+              'ART':        Number(r[col + 6]) || 0,
+              'G数':        Number(r[col + 7]) || 0,
+              'IN枚数':     Number(r[col + 8]) || 0,
+              '台売上':     Number(r[col + 9]) || 0,
+              '台粗利':     Number(r[col + 10]) || 0,
+            });
+          }
           addedDatesSet.add(date);
         }
 
@@ -1666,7 +1691,8 @@ function parseOneFile(file) {
           count: newRecords.length,
           records: newRecords,
           name: file.name,
-          isMonthly
+          isMonthly,
+          isPachinko
         });
       } catch(err) {
         reject({ name: file.name, error: err.message });
@@ -1763,21 +1789,28 @@ async function handleUpload(event) {
     if (origStoreId) localStorage.setItem(_NS + 'bi_active_store', origStoreId);
     else localStorage.removeItem(_NS + 'bi_active_store');
 
-    let storeNewRecords = [];
-    let storeDates = [];
+    // パチンコ対応：ファイルごとに振り分け先店舗を分けるため targetMap で管理
+    // { storeId: { store, records: [], dates: [] } }
+    const targetMap = {};
 
     for (const result of results) {
       if (result.status === 'fulfilled') {
-        const { addedDates: aDates, count, records, name, isMonthly } = result.value;
+        const { addedDates: aDates, count, records, name, isMonthly, isPachinko } = result.value;
         if (count === 0) {
           errors.push(`${name}: 重複またはデータなし`);
         } else {
-          storeNewRecords.push(...records);
+          // 4円パチンコは「店舗名（4P）」として別店舗に振り分け
+          let tStore = store;
+          if (isPachinko && !store.name.match(/（4P）|4円P/)) {
+            tStore = findOrCreateStore(store.name + '（4P）');
+          }
+          if (!targetMap[tStore.id]) targetMap[tStore.id] = { store: tStore, records: [], dates: [] };
+          targetMap[tStore.id].records.push(...records);
           totalAdded += count;
           if (isMonthly && aDates && aDates.length) {
-            storeDates.push(`${aDates[0].slice(5)}〜${aDates[aDates.length-1].slice(5)}(${aDates.length}日)`);
+            targetMap[tStore.id].dates.push(`${aDates[0].slice(5)}〜${aDates[aDates.length-1].slice(5)}(${aDates.length}日)`);
           } else if (aDates && aDates.length) {
-            storeDates.push(...aDates.map(d => d.slice(5)));
+            targetMap[tStore.id].dates.push(...aDates.map(d => d.slice(5)));
           }
         }
       } else {
@@ -1785,12 +1818,14 @@ async function handleUpload(event) {
       }
     }
 
-    if (storeNewRecords.length > 0) {
-      const prev = DB_CACHE[store.key] || [];
-      const merged = [...prev, ...storeNewRecords];
-      await _idbPut(store.key, merged);   // DB_CACHE も同時に更新される
-      summaries.push({ storeName: store.name, dates: storeDates, count: storeNewRecords.length });
-      lastStore = store;
+    for (const { store: tStore, records: tRecords, dates: tDates } of Object.values(targetMap)) {
+      if (tRecords.length > 0) {
+        const prev = DB_CACHE[tStore.key] || [];
+        const merged = [...prev, ...tRecords];
+        await _idbPut(tStore.key, merged);   // DB_CACHE も同時に更新される
+        summaries.push({ storeName: tStore.name, dates: tDates, count: tRecords.length });
+        lastStore = tStore;
+      }
     }
   }
 
@@ -2013,6 +2048,7 @@ function init() {
   buildStoreSelect();
   initTheme();
   initStoreCmp();
+  _refreshInLabels();
 
   // ── 管理者：データ配信ボタンを表示 ──
   if (USER_ID === 'admin' && USERS_CONFIG.length > 0) {
@@ -2126,11 +2162,43 @@ function buildStoreSelect() {
   ).join('');
 }
 
+// パチンコ店舗（名前が「（4P）」で終わる）かどうか判定
+function _isPachinkoStore(store) {
+  return (store || _activeStore()).name.includes('（4P）');
+}
+
+// IN枚数 or アウト のどちらのラベルを使うか返す
+function _inLabel(short) {
+  if (_isPachinkoStore()) return short ? 'アウト' : 'アウト';
+  return short ? 'IN枚数' : 'IN枚数（アウト）';
+}
+
+// パチンコ/スロットに応じてUIラベルを一括更新
+function _refreshInLabels() {
+  const isPachi = _isPachinkoStore();
+  // メトリクスセレクトのIN枚数オプション
+  const metSel = document.getElementById('metricFilter');
+  if (metSel) {
+    for (const opt of metSel.options) {
+      if (opt.value === 'IN枚数') opt.textContent = isPachi ? 'アウト' : 'IN枚数（アウト）';
+    }
+  }
+  // KPIラベル
+  document.querySelectorAll('[data-in-label]').forEach(el => {
+    el.textContent = isPachi ? el.dataset.inLabelP || 'アウト' : el.dataset.inLabel || 'IN枚数（アウト）';
+  });
+  // チャートタイトルなどテキストノードを持つ要素（class="in-label"）
+  document.querySelectorAll('.in-label').forEach(el => {
+    el.textContent = isPachi ? (el.dataset.p || 'アウト') : (el.dataset.s || 'IN枚数');
+  });
+}
+
 function switchStore(id) {
   localStorage.setItem(_NS + 'bi_active_store', id);
   const store = getStores().find(s => s.id === id) || DEFAULT_STORE;
   const stEl = document.getElementById('storeTitle'); if(stEl) stEl.textContent = store.name;
   reloadAll();
+  _refreshInLabels();
 }
 
 function openStoreModal() {
@@ -2665,7 +2733,7 @@ function getThemeColors() {
 function renderCharts() {
   const tc = getThemeColors();
   const metricKey = document.getElementById('metricFilter').value;
-  const metricLabel = {'IN枚数':'IN枚数（アウト）','台粗利':'推定粗利','台売上':'推定売上'}[metricKey] || metricKey;
+  const metricLabel = {'IN枚数': _inLabel(),'台粗利':'推定粗利','台売上':'推定売上'}[metricKey] || metricKey;
   const filteredDates = [...new Set(filtered.map(d => d.date))].sort();
 
   const trendData = filteredDates.map(date => sum(filtered.filter(d => d.date === date), metricKey));
