@@ -1704,6 +1704,7 @@ function parseOneFile(file) {
 
 // ─ ファイル名から店舗名を自動判定 ─
 // パターン: YYYYMM_店舗名_suffix  または  YYYYMMDD_店舗名_suffix
+// または 店舗名_4P.xlsx / 店舗名_4P_suffix.xlsx
 // 純粋な日付のみ（YYYYMMDD.xlsx）は現在の店舗を使用
 function detectStoreNameFromFilename(filename) {
   const base = filename.replace(/\.[^.]+$/, ''); // 拡張子除去
@@ -1712,6 +1713,10 @@ function detectStoreNameFromFilename(filename) {
   if (m) return m[1].trim();
   // 8桁日付 + _ + 店舗名 + _
   m = base.match(/^\d{8}_([^_]+)_/);
+  if (m) return m[1].trim();
+  // 4Pパターン: 店舗名_4P / 店舗名_4円P（末尾 or アンダースコア区切り）
+  // → 店舗名のみ返す（isPachinko検出後に（4P）が付与される）
+  m = base.match(/^(.+?)_4[円]?[Pp](?:_|$)/);
   if (m) return m[1].trim();
   // 日付のみ → 店舗名なし（現在の店舗を使用）
   return null;
