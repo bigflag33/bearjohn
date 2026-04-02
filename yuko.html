@@ -31,14 +31,6 @@
     --green: #34d399; --red: #f87171;
     --header-bg: linear-gradient(135deg,#0b1e35,#0f2743);
   }
-  /* ── Pachinko Theme（4円P店舗選択時に自動適用） ── */
-  [data-theme="pachinko"] {
-    --bg: #030d06; --card: #081408; --card2: #0e1e0e;
-    --accent: #22c55e; --accent2: #f59e0b; --accent3: #86efac; --accent4: #fcd34d;
-    --text: #dcfce7; --text2: #4d8a60; --border: #1a3d24;
-    --green: #22c55e; --red: #f87171;
-    --header-bg: linear-gradient(135deg,#020e05,#0a3018);
-  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI','Hiragino Sans',sans-serif; min-height: 100vh; }
 
@@ -51,7 +43,6 @@
   .theme-btn.t-dark     { background: linear-gradient(135deg,#1a1d2e,#6c63ff); }
   .theme-btn.t-light    { background: linear-gradient(135deg,#f0f4f8,#5b52e8); }
   .theme-btn.t-cool     { background: linear-gradient(135deg,#060f1e,#00d4ff); }
-  .theme-btn.t-pachinko { background: linear-gradient(135deg,#020e05,#22c55e); }
   .header h1 span { color: var(--accent); }
   [data-theme="light"] .header h1,
   [data-theme="light"] .header h1 span { color: #fff; }
@@ -59,17 +50,6 @@
   [data-theme="light"] .store-select { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: #fff; }
   [data-theme="light"] .store-add-btn { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: #fff; }
   [data-theme="light"] .theme-switcher span { color: rgba(255,255,255,0.8) !important; }
-  /* ── Pachinko テーマ ヘッダー文字色 ── */
-  [data-theme="pachinko"] .header h1 { color: #dcfce7; }
-  [data-theme="pachinko"] .header h1 span { color: #22c55e; }
-  [data-theme="pachinko"] .header-date-range { color: rgba(220,252,231,0.7); }
-  [data-theme="pachinko"] .store-select { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.3); color: #dcfce7; }
-  [data-theme="pachinko"] .store-add-btn { background: rgba(34,197,94,0.15); border-color: rgba(34,197,94,0.3); color: #dcfce7; }
-  [data-theme="pachinko"] .theme-switcher span { color: rgba(220,252,231,0.8) !important; }
-  [data-theme="pachinko"] .upload-fab { background: linear-gradient(135deg,#16a34a,#15803d); }
-  [data-theme="pachinko"] .ai-greeting-bar { border-color: rgba(34,197,94,0.3); }
-  /* 4P バッジ表示 */
-  #pachiStoreBadge { display:none; font-size:11px; font-weight:700; background:rgba(34,197,94,0.2); color:#22c55e; border:1px solid rgba(34,197,94,0.4); border-radius:20px; padding:3px 10px; white-space:nowrap; }
   .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
   .header-date-range { font-size: 12px; color: var(--text2); }
   .store-switcher { display:flex; align-items:center; gap:8px; }
@@ -635,9 +615,7 @@
       <button class="theme-btn t-dark  active" id="tbtn-dark"  onclick="setTheme('dark')"  title="ダーク"></button>
       <button class="theme-btn t-light"        id="tbtn-light" onclick="setTheme('light')" title="ライト"></button>
       <button class="theme-btn t-cool"         id="tbtn-cool"  onclick="setTheme('cool')"  title="クール"></button>
-      <button class="theme-btn t-pachinko"     id="tbtn-pachinko" onclick="setTheme('pachinko')" title="パチンコ" style="display:none;"></button>
     </div>
-    <span id="pachiStoreBadge">🎰 4円パチンコ</span>
     <div class="header-date-range" id="dataRange"></div>
     <span id="uploadMsg" class="upload-msg-inline"></span>
     <button class="upload-fab" onclick="document.getElementById('fileInput').click()">
@@ -2076,7 +2054,6 @@ function init() {
   initTheme();
   initStoreCmp();
   _refreshInLabels();
-  _autoThemeForStore();
 
   // ── 管理者：データ配信ボタンを表示 ──
   if (USER_ID === 'admin' && USERS_CONFIG.length > 0) {
@@ -2123,7 +2100,7 @@ function resetFilter() {
 
 
 // ═══ テーマ ═══
-const THEMES = ['dark', 'light', 'cool', 'pachinko'];
+const THEMES = ['dark', 'light', 'cool'];
 function setTheme(t) {
   document.documentElement.setAttribute('data-theme', t === 'dark' ? '' : t);
   localStorage.setItem('bi_theme', t);
@@ -2245,33 +2222,12 @@ function _refreshInLabels() {
   });
 }
 
-// パチンコ店舗切り替え時のテーマ自動切り替え
-function _autoThemeForStore() {
-  const isPachi = _isPachinkoStore();
-  const currentTheme = localStorage.getItem('bi_theme') || 'dark';
-  // パチンコテーマボタン・バッジの表示切り替え
-  const pachiBtn   = document.getElementById('tbtn-pachinko');
-  const pachiBadge = document.getElementById('pachiStoreBadge');
-  if (pachiBtn)   pachiBtn.style.display   = isPachi ? '' : 'none';
-  if (pachiBadge) pachiBadge.style.display = isPachi ? '' : 'none';
-  if (isPachi && currentTheme !== 'pachinko') {
-    // パチンコ店舗に入った: スロットテーマを保存してパチンコテーマ適用
-    localStorage.setItem('bi_theme_slot_backup', currentTheme);
-    setTheme('pachinko');
-  } else if (!isPachi && currentTheme === 'pachinko') {
-    // パチンコ店舗から出た: スロットテーマを復元
-    const backup = localStorage.getItem('bi_theme_slot_backup') || 'dark';
-    setTheme(backup);
-  }
-}
-
 function switchStore(id) {
   localStorage.setItem(_NS + 'bi_active_store', id);
   const store = getStores().find(s => s.id === id) || DEFAULT_STORE;
   const stEl = document.getElementById('storeTitle'); if(stEl) stEl.textContent = store.name;
   reloadAll();
   _refreshInLabels();
-  _autoThemeForStore();
 }
 
 function openStoreModal() {
