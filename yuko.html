@@ -661,11 +661,11 @@
     <div class="filter-group"><label>終了日</label><input type="date" id="dateTo"></div>
     <div class="filter-group">
       <label>機種</label>
-      <select id="modelFilter"><option value="">全機種</option></select>
+      <select id="modelFilter" onchange="applyFilter()"><option value="">全機種</option></select>
     </div>
     <div class="filter-group">
       <label>日次チャート指標</label>
-      <select id="metricFilter">
+      <select id="metricFilter" onchange="applyFilter()">
         <option value="IN枚数">IN枚数（アウト）</option>
         <option value="台粗利">推定粗利</option>
         <option value="台売上">推定売上</option>
@@ -2037,13 +2037,13 @@ function reloadAll() {
   filtered = [...all];
   updateDateDots();
   const allDates = [...new Set(all.map(d => d.date))].sort();
-  // 常に全データの最小〜最大日付に範囲を広げる
+  // 日付が未設定のときだけ自動セット（手動設定済みの場合はキープ）
   const curFrom = document.getElementById('dateFrom').value;
   const curTo   = document.getElementById('dateTo').value;
-  if (!curFrom || allDates[0] < curFrom) {
+  if (!curFrom) {
     document.getElementById('dateFrom').value = allDates[0];
   }
-  if (!curTo || allDates[allDates.length-1] > curTo) {
+  if (!curTo) {
     document.getElementById('dateTo').value = allDates[allDates.length-1];
   }
   document.getElementById('dataRange').textContent = `データ期間: ${allDates[0]} 〜 ${allDates[allDates.length-1]}`;
