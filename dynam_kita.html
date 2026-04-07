@@ -5450,13 +5450,30 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     h += row('  ', `A: <span class="${d.profitA>=0?'ai-up':'ai-down'}">${fmtV(d.profitA,'円')}</span> &nbsp;/&nbsp; B: <span class="ai-up">${fmtV(d.profitB,'円')}</span>`);
   });
 
-  // ── IN枚数 差異が大きい機種TOP3 ──
-  const byInDiff = [...diffs].sort((a,b) => Math.abs(b.inmaiDiff) - Math.abs(a.inmaiDiff)).slice(0, 3);
-  h += sec(`🎰 ${_cmpInLabel()} 差異が最も大きい機種 TOP3`);
-  byInDiff.forEach(d => {
-    const winner = d.inmaiDiff >= 0 ? nameA : nameB;
-    h += row('📌', `<strong>${d.model}</strong>: ${sgn(d.inmaiDiff,_cmpInUnit())} → ${winner}優位`);
-  });
+  // ── IN枚数 店舗A優位 TOP3 / 店舗B優位 TOP3 ──
+  const byInSorted = [...diffs].sort((a,b) => b.inmaiDiff - a.inmaiDiff);
+  const inTopA = byInSorted.filter(d => d.inmaiDiff > 0).slice(0, 3);
+  const inTopB = [...byInSorted].reverse().filter(d => d.inmaiDiff < 0).slice(0, 3);
+
+  h += sec(`🎰 ${_cmpInLabel()} — ${nameA} が優位な機種 TOP3`);
+  if (inTopA.length) {
+    inTopA.forEach((d, i) => {
+      const medal = ['🥇','🥈','🥉'][i];
+      h += row(medal, `<strong>${d.model}</strong>: ${sgn(d.inmaiDiff,_cmpInUnit())} &nbsp;<span style="color:var(--text2);">（A:${fmtV(d.inmaiA,_cmpInUnit())} / B:${fmtV(d.inmaiB,_cmpInUnit())}）</span>`);
+    });
+  } else {
+    h += row('—', `${nameA} が優位な機種はありません`);
+  }
+
+  h += sec(`🎰 ${_cmpInLabel()} — ${nameB} が優位な機種 TOP3`);
+  if (inTopB.length) {
+    inTopB.forEach((d, i) => {
+      const medal = ['🥇','🥈','🥉'][i];
+      h += row(medal, `<strong>${d.model}</strong>: ${sgn(d.inmaiDiff,_cmpInUnit())} &nbsp;<span style="color:var(--text2);">（A:${fmtV(d.inmaiA,_cmpInUnit())} / B:${fmtV(d.inmaiB,_cmpInUnit())}）</span>`);
+    });
+  } else {
+    h += row('—', `${nameB} が優位な機種はありません`);
+  }
 
   // ── 機種別 相関係数ランキング ──
   // 各共通機種について「日次1台平均粗利」のA・B間ピアソン相関を計算
