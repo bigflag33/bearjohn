@@ -567,6 +567,31 @@
     color: var(--text2); font-size: 13px;
   }
   #cmpModelChartWrap canvas { display: block; }
+  /* 比較期間指定 */
+  .store-cmp-daterange {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin: 0 0 10px; padding: 10px 14px;
+    background: var(--card2); border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+  .store-cmp-daterange label { font-size: 11px; font-weight: 700; color: #06b6d4; white-space:nowrap; }
+  .store-cmp-daterange input[type="date"] {
+    background: var(--bg); border: 1.5px solid var(--border);
+    color: var(--text); border-radius: 6px; padding: 5px 10px;
+    font-size: 12px; cursor: pointer;
+  }
+  .store-cmp-daterange span { color: var(--text2); font-size: 13px; }
+  .cmp-reset-btn {
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text2); border-radius: 6px; padding: 4px 10px;
+    font-size: 11px; cursor: pointer;
+  }
+  .cmp-reset-btn:hover { border-color: #06b6d4; color: #06b6d4; }
+  /* 相関係数カード */
+  .cmp-stat-box.box-corr { border-color: #a78bfa; }
+  .cmp-stat-val.cc { color: #a78bfa; }
+  .corr-bar-wrap { margin-top: 6px; height: 5px; background: var(--border); border-radius: 3px; overflow:hidden; }
+  .corr-bar { height: 100%; border-radius: 3px; transition: width 0.4s; }
 
 </style>
 </head>
@@ -1028,6 +1053,15 @@
         <button class="cmp-metric-btn"        id="cmpBtnSales"  onclick="cmpSetMetric('sales')" >1台平均売上</button>
         <button class="cmp-metric-btn"        id="cmpBtnRate"   onclick="cmpSetMetric('rate')"  >利益率（%）</button>
       </div>
+    </div>
+
+    <!-- 比較期間指定 -->
+    <div class="store-cmp-daterange">
+      <label>📅 比較期間</label>
+      <input type="date" id="cmpFrom" onchange="renderStoreCmp()">
+      <span>〜</span>
+      <input type="date" id="cmpTo" onchange="renderStoreCmp()">
+      <button class="cmp-reset-btn" onclick="cmpResetDates()">リセット</button>
     </div>
 
     <div class="store-cmp-summary" id="cmpSummary" style="margin-top:12px;"></div>
@@ -5021,13 +5055,41 @@ function buildCmpTargetSelect() {
   }
 }
 
+// ── 比較期間リセット ──
+function cmpResetDates() {
+  const f = document.getElementById('cmpFrom');
+  const t = document.getElementById('cmpTo');
+  if (f) f.value = '';
+  if (t) t.value = '';
+  renderStoreCmp();
+}
+
+// ── ピアソン相関係数 ──
+function _pearsonCorr(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return null;
+  const mx = xs.reduce((a,b)=>a+b,0)/n;
+  const my = ys.reduce((a,b)=>a+b,0)/n;
+  let num=0, dx2=0, dy2=0;
+  for (let i=0;i<n;i++) {
+    const dx=xs[i]-mx, dy=ys[i]-my;
+    num+=dx*dy; dx2+=dx*dx; dy2+=dy*dy;
+  }
+  const denom = Math.sqrt(dx2*dy2);
+  return denom===0 ? 0 : num/denom;
+}
+
 // ── 日別集計（ストアキー + 任意のモデルフィルタ）──
 // 戻り値: { date → { profit, sales, inmai, count } }
 // 指標はすべて「1台平均」＝ sum/count で返す
 function _cmpAggByDate(key, modelFilter) {
+  const from = document.getElementById('cmpFrom')?.value || null;
+  const to   = document.getElementById('cmpTo')?.value   || null;
   const rows = (DB_CACHE[key] || []).filter(r => {
     if (!r.date) return false;
-    if (modelFilter && modelFilter !== '__all__') return r['機種名'] === modelFilter;
+    if (modelFilter && modelFilter !== '__all__' && r['機種名'] !== modelFilter) return false;
+    if (from && r.date < from) return false;
+    if (to   && r.date > to)   return false;
     return true;
   });
   const map = {};
@@ -5061,16 +5123,17 @@ function _cmpBuildSummary(nameA, nameB, mapA, mapB) {
   // 利益率以外は日次平均、利益率だけは期間合計profit÷期間合計salesで正確に計算
   let totA = 0, totB = 0, cntA = 0, cntB = 0;
   let sumProfitA = 0, sumSalesA = 0, sumProfitB = 0, sumSalesB = 0;
+  const sharedXs = [], sharedYs = [];
   allDates.forEach(d => {
     const vA = _cmpVal(mapA[d], metric), vB = _cmpVal(mapB[d], metric);
     if (vA !== null) { totA += vA; cntA++; }
     if (vB !== null) { totB += vB; cntB++; }
     if (mapA[d]) { sumProfitA += mapA[d].profit; sumSalesA += mapA[d].sales; }
     if (mapB[d]) { sumProfitB += mapB[d].profit; sumSalesB += mapB[d].sales; }
+    if (vA !== null && vB !== null) { sharedXs.push(vA); sharedYs.push(vB); }
   });
 
   const isRate = metric === 'rate';
-  // 利益率は Σ台粗利 ÷ Σ台売上 × 100（台数・日数で重みを正確に反映）
   const avgA    = isRate ? (sumSalesA > 0 ? sumProfitA / sumSalesA * 100 : 0) : (cntA ? totA / cntA : 0);
   const avgB    = isRate ? (sumSalesB > 0 ? sumProfitB / sumSalesB * 100 : 0) : (cntB ? totB / cntB : 0);
   const diffAvg = avgA - avgB;
@@ -5079,6 +5142,16 @@ function _cmpBuildSummary(nameA, nameB, mapA, mapB) {
   const fmtD = v => (v >= 0 ? '+' : '') + (isRate ? v.toFixed(1) + unit : Math.round(v).toLocaleString() + unit);
   const subA = isRate ? `期間合計 / ${cntA}日分` : `1日平均 / ${cntA}日分`;
   const subB = isRate ? `期間合計 / ${cntB}日分` : `1日平均 / ${cntB}日分`;
+
+  // 相関係数
+  const corr = _pearsonCorr(sharedXs, sharedYs);
+  const corrLabel = corr === null ? '—' : corr.toFixed(3);
+  const corrInterp = corr === null ? `共通日数が少なすぎます` :
+    Math.abs(corr) >= 0.7 ? (corr > 0 ? '強い正の相関' : '強い負の相関') :
+    Math.abs(corr) >= 0.4 ? (corr > 0 ? '中程度の正の相関' : '中程度の負の相関') :
+    Math.abs(corr) >= 0.2 ? (corr > 0 ? '弱い正の相関' : '弱い負の相関') : 'ほぼ相関なし';
+  const corrColor = corr === null ? '#888' : Math.abs(corr) >= 0.7 ? '#22c55e' : Math.abs(corr) >= 0.4 ? '#f59e0b' : '#9499b7';
+  const corrBarW  = corr === null ? 0 : Math.round(Math.abs(corr) * 100);
 
   return `
     <div class="cmp-stat-box box-a">
@@ -5095,6 +5168,12 @@ function _cmpBuildSummary(nameA, nameB, mapA, mapB) {
       <div class="cmp-stat-label">差（A − B）</div>
       <div class="cmp-stat-val cd ${diffAvg < 0 ? 'neg' : ''}">${fmtD(diffAvg)}</div>
       <div class="cmp-stat-sub">${isRate ? '期間利益率の差' : '1日平均の差'}</div>
+    </div>
+    <div class="cmp-stat-box box-corr">
+      <div class="cmp-stat-label">📊 相関係数（r）</div>
+      <div class="cmp-stat-val cc" style="color:${corrColor}">${corrLabel}</div>
+      <div class="corr-bar-wrap"><div class="corr-bar" style="width:${corrBarW}%;background:${corrColor}"></div></div>
+      <div class="cmp-stat-sub">${corrInterp}（共通${sharedXs.length}日）</div>
     </div>`;
 }
 
@@ -5379,7 +5458,60 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     h += row('📌', `<strong>${d.model}</strong>: ${sgn(d.inmaiDiff,_cmpInUnit())} → ${winner}優位`);
   });
 
-  h += `<div style="margin-top:14px;font-size:11px;color:var(--text2);">🤖 台粗利・${_cmpInLabel()}は「1台平均値」。設置台数が極端に異なる機種は参考値として扱ってください。</div>`;
+  // ── 機種別 相関係数ランキング ──
+  // 各共通機種について「日次1台平均粗利」のA・B間ピアソン相関を計算
+  const _dailyAvgProfit = (rows, model) => {
+    const map = {};
+    rows.filter(r => r['機種名'] === model && r.date).forEach(r => {
+      if (!map[r.date]) map[r.date] = { profit: 0, count: 0 };
+      map[r.date].profit += r['台粗利'] || 0;
+      map[r.date].count  += 1;
+    });
+    Object.keys(map).forEach(d => {
+      map[d].avg = map[d].count > 0 ? map[d].profit / map[d].count : 0;
+    });
+    return map;
+  };
+
+  const modelCorrs = common.map(model => {
+    const dayA = _dailyAvgProfit(rowsA, model);
+    const dayB = _dailyAvgProfit(rowsB, model);
+    const shared = Object.keys(dayA).filter(d => dayB[d]);
+    if (shared.length < 5) return null; // 共通5日以上必要
+    const xs = shared.map(d => dayA[d].avg);
+    const ys = shared.map(d => dayB[d].avg);
+    const r = _pearsonCorr(xs, ys);
+    return r === null ? null : { model, r, days: shared.length };
+  }).filter(Boolean).sort((a, b) => b.r - a.r);
+
+  const corrTop3  = modelCorrs.slice(0, 3);
+  const corrBot3  = modelCorrs.slice(-3).reverse();
+
+  const corrStr = r => {
+    const abs = Math.abs(r);
+    const dir = r >= 0 ? '正' : '負';
+    const str = abs >= 0.7 ? '強い' : abs >= 0.4 ? '中程度の' : '弱い';
+    return `${str}${dir}の相関`;
+  };
+  const corrColor = r => Math.abs(r) >= 0.7 ? 'var(--green)' : Math.abs(r) >= 0.4 ? '#f59e0b' : 'var(--text2)';
+
+  if (corrTop3.length > 0) {
+    h += sec('📈 プラス相関 TOP3（A・B が連動して動く機種）');
+    corrTop3.forEach((c, i) => {
+      const medal = ['🥇','🥈','🥉'][i];
+      h += row(medal, `<strong>${c.model}</strong> &nbsp; r = <span style="color:${corrColor(c.r)};font-weight:700;">${c.r.toFixed(3)}</span> &nbsp;<span style="color:var(--text2);">${corrStr(c.r)}（${c.days}日）</span>`);
+    });
+  }
+
+  if (corrBot3.length > 0) {
+    h += sec('📉 マイナス相関 TOP3（A・B が逆に動く機種）');
+    corrBot3.forEach((c, i) => {
+      const icon = ['⚡','⚡','⚡'][i];
+      h += row(icon, `<strong>${c.model}</strong> &nbsp; r = <span style="color:${corrColor(c.r)};font-weight:700;">${c.r.toFixed(3)}</span> &nbsp;<span style="color:var(--text2);">${corrStr(c.r)}（${c.days}日）</span>`);
+    });
+  }
+
+  h += `<div style="margin-top:14px;font-size:11px;color:var(--text2);">🤖 台粗利・${_cmpInLabel()}は「1台平均値」。設置台数が極端に異なる機種は参考値として扱ってください。相関係数は共通5日以上のデータがある機種のみ対象。</div>`;
   return h;
 }
 
