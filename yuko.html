@@ -4135,7 +4135,7 @@ function renderModelTable() {
       <td>${fmtAbs(r.sales)}円</td>
       <td class="${colorClass(parseFloat(profitRate))}">${profitRate}%</td>
       <td class="${colorClass(r.diff)}">${fmt(r.diff)}</td>
-      <td class="${colorClass(r.diff * 4)}">${fmt(r.diff * 4)}円</td>
+      <td>${r.inmai > 0 ? (r.sales / r.inmai).toFixed(2) : '0.00'}円</td>
     </tr>`;
   }).join('');
 }
