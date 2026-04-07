@@ -4118,7 +4118,7 @@ function renderModelTable() {
     <th>推定売上合計</th>
     <th>利益率</th>
     <th>${_isPachinkoStore()?'差玉合計':'差枚合計'}</th>
-    ${_isPachinkoStore() ? '<th>大当たり</th><th>初当たり</th>' : '<th>BB</th><th>RB</th><th>ART</th>'}
+    <th>${_isPachinkoStore()?'玉粗利合計':'コイン粗利合計'}</th>
   </tr>`;
   tbody.innerHTML = rows.map(r => {
     const days = r.days.size;
@@ -4135,7 +4135,7 @@ function renderModelTable() {
       <td>${fmtAbs(r.sales)}円</td>
       <td class="${colorClass(parseFloat(profitRate))}">${profitRate}%</td>
       <td class="${colorClass(r.diff)}">${fmt(r.diff)}</td>
-      ${_isPachinkoStore() ? `<td>${Math.round(r.bb)}</td><td>${Math.round(r.rb)}</td>` : `<td>${Math.round(r.bb)}</td><td>${Math.round(r.rb)}</td><td>${Math.round(r.art)}</td>`}
+      <td class="${colorClass(r.diff * 4)}">${fmt(r.diff * 4)}円</td>
     </tr>`;
   }).join('');
 }
