@@ -5499,10 +5499,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     const ys = shared.map(d => dayB[d].avg);
     const r = _pearsonCorr(xs, ys);
     return r === null ? null : { model, r, days: shared.length };
-  }).filter(Boolean).sort((a, b) => b.r - a.r);
+  }).filter(Boolean);
 
-  const corrTop3  = modelCorrs.slice(0, 3);
-  const corrBot3  = modelCorrs.slice(-3).reverse();
+  // プラス相関: r が高い順（1に近い順）
+  const corrTop3 = [...modelCorrs].sort((a, b) => b.r - a.r).slice(0, 3);
+  // マイナス相関: r が低い順（-1に近い順）
+  const corrBot3 = [...modelCorrs].sort((a, b) => a.r - b.r).slice(0, 3);
 
   const corrStr = r => {
     const abs = Math.abs(r);
