@@ -1282,7 +1282,7 @@ const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX
 // ║  ★ 配布設定 ― この3行だけ編集して各担当者に渡してください ★  ║
 // ╚══════════════════════════════════════════════════════════════╝
 // 見られる店舗名をここに列挙。空 [] なら全店舗OK（管理者用）
-const STORE_WHITELIST = ["メガフェイス朝倉", "D'STATION 39大村"];          // 例: ['店舗A', '店舗B']
+const STORE_WHITELIST = ["メガフェイス朝倉", "D'STATION 39大村", "業界ベンチマーク"];          // 例: ['店舗A', '店舗B']
 // このファイルを使う人の名前（ヘッダーに表示）
 const USER_LABEL = 'ダイナム南さん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
@@ -1473,6 +1473,46 @@ async function exportUserData() {
   const allStores = getStores();
   const results = [];
 
+  // ── 業界ベンチマーク計算 ──────────────────────────────────────
+  // 4円パチンコ（（4P）を含む）と WINS北上 は除外して全店舗日次平均を算出
+  const BENCHMARK_NAME = '業界ベンチマーク';
+  const BENCHMARK_EXCLUDE_PATTERNS = ['（4P）', 'WINS北上'];
+  const benchByDate = {};
+  for (const store of allStores) {
+    if (store.id === 'ueda') continue; // デフォルトストアをスキップ
+    if (BENCHMARK_EXCLUDE_PATTERNS.some(ex => store.name.includes(ex))) continue;
+    const records = DB_CACHE[store.key] && DB_CACHE[store.key].length
+      ? DB_CACHE[store.key]
+      : await _idbGet(store.key);
+    records.forEach(r => {
+      if (!r.date) return;
+      if (!benchByDate[r.date]) benchByDate[r.date] = { profit:0, sales:0, inmai:0, diff:0, games:0, bb:0, rb:0, art:0, count:0 };
+      benchByDate[r.date].profit += r['台粗利'] || 0;
+      benchByDate[r.date].sales  += r['台売上'] || 0;
+      benchByDate[r.date].inmai  += r['IN枚数'] || 0;
+      benchByDate[r.date].diff   += r['差枚']   || 0;
+      benchByDate[r.date].games  += r['G数']    || 0;
+      benchByDate[r.date].bb     += r['BB']     || 0;
+      benchByDate[r.date].rb     += r['RB']     || 0;
+      benchByDate[r.date].art    += r['ART']    || 0;
+      benchByDate[r.date].count  += 1;
+    });
+  }
+  const benchmarkRecords = Object.entries(benchByDate).map(([date, v]) => ({
+    date,
+    '機種名': '業界全体平均',
+    '台粗利': v.count > 0 ? v.profit / v.count : 0,
+    '台売上': v.count > 0 ? v.sales  / v.count : 0,
+    'IN枚数': v.count > 0 ? v.inmai  / v.count : 0,
+    '差枚':   v.count > 0 ? v.diff   / v.count : 0,
+    'G数':    v.count > 0 ? v.games  / v.count : 0,
+    'BB':     v.count > 0 ? v.bb     / v.count : 0,
+    'RB':     v.count > 0 ? v.rb     / v.count : 0,
+    'ART':    v.count > 0 ? v.art    / v.count : 0,
+  })).sort((a, b) => a.date.localeCompare(b.date));
+  console.log(`[benchmark] ${Object.keys(benchByDate).length}日分・1日あたり平均台数=${benchByDate[Object.keys(benchByDate)[0]]?.count||0}台ベースで算出`);
+  // ──────────────────────────────────────────────────────────────
+
   for (const userConf of USERS_CONFIG) {
     const exportData = { generated: new Date().toISOString(), user: userConf.file, stores: {} };
     let storeCount = 0;
@@ -1491,6 +1531,11 @@ async function exportUserData() {
         }
       }
     }
+    // 業界ベンチマークを全ユーザーに追加
+    if (benchmarkRecords.length > 0) {
+      exportData.stores[BENCHMARK_NAME] = benchmarkRecords;
+    }
+
     results.push({ name: `${userConf.file}_data.json`, data: exportData, storeCount, recordCount });
   }
 
