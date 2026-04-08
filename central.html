@@ -3103,6 +3103,54 @@ function renderRivalAnalysis() {
   let html = '';
 
   // ① 絞り日 / 集客日カレンダー
+  // 曜日別集計（コメント生成用）
+  const dowNames = ['日','月','火','水','木','金','土'];
+  const dowType  = [0,1,2,3,4,5,6].map(dow => {
+    const entries = dayTypes.filter(d => new Date(d.date+'T00:00:00').getDay() === dow);
+    const sq = entries.filter(d => d.type === 'squeeze').length;
+    const at = entries.filter(d => d.type === 'attract').length;
+    const avgAtIN = entries.filter(d => d.type === 'attract').reduce((a,d) => a+d.avgI, 0) / Math.max(entries.filter(d=>d.type==='attract').length, 1);
+    return { dow, name: dowNames[dow], total: entries.length, sq, at, avgAtIN };
+  }).filter(d => d.total >= 2);
+
+  // 絞り日コメント
+  let squeezeComment = '';
+  if (dowType.length > 0 && squeezeDays.length > 0) {
+    const sorted = [...dowType].sort((a,b) => b.sq/Math.max(b.total,1) - a.sq/Math.max(a.total,1));
+    const top = sorted[0];
+    const rate = Math.round(top.sq / top.total * 100);
+    // 週末 vs 平日傾向
+    const weekendSq = dowType.filter(d => d.dow===0||d.dow===6).reduce((a,d)=>a+d.sq,0);
+    const weekdaySq = dowType.filter(d => d.dow>=1&&d.dow<=5).reduce((a,d)=>a+d.sq,0);
+    const weekendTotal = dowType.filter(d => d.dow===0||d.dow===6).reduce((a,d)=>a+d.total,0);
+    const weekdayTotal = dowType.filter(d => d.dow>=1&&d.dow<=5).reduce((a,d)=>a+d.total,0);
+    const weekendRate = weekendTotal > 0 ? weekendSq/weekendTotal : 0;
+    const weekdayRate = weekdayTotal > 0 ? weekdaySq/weekdayTotal : 0;
+    const pattern = weekdayRate > weekendRate + 0.15 ? '平日に絞る傾向' : weekendRate > weekdayRate + 0.15 ? '週末に絞る傾向' : '曜日に関係なく絞る日が点在';
+    squeezeComment = `💡 <b style="color:#fbbf24">${top.name}曜日</b>に最も絞り傾向（${top.sq}/${top.total}日・${rate}%）。${pattern}。翌日に自店イベントを集中させるのが有効。`;
+  }
+
+  // 集客日コメント
+  let attractComment = '';
+  if (dowType.length > 0 && attractDays.length > 0) {
+    const sorted = [...dowType].sort((a,b) => b.at/Math.max(b.total,1) - a.at/Math.max(a.total,1));
+    const top = sorted[0];
+    const rate = Math.round(top.at / top.total * 100);
+    // 集客日の平均INと全体平均を比較
+    const avgAtIN   = attractDays.reduce((a,d) => a+d.avgI, 0) / Math.max(attractDays.length, 1);
+    const avgNormIN = dayTypes.filter(d=>d.type!=='attract').reduce((a,d)=>a+d.avgI,0) / Math.max(dayTypes.filter(d=>d.type!=='attract').length, 1);
+    const inUpRate  = avgNormIN > 0 ? Math.round((avgAtIN - avgNormIN) / avgNormIN * 100) : 0;
+    // 週末 vs 平日傾向
+    const weekendAt = dowType.filter(d => d.dow===0||d.dow===6).reduce((a,d)=>a+d.at,0);
+    const weekdayAt = dowType.filter(d => d.dow>=1&&d.dow<=5).reduce((a,d)=>a+d.at,0);
+    const weekendTotal = dowType.filter(d => d.dow===0||d.dow===6).reduce((a,d)=>a+d.total,0);
+    const weekdayTotal = dowType.filter(d => d.dow>=1&&d.dow<=5).reduce((a,d)=>a+d.total,0);
+    const weekendRate = weekendTotal > 0 ? weekendAt/weekendTotal : 0;
+    const weekdayRate = weekdayTotal > 0 ? weekdayAt/weekdayTotal : 0;
+    const pattern = weekendRate > weekdayRate + 0.2 ? '週末集中型の集客スタイル' : weekdayRate > weekendRate + 0.2 ? '平日に集客日を置くスタイル' : '曜日を問わず集客日を配置';
+    attractComment = `💡 <b style="color:#60a5fa">${top.name}曜日</b>に最も集客傾向（${top.at}/${top.total}日・${rate}%）。${pattern}。集客日のアウトは通常日比 <b style="color:#60a5fa">+${inUpRate}%</b>。この曜日に自店も放出を合わせると客の取り合いになる。`;
+  }
+
   html += `<div class="rival-section">
     <div class="rival-section-title">📅 運用日分類 — 絞り日・集客日を把握せよ</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
@@ -3118,6 +3166,7 @@ function renderRivalAnalysis() {
           ${squeezeDays.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
         </div>
         <div style="font-size:10px;color:var(--text2);margin-top:4px;">※台粗利が平均${Math.round(SQUEEZE_PROFIT_TH*100)}%超 かつ アウトが平均${Math.round(SQUEEZE_IN_TH*100)}%以下</div>
+        ${squeezeComment ? `<div style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6;">${squeezeComment}</div>` : ''}
       </div>
       <div>
         <div style="font-size:11px;font-weight:800;color:#60a5fa;margin-bottom:6px;">
@@ -3131,26 +3180,10 @@ function renderRivalAnalysis() {
           ${attractDays.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
         </div>
         <div style="font-size:10px;color:var(--text2);margin-top:4px;">※アウトが平均${Math.round(ATTRACT_IN_TH*100)}%超</div>
+        ${attractComment ? `<div style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6;">${attractComment}</div>` : ''}
       </div>
-    </div>`;
-
-  // 曜日別 絞り日/集客日傾向
-  const dowNames = ['日','月','火','水','木','金','土'];
-  const dowType  = [0,1,2,3,4,5,6].map(dow => {
-    const entries = dayTypes.filter(d => new Date(d.date+'T00:00:00').getDay() === dow);
-    const sq = entries.filter(d => d.type === 'squeeze').length;
-    const at = entries.filter(d => d.type === 'attract').length;
-    return { dow, name: dowNames[dow], total: entries.length, sq, at };
-  }).filter(d => d.total >= 2);
-  if (dowType.length > 0) {
-    const bestSqueeze = [...dowType].sort((a,b) => b.sq/Math.max(b.total,1) - a.sq/Math.max(a.total,1))[0];
-    const bestAttract = [...dowType].sort((a,b) => b.at/Math.max(b.total,1) - a.at/Math.max(a.total,1))[0];
-    html += `<div style="font-size:11px;color:var(--text2);margin-top:2px;">
-      💡 <b style="color:#fbbf24">${bestSqueeze.name}曜日</b>に絞り傾向（${bestSqueeze.sq}/${bestSqueeze.total}日）、
-         <b style="color:#60a5fa">${bestAttract.name}曜日</b>に集客傾向（${bestAttract.at}/${bestAttract.total}日）
-    </div>`;
-  }
-  html += `</div>`;
+    </div>
+  </div>`;
 
   // ② 機種マトリクス
   html += `<div class="rival-section">
@@ -3189,9 +3222,46 @@ function renderRivalAnalysis() {
   });
   html += `</div></div>`;
 
-  // ③ バラエティ機種分析
+  // ③ バラエティ機種分析 — サマリー集計
+  const allTotalMachines   = modelList.reduce((a,m) => a + m.estimatedMachines, 0);
+  const varTotalMachines   = varietyModels.reduce((a,m) => a + m.estimatedMachines, 0);
+  const allTotalProfit     = modelList.reduce((a,m) => a + m.totalProfit, 0);
+  const varTotalProfit     = varietyModels.reduce((a,m) => a + m.totalProfit, 0);
+  const allTotalIn         = modelList.reduce((a,m) => a + m.avgIn * m.dayCount * m.estimatedMachines, 0);
+  const varTotalIn         = varietyModels.reduce((a,m) => a + m.avgIn * m.dayCount * m.estimatedMachines, 0);
+  const varInstallRate     = allTotalMachines > 0 ? varTotalMachines / allTotalMachines * 100 : 0;
+  const varProfitRate      = allTotalProfit !== 0  ? varTotalProfit  / Math.abs(allTotalProfit) * 100 : 0;
+  const varInRate          = allTotalIn > 0        ? varTotalIn      / allTotalIn * 100 : 0;
+  // 利益への貢献傾向コメント
+  const varProfitComment = varProfitRate > varInstallRate + 10
+    ? '設置比率を超えた利益貢献 — バラエティ枠を収益源に使っている'
+    : varProfitRate < varInstallRate - 10
+    ? '設置比率に対して利益貢献が低い — バラエティを集客・放出枠として使っている'
+    : 'バラエティの利益貢献は設置比率とほぼ同水準';
+
   html += `<div class="rival-section">
     <div class="rival-section-title">🎲 バラエティ機種分析 — 1〜2台設置の運用グセ</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+      <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">バラエティ総台数</div>
+        <div style="font-size:18px;font-weight:800;color:#a78bfa;">${varTotalMachines}<span style="font-size:11px;color:var(--text2);"> / ${allTotalMachines}台</span></div>
+      </div>
+      <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">設置比率</div>
+        <div style="font-size:18px;font-weight:800;color:#a78bfa;">${varInstallRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+      </div>
+      <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">利益比率</div>
+        <div style="font-size:18px;font-weight:800;color:${varProfitRate >= 0 ? '#a78bfa' : '#f87171'};">${varProfitRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+      </div>
+      <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+        <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">アウト比率</div>
+        <div style="font-size:18px;font-weight:800;color:#a78bfa;">${varInRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+      </div>
+      <div style="flex:1;min-width:220px;background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.2);border-radius:10px;padding:8px 14px;display:flex;align-items:center;">
+        <span style="font-size:11px;color:var(--text2);line-height:1.6;">💡 ${varProfitComment}</span>
+      </div>
+    </div>
     <div class="rival-variety-grid">
       <div class="rival-variety-box copy">
         <div class="rival-variety-box-title">✅ 利益管理が巧みな機種 <span class="action-badge copy">パクるべき</span>
@@ -3230,6 +3300,7 @@ function renderRivalAnalysis() {
   </div>`;
 
   // 免責メモ
+
   html += `<div style="margin-top:14px;font-size:10px;color:var(--text2);border-top:1px solid var(--border);padding-top:8px;">
     🤖 分類は統計的な推定です。設置台数はユニーク台番または日次平均レコード数から推定。
     閾値：収益源＝台粗利が全体平均の${Math.round(HIGH_PROFIT_TH*100)}%超、高アウト＝全体平均の${Math.round(HIGH_IN_TH*100)}%超。
