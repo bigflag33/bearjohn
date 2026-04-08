@@ -383,6 +383,29 @@
     white-space: pre-wrap;
     min-height: 44px;
   }
+  /* 日次トレンド分析ボックス */
+  .trend-analysis-box {
+    background: rgba(108,99,255,0.07);
+    border: 1px solid rgba(108,99,255,0.2);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .trend-analysis-box .tab-box-title {
+    font-size: 11px; font-weight: 800; color: #a78bfa;
+    letter-spacing: .4px; margin-bottom: 6px;
+  }
+  .trend-analysis-box .tab-box-body {
+    font-size: 12.5px; line-height: 1.7; color: var(--text);
+  }
+  .anomaly-chip {
+    background: rgba(251,191,36,0.1);
+    border: 1px solid rgba(251,191,36,0.35);
+    border-radius: 8px; padding: 4px 10px;
+    font-size: 11px; cursor: pointer;
+    transition: background .15s;
+  }
+  .anomaly-chip:hover { background: rgba(251,191,36,0.22); }
+
   .ai-section-head {
     font-size: 12px; font-weight: 800; letter-spacing: .5px;
     margin: 12px 0 4px; padding: 3px 10px;
@@ -714,6 +737,10 @@
     <div class="chart-card full">
       <div class="chart-title"><div class="dot" style="background:var(--accent)"></div>日次推移</div>
       <div class="chart-wrapper"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="chart-card full" id="trendAnalysisCard">
+      <div class="chart-title"><div class="dot" style="background:#a78bfa"></div>📊 日次トレンド分析</div>
+      <div id="trendAnalysisBody" style="padding:4px 4px 8px;"></div>
     </div>
     <div class="chart-card">
       <div class="chart-title"><div class="dot" style="background:var(--accent2)"></div>機種別粗利 TOP15</div>
@@ -2853,6 +2880,159 @@ function render() {
 
 function sum(arr, key) { return arr.reduce((a,b) => a + (b[key]||0), 0); }
 
+// ══════════════════════════════════════
+//  日次トレンド分析（①〜⑤）
+// ══════════════════════════════════════
+function renderTrendAnalysis(filteredDates, trendData, metricKey) {
+  const el = document.getElementById('trendAnalysisBody');
+  if (!el) return;
+  if (filteredDates.length < 5) {
+    el.innerHTML = '<span style="color:var(--text2);font-size:12px;">データが少なすぎます（5日以上必要）</span>';
+    return;
+  }
+
+  const n = filteredDates.length;
+  const metricUnit = metricKey === 'IN枚数' ? _inUnit() : '円';
+
+  // 基本統計
+  const mean = trendData.reduce((a,b)=>a+b,0) / n;
+  const std  = Math.sqrt(trendData.reduce((a,b)=>a+(b-mean)**2,0) / n);
+
+  // ④ 線形回帰でトレンド方向
+  let sx=0, sy=0, sxy=0, sx2=0;
+  trendData.forEach((y,i)=>{ sx+=i; sy+=y; sxy+=i*y; sx2+=i*i; });
+  const slope = (n*sxy - sx*sy) / (n*sx2 - sx*sx);
+
+  // ② 異常日検出（±1.8σ）
+  const SIGMA = 1.8;
+  const anomalies = filteredDates
+    .map((d,i) => ({ date:d, val:trendData[i], z:(trendData[i]-mean)/(std||1) }))
+    .filter(a => Math.abs(a.z) > SIGMA)
+    .sort((a,b) => Math.abs(b.z)-Math.abs(a.z))
+    .slice(0, 6);
+
+  // ① 月内パターン（前半1〜15日 vs 後半16日〜）
+  const firstHalf=[], secondHalf=[];
+  filteredDates.forEach((d,i) => {
+    const day = parseInt(d.slice(8));
+    (day <= 15 ? firstHalf : secondHalf).push(trendData[i]);
+  });
+  const avgFirst  = firstHalf.length  ? firstHalf.reduce((a,b)=>a+b,0)/firstHalf.length   : null;
+  const avgSecond = secondHalf.length ? secondHalf.reduce((a,b)=>a+b,0)/secondHalf.length : null;
+
+  // ③ 曜日バイアス
+  const DOW_NAMES = ['日','月','火','水','木','金','土'];
+  const dowBuckets = [[], [], [], [], [], [], []];
+  filteredDates.forEach((d,i) => { dowBuckets[new Date(d+'T00:00:00').getDay()].push(trendData[i]); });
+  const dowAvgs = dowBuckets
+    .map((vals, dow) => ({ dow, name: DOW_NAMES[dow], count: vals.length,
+      avg: vals.length >= 2 ? vals.reduce((a,b)=>a+b,0)/vals.length : null }))
+    .filter(d => d.avg !== null);
+  const bestDow  = dowAvgs.length ? [...dowAvgs].sort((a,b)=>b.avg-a.avg)[0] : null;
+  const worstDow = dowAvgs.length ? [...dowAvgs].sort((a,b)=>a.avg-b.avg)[0] : null;
+
+  // ⑤ 業界ベンチマーク対比
+  const benchByDate = {};
+  (DB_CACHE['__benchmark__'] || []).forEach(r => { benchByDate[r.date] = r; });
+  const storeVsBench = filteredDates.map((d,i) => {
+    const bv = benchByDate[d]?.[metricKey];
+    return bv != null ? { date:d, store:trendData[i], bench:bv, diff:trendData[i]-bv } : null;
+  }).filter(Boolean);
+
+  // ── HTML組み立て ──
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:10px;">`;
+
+  // ④ トレンド方向
+  const trendIcon = slope > 50 ? '📈' : slope < -50 ? '📉' : '➡️';
+  const trendWord = slope > 50 ? '上昇トレンド' : slope < -50 ? '下降トレンド' : '横ばい';
+  const slopeStr  = (slope >= 0 ? '+' : '') + Math.round(slope).toLocaleString();
+  html += `<div class="trend-analysis-box">
+    <div class="tab-box-title">${trendIcon} トレンド方向</div>
+    <div class="tab-box-body">
+      <b>${trendWord}</b>（1日あたり ${slopeStr}${metricUnit}/日）<br>
+      <span style="color:var(--text2);font-size:11px;">期間平均 ${Math.round(mean).toLocaleString()}${metricUnit}　σ ${Math.round(std).toLocaleString()}${metricUnit}</span>
+    </div>
+  </div>`;
+
+  // ① 月内パターン
+  if (avgFirst !== null && avgSecond !== null) {
+    const diff = avgFirst - avgSecond;
+    const threshold = std * 0.25;
+    const pattern  = Math.abs(diff) < threshold ? 'フラット型' : diff > 0 ? '前半型' : '後半型';
+    const pIcon    = Math.abs(diff) < threshold ? '🔁' : diff > 0 ? '🌅' : '🌇';
+    const pComment = Math.abs(diff) < threshold
+      ? '前後半で大きな差はありません'
+      : diff > 0 ? '月の前半で稼ぐスタイルです' : '月の後半に向けて伸びるスタイルです';
+    html += `<div class="trend-analysis-box">
+      <div class="tab-box-title">${pIcon} 月内パターン：<b>${pattern}</b></div>
+      <div class="tab-box-body">
+        ${pComment}<br>
+        <span style="color:var(--text2);font-size:11px;">前半平均 ${Math.round(avgFirst).toLocaleString()}${metricUnit}　後半平均 ${Math.round(avgSecond).toLocaleString()}${metricUnit}</span>
+      </div>
+    </div>`;
+  }
+
+  // ③ 曜日バイアス
+  if (bestDow && worstDow && bestDow.dow !== worstDow.dow) {
+    const spread = bestDow.avg - worstDow.avg;
+    const spreadPct = mean !== 0 ? Math.abs(spread/mean*100).toFixed(0) : '—';
+    html += `<div class="trend-analysis-box">
+      <div class="tab-box-title">📅 曜日バイアス</div>
+      <div class="tab-box-body">
+        <span style="color:var(--green)">▲ ${bestDow.name}曜日が最強</span>（平均 ${Math.round(bestDow.avg).toLocaleString()}${metricUnit}）<br>
+        <span style="color:var(--red)">▼ ${worstDow.name}曜日が最弱</span>（平均 ${Math.round(worstDow.avg).toLocaleString()}${metricUnit}）<br>
+        <span style="color:var(--text2);font-size:11px;">最大差 ${Math.round(spread).toLocaleString()}${metricUnit}（平均比 ${spreadPct}%）</span>
+      </div>
+    </div>`;
+  }
+
+  // ⑤ ベンチマーク対比
+  if (storeVsBench.length >= 5) {
+    const totalDays = storeVsBench.length;
+    const aboveCount = storeVsBench.filter(x=>x.diff>=0).length;
+    const avgDiff = storeVsBench.reduce((a,b)=>a+b.diff,0) / totalDays;
+    const recent10 = storeVsBench.slice(-10);
+    const recentAbove = recent10.filter(x=>x.diff>=0).length;
+    let bIcon, bText;
+    if (recentAbove >= 7)      { bIcon='📈'; bText=`直近は業界平均を<b style="color:var(--green)">上回る</b>日が多い（${recentAbove}/${recent10.length}日）`; }
+    else if (recentAbove <= 3) { bIcon='📉'; bText=`直近は業界平均を<b style="color:var(--red)">下回る</b>日が多い（${recent10.length-recentAbove}/${recent10.length}日）`; }
+    else                        { bIcon='🔁'; bText=`業界平均と拮抗（上回った日 ${aboveCount}/${totalDays}日）`; }
+    const diffSign = avgDiff >= 0 ? '+' : '';
+    html += `<div class="trend-analysis-box">
+      <div class="tab-box-title">${bIcon} 業界ベンチマーク対比</div>
+      <div class="tab-box-body">
+        ${bText}<br>
+        <span style="color:var(--text2);font-size:11px;">期間平均差 ${diffSign}${Math.round(avgDiff).toLocaleString()}${metricUnit}/日</span>
+      </div>
+    </div>`;
+  }
+
+  html += `</div>`;
+
+  // ② 注目日（異常日フラグ）
+  if (anomalies.length > 0) {
+    html += `<div>
+      <div style="font-size:11px;font-weight:800;color:#f59e0b;margin-bottom:6px;letter-spacing:.3px;">⚡ 注目日（統計的に突出した日 ±${SIGMA}σ超）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">`;
+    anomalies.forEach(a => {
+      const sign  = a.val >= 0 ? '+' : '';
+      const isUp  = a.z > 0;
+      const icon  = isUp ? '🔺' : '🔻';
+      const col   = isUp ? 'rgba(67,233,123,0.12)' : 'rgba(255,77,109,0.12)';
+      const bdr   = isUp ? 'rgba(67,233,123,0.4)'  : 'rgba(255,77,109,0.4)';
+      const zStr  = (a.z>0?'+':'')+a.z.toFixed(1)+'σ';
+      html += `<span class="anomaly-chip" style="background:${col};border-color:${bdr};"
+        onclick="navigateToPinpoint('${a.date}')" title="ピンポイント分析へジャンプ">
+        ${icon} ${a.date.slice(5)} &nbsp;<b>${sign}${Math.round(a.val).toLocaleString()}${metricUnit}</b>
+        <span style="color:var(--text2);font-size:10px;">(${zStr})</span>
+      </span>`;
+    });
+    html += `</div></div>`;
+  }
+
+  el.innerHTML = html;
+}
+
 function renderKPIs() {
   const profit = sum(filtered, '台粗利');
   const sales = sum(filtered, '台売上');
@@ -2944,6 +3124,9 @@ function renderCharts() {
   });
   document.getElementById('trendChart').style.cursor = 'pointer';
   document.getElementById('trendChart').title = '日付クリックでピンポイント分析へ';
+
+  // 日次トレンド分析を描画
+  renderTrendAnalysis(filteredDates, trendData, metricKey);
 
   // 機種別集計
   const modelAgg = {};
@@ -5160,8 +5343,15 @@ function buildCmpTargetSelect() {
 function cmpResetDates() {
   const f = document.getElementById('cmpFrom');
   const t = document.getElementById('cmpTo');
-  if (f) f.value = '';
-  if (t) t.value = '';
+  if (f) {
+    const today = new Date();
+    const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    f.value = prevMonth.toISOString().slice(0, 10);
+  }
+  if (t) {
+    const allDates = getStores().flatMap(s => (DB_CACHE[s.key] || []).map(r => r.date)).filter(Boolean).sort();
+    t.value = allDates.length ? allDates[allDates.length - 1] : new Date().toISOString().slice(0, 10);
+  }
   renderStoreCmp();
 }
 
@@ -5419,6 +5609,19 @@ function buildStoreCmpSelects() {
 function initStoreCmp() {
   buildStoreCmpSelects();
   buildCmpTargetSelect();
+  // デフォルト期間：前月1日〜最新データ日
+  const f = document.getElementById('cmpFrom');
+  const t = document.getElementById('cmpTo');
+  if (f && !f.value) {
+    const today = new Date();
+    const prevMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    f.value = prevMonth.toISOString().slice(0, 10);
+  }
+  if (t && !t.value) {
+    // 全店舗の中で最新の日付を取得
+    const allDates = getStores().flatMap(s => (DB_CACHE[s.key] || []).map(r => r.date)).filter(Boolean).sort();
+    t.value = allDates.length ? allDates[allDates.length - 1] : new Date().toISOString().slice(0, 10);
+  }
   renderStoreCmp();
 }
 
