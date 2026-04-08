@@ -3299,6 +3299,72 @@ function renderRivalAnalysis() {
     </div>
   </div>`;
 
+  // ④ ジャグラーシリーズ分析
+  const jagModels      = modelList.filter(m => m.name.includes('ジャグラー'));
+  const jagMachines    = jagModels.reduce((a,m) => a + m.estimatedMachines, 0);
+  const jagProfit      = jagModels.reduce((a,m) => a + m.totalProfit, 0);
+  const jagIn          = jagModels.reduce((a,m) => a + m.avgIn * m.dayCount * m.estimatedMachines, 0);
+  const jagInstallRate = allTotalMachines > 0 ? jagMachines / allTotalMachines * 100 : 0;
+  const jagProfitRate  = allTotalProfit !== 0  ? jagProfit  / Math.abs(allTotalProfit) * 100 : 0;
+  const jagInRate      = allTotalIn > 0        ? jagIn      / allTotalIn * 100 : 0;
+
+  if (jagModels.length > 0) {
+    // ジャグラーの役割コメント
+    const jagComment = jagProfitRate > jagInstallRate + 10
+      ? 'ジャグラーが設置比率を超えた利益貢献 — 収益の主力として運用している'
+      : jagProfitRate < jagInstallRate - 10
+      ? 'ジャグラーの利益比率が設置比率を下回る — 集客・放出枠として使っている可能性'
+      : 'ジャグラーの利益貢献は設置比率とほぼ同水準';
+
+    // アウト比率 vs 設置比率の差（稼働効率）
+    const jagInComment = jagInRate > jagInstallRate + 8
+      ? `アウト比率が設置比率より高く、ジャグラーに客が集まっている（稼働効率◎）`
+      : jagInRate < jagInstallRate - 8
+      ? `アウト比率が設置比率より低く、ジャグラーの稼働が上がっていない`
+      : `稼働はほぼ設置比率通り`;
+
+    // 機種リスト（台粗利順）
+    const jagSorted = [...jagModels].sort((a,b) => b.avgProfit - a.avgProfit);
+
+    html += `<div class="rival-section">
+      <div class="rival-section-title" style="color:#f59e0b;">🫐 ジャグラーシリーズ分析</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+          <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">ジャグラー総台数</div>
+          <div style="font-size:18px;font-weight:800;color:#f59e0b;">${jagMachines}<span style="font-size:11px;color:var(--text2);"> / ${allTotalMachines}台</span></div>
+        </div>
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+          <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">設置比率</div>
+          <div style="font-size:18px;font-weight:800;color:#f59e0b;">${jagInstallRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+        </div>
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+          <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">利益比率</div>
+          <div style="font-size:18px;font-weight:800;color:${jagProfitRate >= 0 ? '#f59e0b' : '#f87171'};">${jagProfitRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+        </div>
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+          <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">アウト比率</div>
+          <div style="font-size:18px;font-weight:800;color:#f59e0b;">${jagInRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+        </div>
+        <div style="flex:1;min-width:220px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.2);border-radius:10px;padding:8px 14px;">
+          <div style="font-size:11px;color:var(--text2);line-height:1.6;">💡 ${jagComment}<br>${jagInComment}</div>
+        </div>
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;">機種別内訳（台粗利順・${jagModels.length}機種）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${jagSorted.map(m => {
+          const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
+          const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
+          const profitCol = m.avgProfit >= storeAvgProfit ? '#f59e0b' : m.avgProfit >= 0 ? '#fcd34d' : '#f87171';
+          return `<span class="rival-model-chip" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:${profitCol};"
+            title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜推定${m.estimatedMachines}台">
+            ${m.name.length > 14 ? m.name.slice(0,14)+'…' : m.name}
+            <span style="font-size:10px;opacity:.8;">${profitStr}</span>
+          </span>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
   // 免責メモ
 
   html += `<div style="margin-top:14px;font-size:10px;color:var(--text2);border-top:1px solid var(--border);padding-top:8px;">
