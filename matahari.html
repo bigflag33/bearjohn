@@ -383,6 +383,75 @@
     white-space: pre-wrap;
     min-height: 44px;
   }
+  /* ══ 攻略分析セクション ══ */
+  .rival-section { margin-top: 18px; }
+  .rival-section-title {
+    font-size: 13px; font-weight: 800; color: #f87171;
+    letter-spacing: .5px; margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .rival-section-title::before {
+    content: ''; display: block; width: 4px; height: 16px;
+    background: #f87171; border-radius: 2px;
+  }
+  /* 絞り日/集客日カレンダー */
+  .rival-day-grid {
+    display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px;
+  }
+  .rival-day-chip {
+    padding: 3px 9px; border-radius: 6px; font-size: 11px;
+    font-weight: 700; cursor: default;
+  }
+  .rival-day-chip.squeeze  { background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.4); }
+  .rival-day-chip.attract  { background:rgba(96,165,250,0.15);  color:#60a5fa; border:1px solid rgba(96,165,250,0.4); }
+  .rival-day-chip.normal   { background:rgba(100,116,139,0.1);  color:#94a3b8; border:1px solid rgba(100,116,139,0.2); }
+  /* 機種マトリクス */
+  .rival-matrix-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .rival-matrix-box {
+    border-radius: 10px; padding: 10px 12px;
+  }
+  .rival-matrix-box.revenue  { background:rgba(251,191,36,0.1);  border:1px solid rgba(251,191,36,0.35); }
+  .rival-matrix-box.golden   { background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.35); }
+  .rival-matrix-box.nurture  { background:rgba(96,165,250,0.1);  border:1px solid rgba(96,165,250,0.35); }
+  .rival-matrix-box.selfdest { background:rgba(249,115,22,0.1);  border:1px solid rgba(249,115,22,0.35); }
+  .rival-matrix-box.wasteful { background:rgba(100,116,139,0.1); border:1px solid rgba(100,116,139,0.3); }
+  .rival-matrix-box-title {
+    font-size: 11px; font-weight: 800; margin-bottom: 6px; letter-spacing: .3px;
+  }
+  .rival-matrix-box.revenue  .rival-matrix-box-title { color: #fbbf24; }
+  .rival-matrix-box.golden   .rival-matrix-box-title { color: #a78bfa; }
+  .rival-matrix-box.nurture  .rival-matrix-box-title { color: #60a5fa; }
+  .rival-matrix-box.selfdest .rival-matrix-box-title { color: #fb923c; }
+  .rival-matrix-box.wasteful .rival-matrix-box-title { color: #94a3b8; }
+  .rival-model-chip {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; margin: 2px 3px; font-weight: 600;
+    max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* バラエティ機種 */
+  .rival-variety-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  }
+  .rival-variety-box {
+    border-radius: 10px; padding: 10px 12px;
+  }
+  .rival-variety-box.copy    { background:rgba(52,211,153,0.1);  border:1px solid rgba(52,211,153,0.35); }
+  .rival-variety-box.spice   { background:rgba(96,165,250,0.1);  border:1px solid rgba(96,165,250,0.35); }
+  .rival-variety-box-title   { font-size: 11px; font-weight: 800; margin-bottom: 6px; }
+  .rival-variety-box.copy  .rival-variety-box-title  { color: #34d399; }
+  .rival-variety-box.spice .rival-variety-box-title  { color: #60a5fa; }
+  /* アクションバッジ */
+  .action-badge {
+    display: inline-block; padding: 1px 7px; border-radius: 4px;
+    font-size: 10px; font-weight: 800; letter-spacing: .3px; margin-left: 4px;
+  }
+  .action-badge.attack  { background:rgba(248,113,113,0.2); color:#f87171; border:1px solid rgba(248,113,113,0.4); }
+  .action-badge.block   { background:rgba(96,165,250,0.2);  color:#60a5fa; border:1px solid rgba(96,165,250,0.4); }
+  .action-badge.wait    { background:rgba(100,116,139,0.2); color:#94a3b8; border:1px solid rgba(100,116,139,0.4); }
+  .action-badge.copy    { background:rgba(52,211,153,0.2);  color:#34d399; border:1px solid rgba(52,211,153,0.4); }
+
   /* 日次トレンド分析ボックス */
   .trend-analysis-box {
     background: rgba(108,99,255,0.07);
@@ -1039,6 +1108,19 @@
       <div class="pin-ai-content" id="calAIContent">
         <span style="color:var(--text2);font-size:12px;">▶ 「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>
       </div>
+    </div>
+  </div>
+
+  <!-- ▼ 攻略分析 ▼ -->
+  <div class="table-card" id="rivalAnalysisCard">
+    <div class="table-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="dot" style="background:#f87171;"></div>
+        🎯 攻略分析 — この店舗を攻略するには
+      </div>
+    </div>
+    <div id="rivalAnalysisBody" style="padding:4px 0 8px;">
+      <span style="color:var(--text2);font-size:12px;">データをアップロードすると攻略分析が表示されます</span>
     </div>
   </div>
 
@@ -2865,7 +2947,7 @@ function renderComparisons() {
 
 function render() {
   const fns = [renderKPIs, renderCharts, renderCalendar,
-               renderDayTable, renderDOW, renderDigit, renderModelTable];
+               renderDayTable, renderDOW, renderDigit, renderModelTable, renderRivalAnalysis];
   // 機種別集計ビューをテーブルモードにリセット
   modelAggMode = 'table';
   document.getElementById('modelAggTableView').style.display = '';
@@ -2879,6 +2961,283 @@ function render() {
 }
 
 function sum(arr, key) { return arr.reduce((a,b) => a + (b[key]||0), 0); }
+
+// ══════════════════════════════════════
+//  攻略分析
+// ══════════════════════════════════════
+function renderRivalAnalysis() {
+  const el = document.getElementById('rivalAnalysisBody');
+  if (!el) return;
+
+  const all = loadAllData();
+  if (all.length < 10) {
+    el.innerHTML = '<span style="color:var(--text2);font-size:12px;">データをアップロードすると攻略分析が表示されます</span>';
+    return;
+  }
+
+  // ── 全体平均（ベースライン）──
+  const storeAvgProfit = all.reduce((a,r) => a+(r['台粗利']||0), 0) / all.length;
+  const storeAvgIn     = all.reduce((a,r) => a+(r['IN枚数']||0), 0) / all.length;
+
+  // ── 日別集計（絞り日/集客日判定用）──
+  const byDate = {};
+  all.forEach(r => {
+    if (!r.date) return;
+    if (!byDate[r.date]) byDate[r.date] = { profit:0, inmai:0, diff:0, count:0 };
+    byDate[r.date].profit += r['台粗利'] || 0;
+    byDate[r.date].inmai  += r['IN枚数'] || 0;
+    byDate[r.date].diff   += r['差枚']   || 0;
+    byDate[r.date].count  += 1;
+  });
+  const dateEntries = Object.entries(byDate).sort((a,b) => a[0].localeCompare(b[0]));
+  const avgDailyProfit = dateEntries.reduce((a,[,v]) => a + v.profit/Math.max(v.count,1), 0) / Math.max(dateEntries.length,1);
+  const avgDailyIn     = dateEntries.reduce((a,[,v]) => a + v.inmai/Math.max(v.count,1),  0) / Math.max(dateEntries.length,1);
+
+  // 絞り日 = 台粗利高 かつ IN枚数/台が平均以下
+  // 集客日 = IN枚数/台が高い かつ 放出率が低い（差枚/IN枚数がマイナス寄り）
+  const SQUEEZE_PROFIT_TH = 1.15; // 平均の115%以上の粗利
+  const SQUEEZE_IN_TH     = 0.95; // 平均の95%以下のアウト
+  const ATTRACT_IN_TH     = 1.1;  // 平均の110%以上のアウト
+  const ATTRACT_DIFF_TH   = -0.02; // 差枚/IN枚数が-2%以下（放出している）
+
+  const dayTypes = dateEntries.map(([date, v]) => {
+    const avgP = v.profit / Math.max(v.count, 1);
+    const avgI = v.inmai  / Math.max(v.count, 1);
+    const diffRate = v.inmai > 0 ? v.diff / v.inmai : 0;
+    let type = 'normal';
+    if (avgP >= avgDailyProfit * SQUEEZE_PROFIT_TH && avgI <= avgDailyIn * SQUEEZE_IN_TH) {
+      type = 'squeeze'; // 絞り日
+    } else if (avgI >= avgDailyIn * ATTRACT_IN_TH && diffRate <= ATTRACT_DIFF_TH) {
+      type = 'attract'; // 集客日（高アウト＋放出）
+    } else if (avgI >= avgDailyIn * ATTRACT_IN_TH) {
+      type = 'attract'; // アウト高のみでも集客日扱い
+    }
+    return { date, type, avgP, avgI, diffRate };
+  });
+
+  const squeezeDays  = dayTypes.filter(d => d.type === 'squeeze');
+  const attractDays  = dayTypes.filter(d => d.type === 'attract');
+
+  // ── 機種別集計（マトリクス分類用）──
+  const byModel = {};
+  all.forEach(r => {
+    const m = r['機種名'];
+    if (!m) return;
+    if (!byModel[m]) byModel[m] = {
+      profit:0, inmai:0, diff:0, count:0,
+      dates: new Set(), banTai: new Set(),
+      earlyIn:0, earlyCount:0, lateIn:0, lateCount:0
+    };
+    byModel[m].profit += r['台粗利'] || 0;
+    byModel[m].inmai  += r['IN枚数'] || 0;
+    byModel[m].diff   += r['差枚']   || 0;
+    byModel[m].count  += 1;
+    byModel[m].dates.add(r.date);
+    if (r['台番']) byModel[m].banTai.add(String(r['台番']));
+  });
+
+  // 日付を前半/後半に分けてIN枚数トレンドを計算
+  const allDates = [...new Set(all.map(r => r.date).filter(Boolean))].sort();
+  const midIdx   = Math.floor(allDates.length / 2);
+  const earlySet = new Set(allDates.slice(0, midIdx));
+  const lateSet  = new Set(allDates.slice(midIdx));
+  all.forEach(r => {
+    const m = r['機種名'];
+    if (!m || !byModel[m]) return;
+    if (earlySet.has(r.date)) { byModel[m].earlyIn += r['IN枚数']||0; byModel[m].earlyCount++; }
+    if (lateSet.has(r.date))  { byModel[m].lateIn  += r['IN枚数']||0; byModel[m].lateCount++;  }
+  });
+
+  // 各機種の指標計算
+  const modelList = Object.entries(byModel).map(([name, v]) => {
+    const dayCount       = v.dates.size;
+    const avgMachines    = v.count / Math.max(dayCount, 1); // 1日平均台数
+    const avgProfit      = v.profit / Math.max(v.count, 1);
+    const avgIn          = v.inmai  / Math.max(v.count, 1);
+    const earlyAvgIn     = v.earlyCount > 0 ? v.earlyIn / v.earlyCount : 0;
+    const lateAvgIn      = v.lateCount  > 0 ? v.lateIn  / v.lateCount  : 0;
+    const inTrend        = earlyAvgIn > 0 ? (lateAvgIn - earlyAvgIn) / earlyAvgIn : 0; // 正=上昇
+    const uniqueBanTai   = v.banTai.size;
+    const estimatedMachines = Math.max(Math.round(avgMachines), uniqueBanTai > 0 ? Math.min(uniqueBanTai, Math.round(avgMachines)+1) : Math.round(avgMachines));
+    return { name, avgProfit, avgIn, inTrend, dayCount, estimatedMachines, totalProfit: v.profit };
+  }).filter(m => m.dayCount >= 3); // 3日以上データある機種のみ
+
+  // 機種分類（粗利×アウトの2軸 + INトレンド）
+  const HIGH_PROFIT_TH  = 0.8;  // 全体平均の80%以上
+  const HIGH_IN_TH      = 0.9;  // 全体平均の90%以上
+  const LOW_PROFIT_TH   = 0.3;  // 全体平均の30%以下（放出設定）
+  const LOW_IN_TH       = 0.7;  // 全体平均の70%以下（アウト低い）
+  const TREND_UP_TH     = 0.05; // 5%以上上昇
+  const TREND_DOWN_TH   = -0.05;// 5%以上下降
+
+  const classified = { golden:[], revenue:[], nurture:[], selfdest:[], wasteful:[], other:[] };
+  modelList.forEach(m => {
+    const isHighProfit = m.avgProfit >= storeAvgProfit * HIGH_PROFIT_TH;
+    const isHighIn     = m.avgIn     >= storeAvgIn     * HIGH_IN_TH;
+    const isLowProfit  = m.avgProfit <  storeAvgProfit * LOW_PROFIT_TH;
+    const isLowIn      = m.avgIn     <  storeAvgIn     * LOW_IN_TH;
+    const inRising     = m.inTrend   >= TREND_UP_TH;
+    const inFalling    = m.inTrend   <= TREND_DOWN_TH;
+
+    if (isHighProfit && isHighIn)                          classified.golden.push(m);
+    else if (isHighProfit && isLowIn  && inFalling)        classified.selfdest.push(m); // 収益設定だがアウト下落→抜きすぎ自滅
+    else if (isHighProfit)                                  classified.revenue.push(m); // 収益源
+    else if (isLowProfit  && isHighIn && inRising)         classified.nurture.push(m); // 育成中（放出+アウト上昇）
+    else if (isLowProfit  && isHighIn)                     classified.nurture.push(m); // 育成（高アウト）
+    else if (isLowProfit  && isLowIn)                      classified.wasteful.push(m);// 放出しているのにアウト低
+    else                                                    classified.other.push(m);
+  });
+  // 各カテゴリを粗利順ソート
+  Object.keys(classified).forEach(k => classified[k].sort((a,b) => b.avgProfit - a.avgProfit));
+
+  // バラエティ機種（推定設置台数1〜2台）
+  const varietyModels = modelList.filter(m => m.estimatedMachines <= 2 && m.dayCount >= 5);
+  const varietyCopy   = varietyModels.filter(m =>
+    m.avgProfit >= storeAvgProfit * 0.7 && m.avgIn >= storeAvgIn * 0.8
+  ).sort((a,b) => b.avgProfit - a.avgProfit);
+  const varietySpice  = varietyModels.filter(m =>
+    m.avgIn >= storeAvgIn && m.avgProfit < storeAvgProfit * 0.5
+  ).sort((a,b) => b.avgIn - a.avgIn);
+
+  // ── HTML組み立て ──
+  let html = '';
+
+  // ① 絞り日 / 集客日カレンダー
+  html += `<div class="rival-section">
+    <div class="rival-section-title">📅 運用日分類 — 絞り日・集客日を把握せよ</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:11px;font-weight:800;color:#fbbf24;margin-bottom:6px;">
+          🟡 絞り日（利益確保日）<span class="action-badge attack">狙い目：翌日に仕掛けよ</span>
+          <span style="color:var(--text2);font-weight:400;"> ${squeezeDays.length}日/${dateEntries.length}日</span>
+        </div>
+        <div class="rival-day-grid">
+          ${squeezeDays.slice(0,20).map(d =>
+            `<span class="rival-day-chip squeeze" title="台粗利 ${Math.round(d.avgP)}円 / IN ${Math.round(d.avgI)}枚">${d.date.slice(5)}</span>`
+          ).join('')}
+          ${squeezeDays.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-top:4px;">※台粗利が平均${Math.round(SQUEEZE_PROFIT_TH*100)}%超 かつ アウトが平均${Math.round(SQUEEZE_IN_TH*100)}%以下</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:800;color:#60a5fa;margin-bottom:6px;">
+          🔵 集客日（アウト確保日）<span class="action-badge block">要注意：客が集まっている</span>
+          <span style="color:var(--text2);font-weight:400;"> ${attractDays.length}日/${dateEntries.length}日</span>
+        </div>
+        <div class="rival-day-grid">
+          ${attractDays.slice(0,20).map(d =>
+            `<span class="rival-day-chip attract" title="台粗利 ${Math.round(d.avgP)}円 / IN ${Math.round(d.avgI)}枚 / 放出率 ${(d.diffRate*100).toFixed(1)}%">${d.date.slice(5)}</span>`
+          ).join('')}
+          ${attractDays.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-top:4px;">※アウトが平均${Math.round(ATTRACT_IN_TH*100)}%超</div>
+      </div>
+    </div>`;
+
+  // 曜日別 絞り日/集客日傾向
+  const dowNames = ['日','月','火','水','木','金','土'];
+  const dowType  = [0,1,2,3,4,5,6].map(dow => {
+    const entries = dayTypes.filter(d => new Date(d.date+'T00:00:00').getDay() === dow);
+    const sq = entries.filter(d => d.type === 'squeeze').length;
+    const at = entries.filter(d => d.type === 'attract').length;
+    return { dow, name: dowNames[dow], total: entries.length, sq, at };
+  }).filter(d => d.total >= 2);
+  if (dowType.length > 0) {
+    const bestSqueeze = [...dowType].sort((a,b) => b.sq/Math.max(b.total,1) - a.sq/Math.max(a.total,1))[0];
+    const bestAttract = [...dowType].sort((a,b) => b.at/Math.max(b.total,1) - a.at/Math.max(a.total,1))[0];
+    html += `<div style="font-size:11px;color:var(--text2);margin-top:2px;">
+      💡 <b style="color:#fbbf24">${bestSqueeze.name}曜日</b>に絞り傾向（${bestSqueeze.sq}/${bestSqueeze.total}日）、
+         <b style="color:#60a5fa">${bestAttract.name}曜日</b>に集客傾向（${bestAttract.at}/${bestAttract.total}日）
+    </div>`;
+  }
+  html += `</div>`;
+
+  // ② 機種マトリクス
+  html += `<div class="rival-section">
+    <div class="rival-section-title">🎮 機種マトリクス — 依存機種を暴く</div>
+    <div class="rival-matrix-grid">`;
+
+  const matrixDefs = [
+    { key:'golden',   cls:'golden',   icon:'👑', title:'ゴールデン機種',    badge:'attack',  badgeText:'最優先で叩け',    desc:'高収益 × 高アウト。この店の柱。真っ先に同機種で対抗すべき。' },
+    { key:'revenue',  cls:'revenue',  icon:'💰', title:'収益源機種',        badge:'attack',  badgeText:'叩いて収益構造を崩せ', desc:'高収益で運用中。同機種を甘く設定すれば相手の利益の柱が崩れる。' },
+    { key:'nurture',  cls:'nurture',  icon:'🌱', title:'育成・集客機種',    badge:'block',   badgeText:'邪魔すべき',       desc:'放出伴いアウト上昇中。育成効果が出ている。同機種で先手を打て。' },
+    { key:'selfdest', cls:'selfdest', icon:'💣', title:'自滅機種（抜きすぎ）',badge:'wait',  badgeText:'自滅を待て',       desc:'収益設定なのにアウト急落。客が逃げている可能性大。放置でよい。' },
+    { key:'wasteful', cls:'wasteful', icon:'🕳️', title:'無駄放出機種',      badge:'wait',   badgeText:'様子見',           desc:'放出しているのにアウトが伸びない。集客できていない機種。放置でよい。' },
+  ];
+
+  matrixDefs.forEach(def => {
+    const models = classified[def.key];
+    html += `<div class="rival-matrix-box ${def.cls}">
+      <div class="rival-matrix-box-title">${def.icon} ${def.title} <span class="action-badge ${def.badge}">${def.badgeText}</span>
+        <span style="color:var(--text2);font-size:10px;font-weight:400;"> ${models.length}機種</span>
+      </div>
+      <div style="font-size:10px;color:var(--text2);margin-bottom:6px;">${def.desc}</div>
+      <div>
+        ${models.slice(0,8).map(m => {
+          const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
+          const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
+          const trendStr  = m.inTrend > 0.05 ? '↑' : m.inTrend < -0.05 ? '↓' : '→';
+          return `<span class="rival-model-chip" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text);"
+            title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜IN推移 ${trendStr}｜${m.estimatedMachines}台設置推定">
+            ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
+          </span>`;
+        }).join('')}
+        ${models.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+        ${models.length > 8 ? `<span style="color:var(--text2);font-size:10px;">他${models.length-8}機種</span>` : ''}
+      </div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  // ③ バラエティ機種分析
+  html += `<div class="rival-section">
+    <div class="rival-section-title">🎲 バラエティ機種分析 — 1〜2台設置の運用グセ</div>
+    <div class="rival-variety-grid">
+      <div class="rival-variety-box copy">
+        <div class="rival-variety-box-title">✅ 利益管理が巧みな機種 <span class="action-badge copy">パクるべき</span>
+          <span style="color:var(--text2);font-size:10px;font-weight:400;"> ${varietyCopy.length}機種</span>
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:6px;">少台数で継続的に粗利・アウトともに平均水準を維持。運用の腕が光る機種。自店に導入して甘めに使えば即戦力。</div>
+        <div>
+          ${varietyCopy.slice(0,8).map(m => {
+            const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
+            const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
+            return `<span class="rival-model-chip" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;"
+              title="${m.name}｜台粗利 ${profitStr}｜IN ${inStr}｜推定${m.estimatedMachines}台">
+              ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
+            </span>`;
+          }).join('')}
+          ${varietyCopy.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+        </div>
+      </div>
+      <div class="rival-variety-box spice">
+        <div class="rival-variety-box-title">🌶️ 集客スパイス機種 <span class="action-badge block">邪魔すべき</span>
+          <span style="color:var(--text2);font-size:10px;font-weight:400;"> ${varietySpice.length}機種</span>
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-bottom:6px;">放出を伴いアウトが平均以上。1〜2台でも集客効果を発揮している。同機種でさらに甘く使い客を先取りせよ。</div>
+        <div>
+          ${varietySpice.slice(0,8).map(m => {
+            const inStr = Math.round(m.avgIn).toLocaleString() + _inUnit();
+            return `<span class="rival-model-chip" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;"
+              title="${m.name}｜IN ${inStr}｜推定${m.estimatedMachines}台">
+              ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
+            </span>`;
+          }).join('')}
+          ${varietySpice.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // 免責メモ
+  html += `<div style="margin-top:14px;font-size:10px;color:var(--text2);border-top:1px solid var(--border);padding-top:8px;">
+    🤖 分類は統計的な推定です。設置台数はユニーク台番または日次平均レコード数から推定。
+    閾値：収益源＝台粗利が全体平均の${Math.round(HIGH_PROFIT_TH*100)}%超、高アウト＝全体平均の${Math.round(HIGH_IN_TH*100)}%超。
+    データ期間・台数が少ない機種は参考値としてご活用ください。
+  </div>`;
+
+  el.innerHTML = html;
+}
 
 // ══════════════════════════════════════
 //  日次トレンド分析（①〜⑤）
