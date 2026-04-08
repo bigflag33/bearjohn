@@ -1319,6 +1319,8 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'tokai_unu',    label: '東海UNUさん専用',           stores: ['スーパーライブガーデン野木'] },
 ];
 const DEFAULT_STORE = { id: 'default', name: 'デフォルト店舗', key: _NS + 'bi_added_data_default' };
+// 業界ベンチマーク仮想ストア（localStorageに保存しない・DB_CACHE['__benchmark__']で管理）
+const BENCHMARK_VSTORE = { id: '__benchmark__', name: '業界ベンチマーク', key: '__benchmark__' };
 const BASE_DATES  = [...new Set(RAW_DATA.map(d => d.date))].sort();
 RAW_DATA.forEach(d => { if (d['機種名正式']) d['機種名'] = d['機種名正式']; });
 // ─ 店舗対応データ読み込み ─
@@ -1420,6 +1422,7 @@ function saveAddedData(arr) {
 
 function clearAdded() {
   const store = _activeStore();
+  if (store.id === '__benchmark__') { showMsg('業界ベンチマークはリセットできません', 'error'); return; }
   const isDefault = store.id === 'ueda';
   const msg = isDefault
     ? '追加分データをリセットしますか？\n（ベースデータ 3/13〜3/22 は残ります）'
@@ -1467,6 +1470,49 @@ async function loadRemoteData() {
 }
 
 // ── 管理者専用：ユーザー別データJSON書き出し ──
+// ── 業界ベンチマーク：IndexedDB上の全店舗データからリアルタイム計算（ADMIN用）──
+async function _buildBenchmarkFromCache() {
+  if (USER_ID !== 'admin') return; // 各社はJSONから読み込むのでスキップ
+  const EXCL = ['（4P）', 'WINS北上'];
+  const allStores = getStores().filter(s => {
+    if (s.id === 'default' || s.id === '__benchmark__') return false;
+    if (EXCL.some(ex => s.name.includes(ex))) return false;
+    return true;
+  });
+  const byDate = {};
+  for (const store of allStores) {
+    const records = DB_CACHE[store.key] || [];
+    records.forEach(r => {
+      if (!r.date) return;
+      if (!byDate[r.date]) byDate[r.date] = { profit:0, sales:0, inmai:0, diff:0, games:0, bb:0, rb:0, art:0, count:0 };
+      byDate[r.date].profit += r['台粗利'] || 0;
+      byDate[r.date].sales  += r['台売上'] || 0;
+      byDate[r.date].inmai  += r['IN枚数'] || 0;
+      byDate[r.date].diff   += r['差枚']   || 0;
+      byDate[r.date].games  += r['G数']    || 0;
+      byDate[r.date].bb     += r['BB']     || 0;
+      byDate[r.date].rb     += r['RB']     || 0;
+      byDate[r.date].art    += r['ART']    || 0;
+      byDate[r.date].count  += 1;
+    });
+  }
+  DB_CACHE['__benchmark__'] = Object.entries(byDate).map(([date, v]) => ({
+    date,
+    '機種名': '業界全体平均',
+    '台粗利': v.count > 0 ? v.profit / v.count : 0,
+    '台売上': v.count > 0 ? v.sales  / v.count : 0,
+    'IN枚数': v.count > 0 ? v.inmai  / v.count : 0,
+    '差枚':   v.count > 0 ? v.diff   / v.count : 0,
+    'G数':    v.count > 0 ? v.games  / v.count : 0,
+    'BB':     v.count > 0 ? v.bb     / v.count : 0,
+    'RB':     v.count > 0 ? v.rb     / v.count : 0,
+    'ART':    v.count > 0 ? v.art    / v.count : 0,
+  })).sort((a, b) => a.date.localeCompare(b.date));
+  const days = DB_CACHE['__benchmark__'].length;
+  const storeCount = allStores.length;
+  console.log(`[benchmark] リアルタイム計算完了: ${storeCount}店舗・${days}日分`);
+}
+
 async function exportUserData() {
   if (!USERS_CONFIG.length) { alert('USERS_CONFIGが設定されていません'); return; }
   showMsg('⏳ データを書き出し中...', 'ok');
@@ -2222,11 +2268,20 @@ function initTheme() {
 function getStores() {
   try {
     const s = JSON.parse(localStorage.getItem(_NS + 'bi_stores') || 'null');
-    if (!s || !s.length) return [DEFAULT_STORE];
+    if (!s || !s.length) {
+      const base = [DEFAULT_STORE];
+      if (DB_CACHE['__benchmark__']?.length) base.push(BENCHMARK_VSTORE);
+      return base;
+    }
     // 旧デフォルト店舗（ueda ID）が残っていたら自動除去
-    const cleaned = s.filter(st => st.id !== 'ueda');
+    const cleaned = s.filter(st => st.id !== 'ueda' && st.id !== '__benchmark__');
     if (cleaned.length !== s.length) saveStores(cleaned.length ? cleaned : [DEFAULT_STORE]);
-    return cleaned.length ? cleaned : [DEFAULT_STORE];
+    const stores = cleaned.length ? cleaned : [DEFAULT_STORE];
+    // 業界ベンチマーク：計算済みかつ他の店舗名として登録されていなければ仮想ストアを末尾に追加
+    if (DB_CACHE['__benchmark__']?.length && !stores.find(st => st.name === '業界ベンチマーク')) {
+      stores.push(BENCHMARK_VSTORE);
+    }
+    return stores;
   } catch(e) { return [DEFAULT_STORE]; }
 }
 function saveStores(arr) { localStorage.setItem(_NS + 'bi_stores', JSON.stringify(arr)); }
@@ -5011,6 +5066,7 @@ async function checkAuth() {
     sessionStorage.setItem(AUTH_KEY, '1');
     document.getElementById('authOverlay').style.display = 'none';
     await initDB();
+    await _buildBenchmarkFromCache();
     await loadRemoteData();
     init();
   } else {
@@ -5025,7 +5081,7 @@ async function checkAuth() {
 window.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem(AUTH_KEY) === '1') {
     document.getElementById('authOverlay').style.display = 'none';
-    initDB().then(loadRemoteData).then(init).catch(e => { console.error('[initDB]', e); init(); });
+    initDB().then(_buildBenchmarkFromCache).then(loadRemoteData).then(init).catch(e => { console.error('[initDB]', e); init(); });
   } else {
     // authOverlayを表示したままにする（init()は呼ばない）
     setTimeout(() => document.getElementById('authInput').focus(), 100);
