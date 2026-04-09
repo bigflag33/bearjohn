@@ -3407,14 +3407,28 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     .sort((a,b) => Math.abs(b.z)-Math.abs(a.z))
     .slice(0, 6);
 
-  // ① 月内パターン（前半1〜15日 vs 後半16日〜）
-  const firstHalf=[], secondHalf=[];
+  // ① 月内パターン（上旬1〜10日 / 中旬11〜20日 / 下旬21日〜）
+  const jou=[], chu=[], ka=[];
+  // 入金タイミングゾーン
+  const monthInitZone=[], salaryZone=[], pensionZone=[];
   filteredDates.forEach((d,i) => {
-    const day = parseInt(d.slice(8));
-    (day <= 15 ? firstHalf : secondHalf).push(trendData[i]);
+    const day  = parseInt(d.slice(8));
+    const mon  = parseInt(d.slice(5,7));
+    if (day <= 10)       jou.push(trendData[i]);
+    else if (day <= 20)  chu.push(trendData[i]);
+    else                 ka.push(trendData[i]);
+    // 月初（1〜7日）
+    if (day <= 7)  monthInitZone.push(trendData[i]);
+    // 給料日（25〜29日）
+    if (day >= 25 && day <= 29) salaryZone.push(trendData[i]);
+    // 年金支給日（偶数月15〜19日のみ）
+    if (mon % 2 === 0 && day >= 15 && day <= 19) pensionZone.push(trendData[i]);
   });
-  const avgFirst  = firstHalf.length  ? firstHalf.reduce((a,b)=>a+b,0)/firstHalf.length   : null;
-  const avgSecond = secondHalf.length ? secondHalf.reduce((a,b)=>a+b,0)/secondHalf.length : null;
+  const avg3 = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+  const avgJou = avg3(jou), avgChu = avg3(chu), avgKa = avg3(ka);
+  const avgMonthInit = avg3(monthInitZone);
+  const avgSalary    = avg3(salaryZone);
+  const avgPension   = avg3(pensionZone);
 
   // ③ 曜日バイアス
   const DOW_NAMES = ['日','月','火','水','木','金','土'];
@@ -3450,22 +3464,88 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     </div>
   </div>`;
 
-  // ① 月内パターン
-  if (avgFirst !== null && avgSecond !== null) {
-    const diff = avgFirst - avgSecond;
-    const threshold = std * 0.25;
-    const pattern  = Math.abs(diff) < threshold ? 'フラット型' : diff > 0 ? '前半型' : '後半型';
-    const pIcon    = Math.abs(diff) < threshold ? '🔁' : diff > 0 ? '🌅' : '🌇';
-    const pComment = Math.abs(diff) < threshold
-      ? '前後半で大きな差はありません'
-      : diff > 0 ? '月の前半で稼ぐスタイルです' : '月の後半に向けて伸びるスタイルです';
+  // ① 月内パターン（上旬/中旬/下旬 7パターン判定）
+  if (avgJou !== null && avgChu !== null && avgKa !== null) {
+    const TH = std * 0.25; // 有意差の閾値
+    const vals3 = [
+      { label:'上旬', avg: avgJou },
+      { label:'中旬', avg: avgChu },
+      { label:'下旬', avg: avgKa  },
+    ];
+    const maxV = vals3.reduce((a,b) => a.avg > b.avg ? a : b);
+    const minV = vals3.reduce((a,b) => a.avg < b.avg ? a : b);
+    const maxMin = maxV.avg - minV.avg;
+    // パターン判定
+    let pattern, pIcon, pComment;
+    if (maxMin < TH) {
+      pattern='フラット型'; pIcon='🔁';
+      pComment='月を通じて安定した運用。規則性が読みにくい。';
+    } else if (avgJou > avgChu + TH && avgJou > avgKa + TH) {
+      pattern='月初突出型'; pIcon='🌅';
+      pComment='上旬だけ突出。給料・月初のタイミングで素早く回収するスタイル。';
+    } else if (avgKa > avgJou + TH && avgKa > avgChu + TH) {
+      pattern='月末追い込み型'; pIcon='🌇';
+      pComment='下旬だけ突出。給料日前後に合わせて絞るスタイル。';
+    } else if (avgChu > avgJou + TH && avgChu > avgKa + TH) {
+      pattern='山型（中旬ピーク）'; pIcon='⛰️';
+      pComment='中旬に最も稼ぐ。月初・月末は緩め、中旬で回収する独特なスタイル。';
+    } else if (avgChu < avgJou - TH && avgChu < avgKa - TH) {
+      pattern='谷型（中旬放出）'; pIcon='🔻';
+      pComment='中旬が最低。上旬・下旬で稼ぎ、中旬で客を呼び込む。';
+    } else if (avgJou <= avgChu && avgChu <= avgKa && avgKa - avgJou > TH) {
+      pattern='右肩上がり型'; pIcon='📈';
+      pComment='上旬→中旬→下旬と段階的に上昇。月末に向けて絞っていくスタイル。';
+    } else if (avgJou >= avgChu && avgChu >= avgKa && avgJou - avgKa > TH) {
+      pattern='右肩下がり型'; pIcon='📉';
+      pComment='上旬→中旬→下旬と段階的に下降。月初回収・後半解放スタイル。';
+    } else {
+      pattern='複合型'; pIcon='〰️';
+      pComment='明確な月内パターンは検出されませんでした。';
+    }
     html += `<div class="trend-analysis-box">
       <div class="tab-box-title">${pIcon} 月内パターン：<b>${pattern}</b></div>
       <div class="tab-box-body">
         ${pComment}<br>
-        <span style="color:var(--text2);font-size:11px;">前半平均 ${Math.round(avgFirst).toLocaleString()}${metricUnit}　後半平均 ${Math.round(avgSecond).toLocaleString()}${metricUnit}</span>
+        <span style="color:var(--text2);font-size:11px;">
+          上旬 ${Math.round(avgJou).toLocaleString()}${metricUnit}
+          中旬 ${Math.round(avgChu).toLocaleString()}${metricUnit}
+          下旬 ${Math.round(avgKa).toLocaleString()}${metricUnit}
+        </span>
       </div>
     </div>`;
+  }
+
+  // ① 入金タイミング効果（月初/給料日/年金）
+  {
+    const midVal = mean; // 全体平均との比較ベース
+    const effects = [];
+    if (avgMonthInit !== null && monthInitZone.length >= 3) {
+      const diff = avgMonthInit - midVal;
+      const pct  = midVal !== 0 ? (diff / Math.abs(midVal) * 100).toFixed(0) : '0';
+      const sign  = diff >= 0 ? '+' : '';
+      effects.push(`💴 <b>月初（1〜7日）</b>：全体平均比 <b style="color:${diff>=0?'var(--red)':'var(--green)'};">${sign}${pct}%</b>　${diff > std*0.3 ? '→ 月初に絞っている' : diff < -std*0.3 ? '→ 月初は放出気味' : '→ 月初の特徴薄い'}`);
+    }
+    if (avgSalary !== null && salaryZone.length >= 3) {
+      const diff = avgSalary - midVal;
+      const pct  = midVal !== 0 ? (diff / Math.abs(midVal) * 100).toFixed(0) : '0';
+      const sign  = diff >= 0 ? '+' : '';
+      effects.push(`💰 <b>給料日（25〜29日）</b>：全体平均比 <b style="color:${diff>=0?'var(--red)':'var(--green)'};">${sign}${pct}%</b>　${diff > std*0.3 ? '→ 給料日に絞っている' : diff < -std*0.3 ? '→ 給料日は集客で放出' : '→ 給料日の特徴薄い'}`);
+    }
+    if (avgPension !== null && pensionZone.length >= 2) {
+      const diff = avgPension - midVal;
+      const pct  = midVal !== 0 ? (diff / Math.abs(midVal) * 100).toFixed(0) : '0';
+      const sign  = diff >= 0 ? '+' : '';
+      effects.push(`👴 <b>年金日（偶数月15〜19日）</b>：全体平均比 <b style="color:${diff>=0?'var(--red)':'var(--green)'};">${sign}${pct}%</b>　${diff > std*0.3 ? '→ 年金日に絞っている' : diff < -std*0.3 ? '→ 年金日は集客で放出' : '→ 年金日の特徴薄い'}`);
+    }
+    if (effects.length > 0) {
+      html += `<div class="trend-analysis-box" style="grid-column: 1 / -1;">
+        <div class="tab-box-title">💳 入金タイミング効果</div>
+        <div class="tab-box-body" style="display:flex;flex-direction:column;gap:4px;">
+          ${effects.map(e => `<div>${e}</div>`).join('')}
+          <div style="font-size:10px;color:var(--text2);margin-top:2px;">※粗利が全体平均より高い＝絞り（赤）、低い＝放出（緑）</div>
+        </div>
+      </div>`;
+    }
   }
 
   // ③ 曜日バイアス
