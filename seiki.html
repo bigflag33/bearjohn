@@ -1347,7 +1347,8 @@
     </div>
     <!-- 結果 -->
     <div id="dcResult" style="display:none;">
-      <div id="dcSummaryGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;"></div>
+      <div id="dcSummaryGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px;"></div>
+      <div id="dcSummaryComment" style="margin-bottom:22px;"></div>
       <!-- 機種別比較 -->
       <div id="dcModelSection">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -1369,12 +1370,13 @@
         <div id="dcChartView" style="display:none;">
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
             <span style="font-size:11px;color:var(--text2);align-self:center;margin-right:4px;">指標:</span>
-            <button id="dcMBtnSales"  onclick="dcSetChartMetric('salesDiff','dcMBtnSales')"  class="pin-toggle-btn dc-active" style="font-size:11px;padding:3px 12px;">売上差</button>
-            <button id="dcMBtnProfit" onclick="dcSetChartMetric('profitDiff','dcMBtnProfit')" class="pin-toggle-btn" style="font-size:11px;padding:3px 12px;">粗利差</button>
-            <button id="dcMBtnInmai"  onclick="dcSetChartMetric('inmaiDiff','dcMBtnInmai')"  class="pin-toggle-btn" style="font-size:11px;padding:3px 12px;">アウト差</button>
-            <button id="dcMBtnCount"  onclick="dcSetChartMetric('countDiff','dcMBtnCount')"  class="pin-toggle-btn" style="font-size:11px;padding:3px 12px;">台数差</button>
+            <button id="dcMBtnSales"  onclick="dcSetChartMetric('sales','dcMBtnSales')"   class="pin-toggle-btn dc-active" style="font-size:11px;padding:3px 12px;">売上</button>
+            <button id="dcMBtnProfit" onclick="dcSetChartMetric('profit','dcMBtnProfit')" class="pin-toggle-btn" style="font-size:11px;padding:3px 12px;">粗利</button>
+            <button id="dcMBtnInmai"  onclick="dcSetChartMetric('inmai','dcMBtnInmai')"   class="pin-toggle-btn" style="font-size:11px;padding:3px 12px;">アウト</button>
+            <button id="dcMBtnCount"  onclick="dcSetChartMetric('count','dcMBtnCount')"   class="pin-toggle-btn" style="font-size:11px;padding:3px 12px;">台数</button>
           </div>
           <div id="dcChartWrap" style="position:relative;"><canvas id="dcModelChart"></canvas></div>
+          <div id="dcChartComment"></div>
         </div>
       </div>
     </div>
@@ -2580,7 +2582,7 @@ let _dcSortCol = 'profitDiff';
 let _dcSortDir = -1;   // -1=降順, 1=昇順
 let _dcLastData = null;
 let _dcModelChart = null;
-let _dcChartMetric = 'salesDiff';
+let _dcChartMetric = 'sales';
 
 // ── 単日/期間 トグル ──
 function dcToggleType(side, type) {
@@ -2759,10 +2761,16 @@ function runDateComparison() {
 
   const models = [...modelSet].map(k => {
     const a = mA[k], b = mB[k];
-    const safe = (va, vb) => (va!=null && vb!=null) ? va-vb : null;
+    const safe  = (va, vb) => (va!=null && vb!=null) ? va-vb : null;
     const ratio = (va, vb) => (va!=null && vb!=null && vb!==0) ? (va/vb*100) : null;
     return {
       name:        k,
+      // 絶対値（グループドバーチャート用）
+      salesA:  a?.sales  ?? null, salesB:  b?.sales  ?? null,
+      profitA: a?.profit ?? null, profitB: b?.profit ?? null,
+      inmaiA:  a?.inmai  ?? null, inmaiB:  b?.inmai  ?? null,
+      countA:  a?.count  ?? null, countB:  b?.count  ?? null,
+      // 差・比率（テーブル用）
       countDiff:   safe(a?.count, b?.count),
       inmaiDiff:   safe(a?.inmai, b?.inmai),
       salesDiff:   safe(a?.sales, b?.sales),
@@ -2779,6 +2787,56 @@ function runDateComparison() {
 
   const el = document.getElementById('dcModelTitle');
   if (el) el.textContent = '機種別比較  ' + titleSuffix;
+
+  // ── サマリーコメント（カード直下）──
+  const commentEl = document.getElementById('dcSummaryComment');
+  if (commentEl && sA && sB) {
+    const profitDiff = sA.profit - sB.profit;
+    const salesDiff  = sA.sales  - sB.sales;
+    const inmaiDiff  = sA.inmai  - sB.inmai;
+    const profitPct  = sB.profit !== 0 ? (profitDiff / Math.abs(sB.profit) * 100) : 0;
+    const salesPct   = sB.sales  !== 0 ? (salesDiff  / Math.abs(sB.sales)  * 100) : 0;
+    const inmaiPct   = sB.inmai  !== 0 ? (inmaiDiff  / Math.abs(sB.inmai)  * 100) : 0;
+
+    // 粗利の総評
+    const profitSentence = Math.abs(profitPct) < 3
+      ? `粗利はほぼ横ばいで、大きな差は見られませんでした`
+      : profitDiff > 0
+        ? `粗利は${labelA}の方が${Math.abs(Math.round(profitPct))}%ほど高く、収益面では${labelA}が優勢でした`
+        : `粗利は${labelB}の方が${Math.abs(Math.round(profitPct))}%ほど高く、収益面では${labelB}が優勢でした`;
+
+    // 売上の補足
+    const salesSentence = Math.abs(salesPct) < 3
+      ? `売上規模はほぼ同水準`
+      : salesDiff > 0
+        ? `売上も${labelA}が${Math.abs(Math.round(salesPct))}%上回っています`
+        : `売上は${labelB}が${Math.abs(Math.round(salesPct))}%上回っています`;
+
+    // アウト（稼働）の読み
+    const inmaiSentence = Math.abs(inmaiPct) < 3
+      ? `稼働（アウト）はほぼ同水準`
+      : inmaiDiff > 0
+        ? `稼働は${labelA}の方が活発で、客の回転が高かった様子です`
+        : `稼働は${labelB}の方が活発で、客の引きつけ力では${labelB}が上回りました`;
+
+    // 機種別で最も変化の大きい機種（粗利ベース）
+    const topModel = [...models]
+      .filter(m => m.profitDiff != null)
+      .sort((a,b) => Math.abs(b.profitDiff) - Math.abs(a.profitDiff))[0];
+    const modelSentence = topModel
+      ? `機種別では「${topModel.name}」の粗利変化が最も大きく（${topModel.profitDiff>=0?'+':''}${Math.round(topModel.profitDiff).toLocaleString()}円）、注目機種です`
+      : '';
+
+    const fullText = [profitSentence, salesSentence, inmaiSentence, modelSentence].filter(Boolean).join('。') + '。';
+
+    commentEl.innerHTML = `
+      <div style="padding:14px 18px;background:rgba(108,99,255,0.08);border-left:4px solid #6c63ff;border-radius:0 10px 10px 0;">
+        <div style="font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:.5px;margin-bottom:6px;">📝 比較サマリー</div>
+        <div style="font-size:13px;line-height:1.8;color:var(--text);">${fullText}</div>
+      </div>`;
+  } else if (commentEl) {
+    commentEl.innerHTML = '';
+  }
 
   renderDcTable(_dcLastData);
   document.getElementById('dcResult').style.display = '';
@@ -2848,26 +2906,31 @@ function renderDcTable({ models }) {
   </tr>`).join('');
 }
 
-// ── グラフ描画（横棒グラフ） ──
+// ── グラフ描画（グループド横棒チャート：A vs B 並列比較）──
 function renderDcChart() {
   if (!_dcLastData) return;
+  const { models, labelA, labelB } = _dcLastData;
+
   const metaMap = {
-    salesDiff:  { label:'売上差(円)',    fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+'円' },
-    profitDiff: { label:'粗利差(円)',    fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+'円' },
-    inmaiDiff:  { label:'アウト差('+_inUnit()+')',  fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+_inUnit() },
-    countDiff:  { label:'台数差',       fmt: v => (v>=0?'+':'')+Math.round(v).toLocaleString()+'台' },
+    sales:  { keyA:'salesA',  keyB:'salesB',  diffKey:'salesDiff',  unit:'円',        label:'売上（円）',       fmt: v => Math.round(v).toLocaleString()+'円' },
+    profit: { keyA:'profitA', keyB:'profitB', diffKey:'profitDiff', unit:'円',        label:'粗利（円）',       fmt: v => Math.round(v).toLocaleString()+'円' },
+    inmai:  { keyA:'inmaiA',  keyB:'inmaiB',  diffKey:'inmaiDiff',  unit:_inUnit(),   label:'アウト（'+_inUnit()+'/台）', fmt: v => Math.round(v).toLocaleString()+_inUnit() },
+    count:  { keyA:'countA',  keyB:'countB',  diffKey:'countDiff',  unit:'台',        label:'台数（台）',       fmt: v => Math.round(v).toLocaleString()+'台' },
   };
-  const meta = metaMap[_dcChartMetric] || metaMap.salesDiff;
-  const sorted = [..._dcLastData.models]
-    .filter(m => m[_dcChartMetric] != null)
-    .sort((a,b) => a[_dcChartMetric] - b[_dcChartMetric]);
+  const meta = metaMap[_dcChartMetric] || metaMap.sales;
 
-  const labels = sorted.map(m => m.name);
-  const values = sorted.map(m => m[_dcChartMetric]);
-  const colors = values.map(v => v >= 0 ? 'rgba(52,211,153,0.75)' : 'rgba(248,113,113,0.75)');
-  const borders= values.map(v => v >= 0 ? '#34d399' : '#f87171');
+  // 差の絶対値が大きい順にソートして上位30機種
+  const sorted = [...models]
+    .filter(m => m[meta.keyA] != null || m[meta.keyB] != null)
+    .sort((a,b) => Math.abs(b[meta.diffKey]||0) - Math.abs(a[meta.diffKey]||0))
+    .slice(0, 30)
+    .reverse(); // Chart.jsはy軸下から描画するため反転
 
-  const chartH = Math.max(300, labels.length * 22);
+  const labels  = sorted.map(m => m.name);
+  const valuesA = sorted.map(m => m[meta.keyA] ?? 0);
+  const valuesB = sorted.map(m => m[meta.keyB] ?? 0);
+
+  const chartH = Math.max(300, labels.length * 34);
   document.getElementById('dcChartWrap').style.height = chartH + 'px';
 
   const gc = getComputedStyle(document.documentElement);
@@ -2879,15 +2942,21 @@ function renderDcChart() {
     type: 'bar',
     data: {
       labels,
-      datasets: [{ label: meta.label, data: values,
-        backgroundColor: colors, borderColor: borders, borderWidth: 1.2, borderRadius: 3 }]
+      datasets: [
+        { label: labelA, data: valuesA,
+          backgroundColor: 'rgba(96,165,250,0.7)', borderColor: '#60a5fa',
+          borderWidth: 1.2, borderRadius: 3 },
+        { label: labelB, data: valuesB,
+          backgroundColor: 'rgba(251,146,60,0.7)', borderColor: '#fb923c',
+          borderWidth: 1.2, borderRadius: 3 },
+      ]
     },
     options: {
       indexAxis: 'y',
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => meta.fmt(ctx.raw) } }
+        legend: { display: true, labels: { color: tickColor, font: { size: 11 }, boxWidth: 14 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}：${meta.fmt(ctx.raw)}` } }
       },
       scales: {
         x: { ticks:{ color:tickColor, font:{size:10} }, grid:{ color:gridColor },
@@ -2896,6 +2965,7 @@ function renderDcChart() {
       }
     }
   });
+
 }
 
 
