@@ -475,6 +475,77 @@
   }
   .anomaly-chip:hover { background: rgba(251,191,36,0.22); }
 
+  /* ── インサイトフィード ── */
+  #insightFeedCard { margin-bottom: 20px; }
+  .insight-feed-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .insight-feed-grid.has-top {
+    grid-template-columns: 1.6fr 1fr;
+  }
+  .insight-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    cursor: default;
+    transition: border-color .18s, transform .18s;
+    position: relative;
+    overflow: hidden;
+  }
+  .insight-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 12px 12px 0 0;
+  }
+  .insight-card.top-story { grid-row: span 2; }
+  .insight-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .insight-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 800; letter-spacing: .5px;
+    padding: 2px 8px; border-radius: 20px;
+    width: fit-content;
+  }
+  .insight-headline {
+    font-size: 13.5px; font-weight: 800; line-height: 1.45;
+    color: var(--text);
+  }
+  .insight-card.top-story .insight-headline { font-size: 15px; }
+  .insight-body {
+    font-size: 11.5px; line-height: 1.65;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+  .insight-card.top-story .insight-body { font-size: 12px; }
+  .insight-meta {
+    font-size: 10px; color: var(--text2);
+    margin-top: auto;
+    padding-top: 6px;
+    border-top: 1px solid var(--border);
+  }
+  /* カラーテーマ per category */
+  .insight-card[data-cat="trend"]::before   { background: linear-gradient(90deg,#a78bfa,#6c63ff); }
+  .insight-card[data-cat="rival"]::before   { background: linear-gradient(90deg,#f87171,#fb923c); }
+  .insight-card[data-cat="variety"]::before { background: linear-gradient(90deg,#34d399,#059669); }
+  .insight-card[data-cat="juggler"]::before { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
+  .insight-card[data-cat="compare"]::before { background: linear-gradient(90deg,#60a5fa,#3b82f6); }
+  .insight-tag[data-cat="trend"]   { background:rgba(167,139,250,.15); color:#c4b5fd; }
+  .insight-tag[data-cat="rival"]   { background:rgba(248,113,113,.15); color:#fca5a5; }
+  .insight-tag[data-cat="variety"] { background:rgba(52,211,153,.15);  color:#6ee7b7; }
+  .insight-tag[data-cat="juggler"] { background:rgba(251,191,36,.15);  color:#fcd34d; }
+  .insight-tag[data-cat="compare"] { background:rgba(96,165,250,.15);  color:#93c5fd; }
+  @media(max-width:700px){
+    .insight-feed-grid,.insight-feed-grid.has-top { grid-template-columns: 1fr; }
+    .insight-card.top-story { grid-row: span 1; }
+  }
+
   .ai-section-head {
     font-size: 12px; font-weight: 800; letter-spacing: .5px;
     margin: 12px 0 4px; padding: 3px 10px;
@@ -800,6 +871,16 @@
       </div>
       <div class="kpi-sub">1日平均</div>
     </div>
+  </div>
+
+  <!-- ── インサイトフィード ── -->
+  <div class="chart-card full" id="insightFeedCard" style="display:none;">
+    <div class="chart-title">
+      <div class="dot" style="background:linear-gradient(135deg,#a78bfa,#60a5fa)"></div>
+      📰 インサイトフィード
+      <span style="margin-left:auto;font-size:10px;color:var(--text2);font-weight:600;" id="insightFeedMeta"></span>
+    </div>
+    <div id="insightFeedBody" style="padding:4px 0 4px;"></div>
   </div>
 
   <div class="charts-grid">
@@ -3015,7 +3096,64 @@ function renderComparisons() {
   pctLabel(curr.avgIn,  prevYr ? prevYr.avgIn  : null, 'cy-in');
 }
 
+// ══════════════════════════════════════
+//  インサイトフィード
+// ══════════════════════════════════════
+window._insightsFeed = [];
+
+function _pushInsight(cat, icon, headline, body, priority) {
+  window._insightsFeed.push({ cat, icon, headline, body, priority: priority || 5 });
+}
+
+function renderInsightFeed() {
+  const card = document.getElementById('insightFeedCard');
+  const body = document.getElementById('insightFeedBody');
+  const meta = document.getElementById('insightFeedMeta');
+  if (!card || !body) return;
+
+  const feed = window._insightsFeed;
+  if (!feed || feed.length === 0) { card.style.display = 'none'; return; }
+
+  // 優先度降順でソート
+  const sorted = [...feed].sort((a, b) => a.priority - b.priority);
+  const [top, ...rest] = sorted;
+  const hasTop = sorted.length >= 3; // top-story は3件以上のときだけ大きく
+
+  let html = `<div class="insight-feed-grid${hasTop ? ' has-top' : ''}">`;
+
+  const makeCard = (item, isTop) => {
+    const stripHtml = s => s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g,' ').trim();
+    const bodyText = stripHtml(item.body);
+    return `<div class="insight-card${isTop ? ' top-story' : ''}" data-cat="${item.cat}">
+      <div class="insight-tag" data-cat="${item.cat}">${item.icon} ${_catLabel(item.cat)}</div>
+      <div class="insight-headline">${item.headline}</div>
+      <div class="insight-body">${bodyText.length > (isTop ? 160 : 90) ? bodyText.slice(0, isTop ? 160 : 90) + '…' : bodyText}</div>
+    </div>`;
+  };
+
+  if (hasTop) {
+    html += makeCard(top, true);
+    html += `<div style="display:contents;">`;
+    rest.forEach(item => { html += makeCard(item, false); });
+    html += `</div>`;
+  } else {
+    sorted.forEach(item => { html += makeCard(item, false); });
+  }
+
+  html += '</div>';
+  body.innerHTML = html;
+  if (meta) meta.textContent = `${feed.length}件のインサイト`;
+  card.style.display = '';
+}
+
+function _catLabel(cat) {
+  return { trend:'日次トレンド', rival:'攻略分析', variety:'バラエティ', juggler:'ジャグラー', compare:'期間比較' }[cat] || cat;
+}
+
 function render() {
+  // インサイトフィードをリセット
+  window._insightsFeed = [];
+
   const fns = [renderKPIs, renderCharts, renderCalendar,
                renderDayTable, renderDOW, renderDigit, renderModelTable, renderRivalAnalysis];
   // 機種別集計ビューをテーブルモードにリセット
@@ -3028,6 +3166,8 @@ function render() {
   if(maC) maC.classList.remove('active');
   fns.forEach(fn => { try { fn(); } catch(e) { console.error(fn.name, e); } });
   try { if (typeof dayViewMode !== 'undefined' && dayViewMode === 'chart') renderDayCharts(); } catch(e) { console.error('renderDayCharts', e); }
+  // 全分析終了後にインサイトフィードを描画
+  try { renderInsightFeed(); } catch(e) { console.error('renderInsightFeed', e); }
 }
 
 function sum(arr, key) { return arr.reduce((a,b) => a + (b[key]||0), 0); }
@@ -3221,6 +3361,17 @@ function renderRivalAnalysis() {
     attractComment = `💡 <b style="color:#60a5fa">${top.name}曜日</b>に最も集客傾向（${top.at}/${top.total}日・${rate}%）。${pattern}。集客日のアウトは通常日比 <b style="color:#60a5fa">+${inUpRate}%</b>。この曜日に自店も放出を合わせると客の取り合いになる。`;
   }
 
+  // ── インサイトフィードへ登録（攻略分析） ──
+  if (squeezeComment) {
+    const sqTop = [...dowType].sort((a,b)=>b.sq/Math.max(b.total,1)-a.sq/Math.max(a.total,1))[0];
+    const sqRate = sqTop ? Math.round(sqTop.sq/sqTop.total*100) : 0;
+    _pushInsight('rival','🟡',`${sqTop ? sqTop.name+'曜日' : ''}に絞り傾向 — 翌日が仕掛けどき`, squeezeComment.replace(/<[^>]*>/g,''), 1);
+  }
+  if (attractComment) {
+    const atTop = [...dowType].sort((a,b)=>b.at/Math.max(b.total,1)-a.at/Math.max(a.total,1))[0];
+    _pushInsight('rival','🔵',`${atTop ? atTop.name+'曜日' : ''}が集客日 — 真っ向勝負は避けよ`, attractComment.replace(/<[^>]*>/g,''), 1);
+  }
+
   html += `<div class="rival-section">
     <div class="rival-section-title">📅 運用日分類 — 絞り日・集客日を把握せよ</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
@@ -3309,6 +3460,12 @@ function renderRivalAnalysis() {
     ? '設置比率に対して利益貢献が低い — バラエティを集客・放出枠として使っている'
     : 'バラエティの利益貢献は設置比率とほぼ同水準';
 
+  // バラエティインサイト
+  if (varTotalMachines > 0) {
+    _pushInsight('variety','🎲',`バラエティ ${varTotalMachines}台（${varInstallRate.toFixed(0)}%設置）— ${varProfitComment.split('—')[0].trim()}`,
+      `設置比率${varInstallRate.toFixed(1)}%に対し利益比率${varProfitRate.toFixed(1)}%・アウト比率${varInRate.toFixed(1)}%。${varProfitComment}`, 3);
+  }
+
   html += `<div class="rival-section">
     <div class="rival-section-title">🎲 バラエティ機種分析 — 1〜2台設置の運用グセ</div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
@@ -3395,6 +3552,10 @@ function renderRivalAnalysis() {
 
     // 機種リスト（台粗利順）
     const jagSorted = [...jagModels].sort((a,b) => b.avgProfit - a.avgProfit);
+
+    // ジャグラーインサイト
+    _pushInsight('juggler','🫐',`ジャグラー ${jagMachines}台（${jagInstallRate.toFixed(0)}%）— ${jagComment.split('—')[0].trim()}`,
+      `設置比率${jagInstallRate.toFixed(1)}%に対し利益比率${jagProfitRate.toFixed(1)}%・アウト比率${jagInRate.toFixed(1)}%。${jagInComment}`, 3);
 
     html += `<div class="rival-section">
       <div class="rival-section-title" style="color:#f59e0b;">🫐 ジャグラーシリーズ分析</div>
@@ -3693,7 +3854,45 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
         <span style="font-size:10px;font-weight:800;color:#a78bfa;letter-spacing:.4px;">📝 総評</span><br>
         <span style="font-size:12.5px;line-height:1.7;color:var(--text);">${summary}</span>
       </div>`;
+      // ── インサイトフィードへ登録 ──
+      _pushInsight('trend', '📊', parts[0], summary, 2);
     }
+  }
+
+  // ── 個別インサイト（入金タイミング・曜日） ──
+  if (avgSalary !== null && salaryZone.length >= 3) {
+    const diff = avgSalary - mean;
+    const pct = mean !== 0 ? Math.abs(diff/mean*100).toFixed(0) : '0';
+    if (Math.abs(diff) > std*0.3) {
+      const dir = diff > 0 ? '絞る（利益確保）傾向' : '放出し集客する傾向';
+      _pushInsight('trend', '💰', `給料日（25〜29日）に${dir}`, `給料日帯の平均が全体平均比 ${diff>0?'+':''}${pct}%。給料日に合わせてイベント戦略を調整すると効果的。`, 3);
+    }
+  }
+  if (avgPension !== null && pensionZone.length >= 2) {
+    const diff = avgPension - mean;
+    const pct = mean !== 0 ? Math.abs(diff/mean*100).toFixed(0) : '0';
+    if (Math.abs(diff) > std*0.3) {
+      const dir = diff > 0 ? '絞る傾向' : '放出気味の傾向';
+      _pushInsight('trend', '👴', `年金日（偶数月15〜19日）に${dir}`, `年金支給日帯の平均が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして把握しておきたい。`, 4);
+    }
+  }
+  if (bestDow && worstDow && bestDow.dow !== worstDow.dow) {
+    const spread = bestDow.avg - worstDow.avg;
+    if (Math.abs(spread) > std*0.4) {
+      _pushInsight('trend', '📅', `${bestDow.name}曜日が最強・${worstDow.name}曜日が最弱`, `曜日間の差が統計的に有意。${bestDow.name}曜日に合わせてイベントを仕掛けると対抗効果が高い。`, 4);
+    }
+  }
+  if (storeVsBench.length >= 5) {
+    const recent10 = storeVsBench.slice(-10);
+    const recentAbove = recent10.filter(x=>x.diff>=0).length;
+    if (recentAbove >= 7)      _pushInsight('trend','📈','直近は業界平均を上回る日が多い',`直近10日中${recentAbove}日が業界ベンチマーク超え。強い時期に自店イベントを集中させるのが有効。`,5);
+    else if (recentAbove <= 3) _pushInsight('trend','📉','直近は業界平均を下回る日が続いている',`直近10日中${recent10.length-recentAbove}日が業界平均以下。この店舗が苦手な時期に自店の集客を強化するチャンス。`,3);
+  }
+  if (anomalies.length > 0) {
+    const ups = anomalies.filter(a=>a.z>0).length;
+    const downs = anomalies.filter(a=>a.z<0).length;
+    const dominant = ups > downs ? `突出した回収日が${ups}日` : `突出した放出日が${downs}日`;
+    _pushInsight('trend','⚡',`統計的異常日 ${anomalies.length}日を検出`,`${dominant}検出。異常日は競合の特別施策が絡んでいる可能性があり、自店の仕掛けタイミングの参考に。`, 4);
   }
 
   // ② 注目日（異常日フラグ）
