@@ -3563,6 +3563,69 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
 
   html += `</div>`;
 
+  // ── 総評文（100文字程度）──
+  {
+    const parts = [];
+
+    // 月内パターン
+    if (avgJou !== null && avgChu !== null && avgKa !== null) {
+      const TH = std * 0.25;
+      const maxMin = Math.max(avgJou,avgChu,avgKa) - Math.min(avgJou,avgChu,avgKa);
+      if (maxMin < TH)                                              parts.push('月内はフラットな運用');
+      else if (avgJou > avgChu+TH && avgJou > avgKa+TH)            parts.push('月初に回収する運用スタイル');
+      else if (avgKa  > avgJou+TH && avgKa  > avgChu+TH)           parts.push('月末に向けて絞る運用スタイル');
+      else if (avgChu > avgJou+TH && avgChu > avgKa+TH)            parts.push('中旬にピークを持つ独特なスタイル');
+      else if (avgChu < avgJou-TH && avgChu < avgKa-TH)            parts.push('中旬に放出し上下旬で回収するスタイル');
+      else if (avgJou<=avgChu && avgChu<=avgKa && avgKa-avgJou>TH) parts.push('月末に向かって段階的に絞るスタイル');
+      else if (avgJou>=avgChu && avgChu>=avgKa && avgJou-avgKa>TH) parts.push('月初から段階的に解放するスタイル');
+    }
+
+    // 給料日効果
+    if (avgSalary !== null && salaryZone.length >= 3) {
+      const diff = avgSalary - mean;
+      if (diff > std*0.3)       parts.push('給料日に絞る傾向あり');
+      else if (diff < -std*0.3) parts.push('給料日は放出で集客');
+    }
+
+    // 年金日効果
+    if (avgPension !== null && pensionZone.length >= 2) {
+      const diff = avgPension - mean;
+      if (diff > std*0.3)       parts.push('年金日にも絞る傾向あり');
+      else if (diff < -std*0.3) parts.push('年金日は放出気味');
+    }
+
+    // 月初効果
+    if (avgMonthInit !== null && monthInitZone.length >= 3) {
+      const diff = avgMonthInit - mean;
+      if (diff > std*0.3)       parts.push('月初も回収重視');
+      else if (diff < -std*0.3) parts.push('月初は集客優先で放出');
+    }
+
+    // 曜日バイアス
+    if (bestDow && worstDow && bestDow.dow !== worstDow.dow) {
+      const spread = bestDow.avg - worstDow.avg;
+      if (Math.abs(spread) > std * 0.4) {
+        parts.push(`${bestDow.name}曜日が最も強く${worstDow.name}曜日が最弱`);
+      }
+    }
+
+    // ベンチマーク対比
+    if (storeVsBench.length >= 5) {
+      const recent10 = storeVsBench.slice(-10);
+      const recentAbove = recent10.filter(x=>x.diff>=0).length;
+      if (recentAbove >= 7)      parts.push('直近は業界平均を上回る日が多い');
+      else if (recentAbove <= 3) parts.push('直近は業界平均を下回る日が続いている');
+    }
+
+    if (parts.length > 0) {
+      const summary = parts.join('。') + '。';
+      html += `<div style="margin:12px 0 8px;padding:10px 14px;background:rgba(108,99,255,0.07);border-left:3px solid #6c63ff;border-radius:0 8px 8px 0;">
+        <span style="font-size:10px;font-weight:800;color:#a78bfa;letter-spacing:.4px;">📝 総評</span><br>
+        <span style="font-size:12.5px;line-height:1.7;color:var(--text);">${summary}</span>
+      </div>`;
+    }
+  }
+
   // ② 注目日（異常日フラグ）
   if (anomalies.length > 0) {
     html += `<div>
