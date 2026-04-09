@@ -3452,17 +3452,6 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   // ── HTML組み立て ──
   let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:10px;">`;
 
-  // ④ トレンド方向
-  const trendIcon = slope > 50 ? '📈' : slope < -50 ? '📉' : '➡️';
-  const trendWord = slope > 50 ? '上昇トレンド' : slope < -50 ? '下降トレンド' : '横ばい';
-  const slopeStr  = (slope >= 0 ? '+' : '') + Math.round(slope).toLocaleString();
-  html += `<div class="trend-analysis-box">
-    <div class="tab-box-title">${trendIcon} トレンド方向</div>
-    <div class="tab-box-body">
-      <b>${trendWord}</b>（1日あたり ${slopeStr}${metricUnit}/日）<br>
-      <span style="color:var(--text2);font-size:11px;">期間平均 ${Math.round(mean).toLocaleString()}${metricUnit}　σ ${Math.round(std).toLocaleString()}${metricUnit}</span>
-    </div>
-  </div>`;
 
   // ① 月内パターン（上旬/中旬/下旬 7パターン判定）
   if (avgJou !== null && avgChu !== null && avgKa !== null) {
@@ -3515,38 +3504,27 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     </div>`;
   }
 
-  // ① 入金タイミング効果（月初/給料日/年金）
-  {
-    const midVal = mean; // 全体平均との比較ベース
-    const effects = [];
-    if (avgMonthInit !== null && monthInitZone.length >= 3) {
-      const diff = avgMonthInit - midVal;
-      const pct  = midVal !== 0 ? (diff / Math.abs(midVal) * 100).toFixed(0) : '0';
-      const sign  = diff >= 0 ? '+' : '';
-      effects.push(`💴 <b>月初（1〜7日）</b>：全体平均比 <b style="color:${diff>=0?'var(--red)':'var(--green)'};">${sign}${pct}%</b>　${diff > std*0.3 ? '→ 月初に絞っている' : diff < -std*0.3 ? '→ 月初は放出気味' : '→ 月初の特徴薄い'}`);
-    }
-    if (avgSalary !== null && salaryZone.length >= 3) {
-      const diff = avgSalary - midVal;
-      const pct  = midVal !== 0 ? (diff / Math.abs(midVal) * 100).toFixed(0) : '0';
-      const sign  = diff >= 0 ? '+' : '';
-      effects.push(`💰 <b>給料日（25〜29日）</b>：全体平均比 <b style="color:${diff>=0?'var(--red)':'var(--green)'};">${sign}${pct}%</b>　${diff > std*0.3 ? '→ 給料日に絞っている' : diff < -std*0.3 ? '→ 給料日は集客で放出' : '→ 給料日の特徴薄い'}`);
-    }
-    if (avgPension !== null && pensionZone.length >= 2) {
-      const diff = avgPension - midVal;
-      const pct  = midVal !== 0 ? (diff / Math.abs(midVal) * 100).toFixed(0) : '0';
-      const sign  = diff >= 0 ? '+' : '';
-      effects.push(`👴 <b>年金日（偶数月15〜19日）</b>：全体平均比 <b style="color:${diff>=0?'var(--red)':'var(--green)'};">${sign}${pct}%</b>　${diff > std*0.3 ? '→ 年金日に絞っている' : diff < -std*0.3 ? '→ 年金日は集客で放出' : '→ 年金日の特徴薄い'}`);
-    }
-    if (effects.length > 0) {
-      html += `<div class="trend-analysis-box" style="grid-column: 1 / -1;">
-        <div class="tab-box-title">💳 入金タイミング効果</div>
-        <div class="tab-box-body" style="display:flex;flex-direction:column;gap:4px;">
-          ${effects.map(e => `<div>${e}</div>`).join('')}
-          <div style="font-size:10px;color:var(--text2);margin-top:2px;">※粗利が全体平均より高い＝絞り（赤）、低い＝放出（緑）</div>
-        </div>
-      </div>`;
-    }
-  }
+  // 入金タイミング効果（月初 / 給料日 / 年金 — それぞれ独立ボックス）
+  const _inkinBox = (icon, title, avg, zone, minDays) => {
+    if (avg === null || zone.length < minDays) return '';
+    const diff = avg - mean;
+    const pct  = mean !== 0 ? (diff / Math.abs(mean) * 100).toFixed(0) : '0';
+    const sign = diff >= 0 ? '+' : '';
+    const col  = diff >= 0 ? 'var(--red)' : 'var(--green)';
+    const judge = diff > std*0.3 ? '絞っている' : diff < -std*0.3 ? '集客で放出' : '特徴薄い';
+    const judgeCol = diff > std*0.3 ? 'var(--red)' : diff < -std*0.3 ? 'var(--green)' : 'var(--text2)';
+    return `<div class="trend-analysis-box">
+      <div class="tab-box-title">${icon} ${title}</div>
+      <div class="tab-box-body">
+        全体平均比 <b style="color:${col};font-size:15px;">${sign}${pct}%</b><br>
+        <b style="color:${judgeCol};">→ ${judge}</b><br>
+        <span style="color:var(--text2);font-size:11px;">対象期間平均 ${Math.round(avg).toLocaleString()}${metricUnit}（全体 ${Math.round(mean).toLocaleString()}${metricUnit}）</span>
+      </div>
+    </div>`;
+  };
+  html += _inkinBox('💴', '月初効果（1〜7日）',        avgMonthInit, monthInitZone, 3);
+  html += _inkinBox('💰', '給料日効果（25〜29日）',    avgSalary,    salaryZone,    3);
+  html += _inkinBox('👴', '年金日効果（偶数月15〜19日）', avgPension, pensionZone,   2);
 
   // ③ 曜日バイアス
   if (bestDow && worstDow && bestDow.dow !== worstDow.dow) {
