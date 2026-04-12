@@ -405,26 +405,37 @@
   .rival-day-chip.squeeze  { background:rgba(251,191,36,0.15); color:#fbbf24; border:1px solid rgba(251,191,36,0.4); }
   .rival-day-chip.attract  { background:rgba(96,165,250,0.15);  color:#60a5fa; border:1px solid rgba(96,165,250,0.4); }
   .rival-day-chip.normal   { background:rgba(100,116,139,0.1);  color:#94a3b8; border:1px solid rgba(100,116,139,0.2); }
-  /* 機種マトリクス */
-  .rival-matrix-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  /* 機種トレンドアラート */
+  .trend-alert-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
   }
-  .rival-matrix-box {
-    border-radius: 10px; padding: 10px 12px;
+  .trend-alert-card {
+    border-radius: 10px; padding: 12px 14px;
+    border-left: 4px solid; position: relative;
   }
-  .rival-matrix-box.revenue  { background:rgba(251,191,36,0.1);  border:1px solid rgba(251,191,36,0.35); }
-  .rival-matrix-box.golden   { background:rgba(167,139,250,0.1); border:1px solid rgba(167,139,250,0.35); }
-  .rival-matrix-box.nurture  { background:rgba(96,165,250,0.1);  border:1px solid rgba(96,165,250,0.35); }
-  .rival-matrix-box.selfdest { background:rgba(249,115,22,0.1);  border:1px solid rgba(249,115,22,0.35); }
-  .rival-matrix-box.wasteful { background:rgba(100,116,139,0.1); border:1px solid rgba(100,116,139,0.3); }
-  .rival-matrix-box-title {
-    font-size: 11px; font-weight: 800; margin-bottom: 6px; letter-spacing: .3px;
+  .trend-alert-card.p1 { background:rgba(239,68,68,0.08);   border-color:#ef4444; }
+  .trend-alert-card.p2 { background:rgba(234,179,8,0.08);   border-color:#eab308; }
+  .trend-alert-card.p3 { background:rgba(249,115,22,0.08);  border-color:#f97316; }
+  .trend-alert-card.p4 { background:rgba(34,197,94,0.08);   border-color:#22c55e; }
+  .trend-alert-level {
+    font-size: 10px; font-weight: 800; letter-spacing: .5px;
+    margin-bottom: 4px; display: flex; align-items: center; gap: 6px;
   }
-  .rival-matrix-box.revenue  .rival-matrix-box-title { color: #fbbf24; }
-  .rival-matrix-box.golden   .rival-matrix-box-title { color: #a78bfa; }
-  .rival-matrix-box.nurture  .rival-matrix-box-title { color: #60a5fa; }
-  .rival-matrix-box.selfdest .rival-matrix-box-title { color: #fb923c; }
-  .rival-matrix-box.wasteful .rival-matrix-box-title { color: #94a3b8; }
+  .trend-alert-card.p1 .trend-alert-level { color:#f87171; }
+  .trend-alert-card.p2 .trend-alert-level { color:#fbbf24; }
+  .trend-alert-card.p3 .trend-alert-level { color:#fb923c; }
+  .trend-alert-card.p4 .trend-alert-level { color:#4ade80; }
+  .trend-alert-title {
+    font-size: 12px; font-weight: 800; margin-bottom: 4px; color: var(--text);
+  }
+  .trend-alert-desc {
+    font-size: 10.5px; color: var(--text2); line-height: 1.55; margin-bottom: 8px;
+  }
+  .trend-alert-stable {
+    margin-top: 10px; padding: 8px 12px;
+    background: rgba(100,116,139,0.07); border-radius: 8px;
+    border: 1px solid rgba(100,116,139,0.2);
+  }
   .rival-model-chip {
     display: inline-block; padding: 2px 8px; border-radius: 999px;
     font-size: 11px; margin: 2px 3px; font-weight: 600;
@@ -3355,24 +3366,21 @@ function renderRivalAnalysis() {
   const TREND_UP_TH     = 0.05; // 5%以上上昇
   const TREND_DOWN_TH   = -0.05;// 5%以上下降
 
-  const classified = { golden:[], revenue:[], nurture:[], selfdest:[], wasteful:[], other:[] };
+  // ── 2×2 トレンドアラート分類（MECE） ──
+  // 軸① アウトトレンド：上昇(+5%以上) / 下降(-5%以下) / 横ばい
+  // 軸② 粗利水準：高い（全体平均の80%以上） / 低い
+  const classified = { rising_profit:[], rising_low:[], falling_profit:[], falling_low:[], stable:[] };
   modelList.forEach(m => {
     const isHighProfit = m.avgProfit >= storeAvgProfit * HIGH_PROFIT_TH;
-    const isHighIn     = m.avgIn     >= storeAvgIn     * HIGH_IN_TH;
-    const isLowProfit  = m.avgProfit <  storeAvgProfit * LOW_PROFIT_TH;
-    const isLowIn      = m.avgIn     <  storeAvgIn     * LOW_IN_TH;
     const inRising     = m.inTrend   >= TREND_UP_TH;
     const inFalling    = m.inTrend   <= TREND_DOWN_TH;
 
-    if (isHighProfit && isHighIn)                          classified.golden.push(m);
-    else if (isHighProfit && isLowIn  && inFalling)        classified.selfdest.push(m); // 収益設定だがアウト下落→抜きすぎ自滅
-    else if (isHighProfit)                                  classified.revenue.push(m); // 収益源
-    else if (isLowProfit  && isHighIn && inRising)         classified.nurture.push(m); // 育成中（放出+アウト上昇）
-    else if (isLowProfit  && isHighIn)                     classified.nurture.push(m); // 育成（高アウト）
-    else if (isLowProfit  && isLowIn)                      classified.wasteful.push(m);// 放出しているのにアウト低
-    else                                                    classified.other.push(m);
+    if      (inRising  && isHighProfit)  classified.rising_profit.push(m);  // 🔴 最優先警戒
+    else if (inRising  && !isHighProfit) classified.rising_low.push(m);     // 🟡 集客警戒
+    else if (inFalling && isHighProfit)  classified.falling_profit.push(m); // 🟠 転換点観察
+    else if (inFalling && !isHighProfit) classified.falling_low.push(m);    // 🟢 好機
+    else                                 classified.stable.push(m);          // 横ばい（非表示）
   });
-  // 各カテゴリを粗利順ソート
   Object.keys(classified).forEach(k => classified[k].sort((a,b) => b.avgProfit - a.avgProfit));
 
   // バラエティ機種（推定設置台数1〜2台）
@@ -3517,42 +3525,97 @@ function renderRivalAnalysis() {
     </div>
   </div>`;
 
-  // ② 機種マトリクス
-  html += `<div class="rival-section">
-    <div class="rival-section-title">🎮 機種マトリクス — 依存機種を暴く</div>
-    <div class="rival-matrix-grid">`;
+  // ② 機種トレンドアラート（2×2 MECE）
+  {
+    const alertDefs = [
+      {
+        key: 'rising_profit', priority: 'p1', icon: '🔴', level: '最優先警戒',
+        title: 'アウト上昇 × 粗利高い',
+        desc: '稼ぎながら客も増えている最強状態。自店で同機種を甘く使い客を引き戻せ。',
+        badge: 'attack', badgeText: '即対抗',
+        chipBg: 'rgba(239,68,68,0.12)', chipBorder: 'rgba(239,68,68,0.4)', chipColor: '#fca5a5',
+        trendIcon: '📈'
+      },
+      {
+        key: 'rising_low', priority: 'p2', icon: '🟡', level: '集客警戒',
+        title: 'アウト上昇 × 粗利低い',
+        desc: '放出で客を引っ張っている状態。自店の客が流れている可能性あり。同機種で競合せよ。',
+        badge: 'block', badgeText: '邪魔せよ',
+        chipBg: 'rgba(234,179,8,0.12)', chipBorder: 'rgba(234,179,8,0.4)', chipColor: '#fcd34d',
+        trendIcon: '📈'
+      },
+      {
+        key: 'falling_profit', priority: 'p3', icon: '🟠', level: '転換点・観察',
+        title: 'アウト下降 × 粗利高い',
+        desc: '抜きすぎで客離れが始まっている。近く設定変更か客が逃げ出す転換点。様子を見よ。',
+        badge: 'wait', badgeText: '変化を待て',
+        chipBg: 'rgba(249,115,22,0.12)', chipBorder: 'rgba(249,115,22,0.4)', chipColor: '#fdba74',
+        trendIcon: '📉'
+      },
+      {
+        key: 'falling_low', priority: 'p4', icon: '🟢', level: '好機',
+        title: 'アウト下降 × 粗利低い',
+        desc: '競合の弱点。放出しているのに客が来なくなっている。自店でこの機種を強化するチャンス。',
+        badge: 'copy', badgeText: '今が仕掛けどき',
+        chipBg: 'rgba(34,197,94,0.12)', chipBorder: 'rgba(34,197,94,0.4)', chipColor: '#86efac',
+        trendIcon: '📉'
+      },
+    ];
 
-  const matrixDefs = [
-    { key:'golden',   cls:'golden',   icon:'👑', title:'ゴールデン機種',    badge:'attack',  badgeText:'最優先で叩け',    desc:'高収益 × 高アウト。この店の柱。真っ先に同機種で対抗すべき。' },
-    { key:'revenue',  cls:'revenue',  icon:'💰', title:'収益源機種',        badge:'attack',  badgeText:'叩いて収益構造を崩せ', desc:'高収益で運用中。同機種を甘く設定すれば相手の利益の柱が崩れる。' },
-    { key:'nurture',  cls:'nurture',  icon:'🌱', title:'育成・集客機種',    badge:'block',   badgeText:'邪魔すべき',       desc:'放出伴いアウト上昇中。育成効果が出ている。同機種で先手を打て。' },
-    { key:'selfdest', cls:'selfdest', icon:'💣', title:'自滅機種（抜きすぎ）',badge:'wait',  badgeText:'自滅を待て',       desc:'収益設定なのにアウト急落。客が逃げている可能性大。放置でよい。' },
-    { key:'wasteful', cls:'wasteful', icon:'🕳️', title:'無駄放出機種',      badge:'wait',   badgeText:'様子見',           desc:'放出しているのにアウトが伸びない。集客できていない機種。放置でよい。' },
-  ];
+    const makeChip = (m, def) => {
+      const profitStr = (m.avgProfit >= 0 ? '+' : '') + Math.round(m.avgProfit).toLocaleString() + '円';
+      const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
+      const pctStr    = (m.inTrend >= 0 ? '+' : '') + Math.round(m.inTrend * 100) + '%';
+      return `<span class="rival-model-chip"
+        style="background:${def.chipBg};border:1px solid ${def.chipBorder};color:${def.chipColor};"
+        title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜アウト推移 ${pctStr}｜${m.estimatedMachines}台設置推定">
+        ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
+        <span style="font-size:9px;opacity:0.8;">${pctStr}</span>
+      </span>`;
+    };
 
-  matrixDefs.forEach(def => {
-    const models = classified[def.key];
-    html += `<div class="rival-matrix-box ${def.cls}">
-      <div class="rival-matrix-box-title">${def.icon} ${def.title} <span class="action-badge ${def.badge}">${def.badgeText}</span>
-        <span style="color:var(--text2);font-size:10px;font-weight:400;"> ${models.length}機種</span>
-      </div>
-      <div style="font-size:10px;color:var(--text2);margin-bottom:6px;">${def.desc}</div>
-      <div>
-        ${models.slice(0,8).map(m => {
-          const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
-          const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
-          const trendStr  = m.inTrend > 0.05 ? '↑' : m.inTrend < -0.05 ? '↓' : '→';
-          return `<span class="rival-model-chip" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:var(--text);"
-            title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜IN推移 ${trendStr}｜${m.estimatedMachines}台設置推定">
-            ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
-          </span>`;
+    html += `<div class="rival-section">
+      <div class="rival-section-title">📡 機種トレンドアラート — 今どこに向かっているか</div>
+      <div style="font-size:10.5px;color:var(--text2);margin-bottom:10px;">アウト推移（前半/後半比較）× 粗利水準 の2軸で全機種をMECE分類。横ばい機種は除外。</div>
+      <div class="trend-alert-grid">`;
+
+    alertDefs.forEach(def => {
+      const models = classified[def.key];
+      html += `<div class="trend-alert-card ${def.priority}">
+        <div class="trend-alert-level">${def.trendIcon} ${def.icon} ${def.level}
+          <span class="action-badge ${def.badge}" style="margin-left:4px;">${def.badgeText}</span>
+          <span style="color:var(--text2);font-size:10px;font-weight:400;margin-left:auto;">${models.length}機種</span>
+        </div>
+        <div class="trend-alert-title">${def.title}</div>
+        <div class="trend-alert-desc">${def.desc}</div>
+        <div>
+          ${models.slice(0, 10).map(m => makeChip(m, def)).join('')}
+          ${models.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+          ${models.length > 10 ? `<span style="color:var(--text2);font-size:10px;margin-left:4px;">他${models.length - 10}機種</span>` : ''}
+        </div>
+      </div>`;
+    });
+
+    // 横ばい機種は小リストで末尾表示
+    const stableModels = classified.stable;
+    if (stableModels.length > 0) {
+      html += `<div class="trend-alert-stable" style="grid-column:span 2;">
+        <span style="font-size:10px;font-weight:700;color:var(--text2);">→ 横ばい機種（様子見）${stableModels.length}機種：</span>
+        ${stableModels.slice(0, 15).map(m => {
+          const profitStr = (m.avgProfit >= 0 ? '+' : '') + Math.round(m.avgProfit).toLocaleString() + '円';
+          return `<span class="rival-model-chip" style="background:rgba(100,116,139,0.1);border:1px solid rgba(100,116,139,0.25);color:#94a3b8;"
+            title="${m.name}｜台粗利 ${profitStr}">${m.name.length > 10 ? m.name.slice(0,10)+'…' : m.name}</span>`;
         }).join('')}
-        ${models.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
-        ${models.length > 8 ? `<span style="color:var(--text2);font-size:10px;">他${models.length-8}機種</span>` : ''}
+        ${stableModels.length > 15 ? `<span style="color:var(--text2);font-size:10px;">他${stableModels.length - 15}機種</span>` : ''}
+      </div>`;
+    }
+
+    html += `</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:8px;">
+        閾値：アウト上昇/下降 ±5%以上（前半/後半比較）、粗利高い = 全体平均の${Math.round(HIGH_PROFIT_TH*100)}%以上
       </div>
     </div>`;
-  });
-  html += `</div></div>`;
+  }
 
   // ③ バラエティ機種分析 — サマリー集計
   const allTotalMachines   = modelList.reduce((a,m) => a + m.estimatedMachines, 0);
