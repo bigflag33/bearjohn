@@ -541,6 +541,13 @@
   .insight-tag[data-cat="variety"] { background:rgba(52,211,153,.15);  color:#6ee7b7; }
   .insight-tag[data-cat="juggler"] { background:rgba(251,191,36,.15);  color:#fcd34d; }
   .insight-tag[data-cat="compare"] { background:rgba(96,165,250,.15);  color:#93c5fd; }
+  .insight-visual { flex-shrink: 0; opacity: 0.9; align-self: flex-start; margin-top: 2px; }
+  .insight-jump-hint {
+    font-size: 9.5px; color: var(--text2); margin-top: 8px;
+    opacity: 0; letter-spacing: .4px; transition: opacity .2s;
+    border-top: 1px solid var(--border); padding-top: 5px;
+  }
+  .insight-card:hover .insight-jump-hint { opacity: 1; }
   @media(max-width:700px){
     .insight-feed-grid,.insight-feed-grid.has-top { grid-template-columns: 1fr; }
     .insight-card.top-story { grid-row: span 1; }
@@ -3102,8 +3109,58 @@ function renderComparisons() {
 // ══════════════════════════════════════
 window._insightsFeed = [];
 
-function _pushInsight(cat, icon, headline, body, priority) {
-  window._insightsFeed.push({ cat, icon, headline, body, priority: priority || 5 });
+// visual=SVG文字列, anchor=ジャンプ先のelementId
+function _pushInsight(cat, icon, headline, body, priority, visual, anchor) {
+  window._insightsFeed.push({ cat, icon, headline, body, priority: priority || 5, visual: visual || '', anchor: anchor || '' });
+}
+
+// ── SVGミニチャートヘルパー ──
+function _svgVBar(values, labels, colors, w, h) {
+  w = w || 96; h = h || 46;
+  const n = values.length;
+  const max = Math.max(...values.map(Math.abs), 1);
+  const bw = Math.floor((w - (n - 1) * 3) / n);
+  const lh = labels ? 11 : 0;
+  let s = `<svg width="${w}" height="${h + lh}" viewBox="0 0 ${w} ${h + lh}" style="display:block;overflow:visible;">`;
+  // ベースライン
+  s += `<line x1="0" y1="${h}" x2="${w}" y2="${h}" stroke="#334155" stroke-width="1"/>`;
+  values.forEach((v, i) => {
+    const bh = Math.max(2, Math.round(Math.abs(v) / max * (h - 2)));
+    const x = i * (bw + 3);
+    const y = h - bh;
+    const c = Array.isArray(colors) ? (colors[i] || '#6c63ff') : (colors || '#6c63ff');
+    s += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="2" fill="${c}" opacity="0.85"/>`;
+    if (labels && labels[i]) s += `<text x="${x + bw / 2}" y="${h + lh - 1}" text-anchor="middle" fill="#64748b" font-size="7.5" font-family="sans-serif">${labels[i]}</text>`;
+  });
+  s += '</svg>';
+  return s;
+}
+
+function _svgRatio2(aVal, bVal, aLabel, bLabel, aCol, bCol, w) {
+  w = w || 88;
+  const max = Math.max(Math.abs(aVal), Math.abs(bVal), 1);
+  const aW = Math.max(2, Math.round(Math.abs(aVal) / max * (w - 4)));
+  const bW = Math.max(2, Math.round(Math.abs(bVal) / max * (w - 4)));
+  aCol = aCol || '#a78bfa'; bCol = bCol || '#475569';
+  return `<svg width="${w}" height="38" viewBox="0 0 ${w} 38" style="display:block;">
+    <text x="0" y="9" fill="#94a3b8" font-size="7.5" font-family="sans-serif">${aLabel}</text>
+    <rect x="0" y="11" width="${aW}" height="7" rx="2" fill="${aCol}" opacity="0.85"/>
+    <text x="0" y="28" fill="#94a3b8" font-size="7.5" font-family="sans-serif">${bLabel}</text>
+    <rect x="0" y="30" width="${bW}" height="7" rx="2" fill="${bCol}" opacity="0.6"/>
+  </svg>`;
+}
+
+function _svgAboveBelow(above, below) {
+  const total = above + below || 1;
+  const aW = Math.round(above / total * 80);
+  const bW = 80 - aW;
+  return `<svg width="88" height="36" viewBox="0 0 88 36" style="display:block;">
+    <text x="0" y="9" fill="#94a3b8" font-size="7.5" font-family="sans-serif">業界平均対比</text>
+    <rect x="0" y="12" width="${aW}" height="8" rx="2" fill="#34d399" opacity="0.85"/>
+    <rect x="${aW + 2}" y="12" width="${bW}" height="8" rx="2" fill="#f87171" opacity="0.7"/>
+    <text x="0" y="30" fill="#34d399" font-size="7.5" font-family="sans-serif">↑${above}日</text>
+    <text x="${aW + 4}" y="30" fill="#f87171" font-size="7.5" font-family="sans-serif">↓${below}日</text>
+  </svg>`;
 }
 
 function renderInsightFeed() {
@@ -3115,20 +3172,37 @@ function renderInsightFeed() {
   const feed = window._insightsFeed;
   if (!feed || feed.length === 0) { card.style.display = 'none'; return; }
 
-  // 優先度降順でソート
   const sorted = [...feed].sort((a, b) => a.priority - b.priority);
   const [top, ...rest] = sorted;
-  const hasTop = sorted.length >= 3; // top-story は3件以上のときだけ大きく
+  const hasTop = sorted.length >= 3;
 
   let html = `<div class="insight-feed-grid${hasTop ? ' has-top' : ''}">`;
 
   const makeCard = (item, isTop) => {
-    const stripHtml = s => s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g,' ').trim();
+    const stripHtml = s => s.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
     const bodyText = stripHtml(item.body);
-    return `<div class="insight-card${isTop ? ' top-story' : ''}" data-cat="${item.cat}">
+    const maxLen = isTop ? 180 : 100;
+    const truncated = bodyText.length > maxLen ? bodyText.slice(0, maxLen) + '…' : bodyText;
+    const hasAnchor = !!item.anchor;
+    const clickAttr = hasAnchor
+      ? `onclick="(function(){var el=document.getElementById('${item.anchor}');if(el){el.scrollIntoView({behavior:'smooth',block:'start'});el.style.outline='2px solid var(--accent)';setTimeout(()=>el.style.outline='',1800);}})()"`
+      : '';
+    const visualHtml = item.visual
+      ? `<div class="insight-visual">${item.visual}</div>`
+      : '';
+    const jumpHint = hasAnchor
+      ? `<div class="insight-jump-hint">詳細セクションへ →</div>`
+      : '';
+    return `<div class="insight-card${isTop ? ' top-story' : ''}" data-cat="${item.cat}" ${clickAttr} style="${hasAnchor ? 'cursor:pointer;' : ''}">
       <div class="insight-tag" data-cat="${item.cat}">${item.icon} ${_catLabel(item.cat)}</div>
-      <div class="insight-headline">${item.headline}</div>
-      <div class="insight-body">${bodyText.length > (isTop ? 160 : 90) ? bodyText.slice(0, isTop ? 160 : 90) + '…' : bodyText}</div>
+      <div style="display:flex;gap:10px;align-items:flex-start;flex:1;min-height:0;">
+        <div style="flex:1;min-width:0;">
+          <div class="insight-headline">${item.headline}</div>
+          <div class="insight-body">${truncated}</div>
+        </div>
+        ${visualHtml}
+      </div>
+      ${jumpHint}
     </div>`;
   };
 
@@ -3375,9 +3449,15 @@ function renderRivalAnalysis() {
     const sqPattern = (sqWeekdayT>0&&sqWeekendT>0)
       ? (sqWeekdaySq/sqWeekdayT > sqWeekendSq/sqWeekendT + 0.15 ? '平日に絞る傾向'
        : sqWeekendSq/sqWeekendT > sqWeekdaySq/sqWeekdayT + 0.15 ? '週末に絞る傾向' : '曜日に関係なく絞り日が点在') : '';
+    // 絞り日：曜日別絞り率の棒グラフ（月〜日）
+    const _sqOrder  = [1,2,3,4,5,6,0];
+    const _sqLabels = ['月','火','水','木','金','土','日'];
+    const _sqVals   = _sqOrder.map(di => { const d = dowType.find(x=>x.dow===di); return d ? d.sq/Math.max(d.total,1)*100 : 0; });
+    const _sqCols   = _sqOrder.map(di => (dowType.find(x=>x.dow===di)||{}).name === sqTop.name ? '#fbbf24' : '#374151');
+    const sqVis = _svgVBar(_sqVals, _sqLabels, _sqCols, 96, 44);
     _pushInsight('rival','🟡',
       `${sqTop.name}曜日に絞り傾向 — 翌日が仕掛けどき`,
-      `${sqTop.name}曜日の絞り率が最も高い（全${sqTop.total}日中${sqTop.sq}日・${sqRate}%）。${sqPattern}。翌日に自店イベントを集中させるのが有効。`, 1);
+      `${sqTop.name}曜日の絞り率が最も高い（全${sqTop.total}日中${sqTop.sq}日・${sqRate}%）。${sqPattern}。翌日に自店イベントを集中させるのが有効。`, 1, sqVis, 'rivalAnalysisCard');
   }
   if (attractComment && dowType.length > 0 && attractDays.length > 0) {
     const atTop    = [...dowType].sort((a,b)=>b.at/Math.max(b.total,1)-a.at/Math.max(a.total,1))[0];
@@ -3392,9 +3472,15 @@ function renderRivalAnalysis() {
     const atPattern = (atWeekendT>0&&atWeekdayT>0)
       ? (atWeekendAt/atWeekendT > atWeekdayAt/atWeekdayT + 0.2 ? '週末集中型の集客スタイル'
        : atWeekdayAt/atWeekdayT > atWeekendAt/atWeekendT + 0.2 ? '平日に集客日を置くスタイル' : '曜日を問わず集客日を配置') : '';
+    // 集客日：曜日別集客率の棒グラフ（月〜日）
+    const _atOrder  = [1,2,3,4,5,6,0];
+    const _atLabels = ['月','火','水','木','金','土','日'];
+    const _atVals   = _atOrder.map(di => { const d = dowType.find(x=>x.dow===di); return d ? d.at/Math.max(d.total,1)*100 : 0; });
+    const _atCols   = _atOrder.map(di => (dowType.find(x=>x.dow===di)||{}).name === atTop.name ? '#60a5fa' : '#374151');
+    const atVis = _svgVBar(_atVals, _atLabels, _atCols, 96, 44);
     _pushInsight('rival','🔵',
       `${atTop.name}曜日が集客日 — 真っ向勝負は避けよ`,
-      `${atTop.name}曜日の集客率が最も高い（全${atTop.total}日中${atTop.at}日・${atRate}%）。${atPattern}。集客日のアウトは通常日比+${inUpRate}%。この曜日に自店も放出を合わせると客の取り合いになる。`, 1);
+      `${atTop.name}曜日の集客率が最も高い（全${atTop.total}日中${atTop.at}日・${atRate}%）。${atPattern}。集客日のアウトは通常日比+${inUpRate}%。この曜日に自店も放出を合わせると客の取り合いになる。`, 1, atVis, 'rivalAnalysisCard');
   }
 
   html += `<div class="rival-section">
@@ -3487,8 +3573,13 @@ function renderRivalAnalysis() {
 
   // バラエティインサイト
   if (varTotalMachines > 0) {
+    const varVis = _svgVBar(
+      [varInstallRate, varProfitRate, varInRate],
+      ['設置','利益','アウト'],
+      ['#a78bfa', varProfitRate > varInstallRate ? '#34d399' : '#f87171', '#60a5fa'],
+      84, 44);
     _pushInsight('variety','🎲',`バラエティ ${varTotalMachines}台（${varInstallRate.toFixed(0)}%設置）— ${varProfitComment.split('—')[0].trim()}`,
-      `設置比率${varInstallRate.toFixed(1)}%に対し利益比率${varProfitRate.toFixed(1)}%・アウト比率${varInRate.toFixed(1)}%。${varProfitComment}`, 3);
+      `設置比率${varInstallRate.toFixed(1)}%に対し利益比率${varProfitRate.toFixed(1)}%・アウト比率${varInRate.toFixed(1)}%。${varProfitComment}`, 3, varVis, 'rivalAnalysisCard');
   }
 
   html += `<div class="rival-section">
@@ -3579,8 +3670,13 @@ function renderRivalAnalysis() {
     const jagSorted = [...jagModels].sort((a,b) => b.avgProfit - a.avgProfit);
 
     // ジャグラーインサイト
+    const jagVis = _svgVBar(
+      [jagInstallRate, jagProfitRate, jagInRate],
+      ['設置','利益','アウト'],
+      ['#f59e0b', jagProfitRate > jagInstallRate ? '#34d399' : '#f87171', '#fcd34d'],
+      84, 44);
     _pushInsight('juggler','🫐',`ジャグラー ${jagMachines}台（${jagInstallRate.toFixed(0)}%）— ${jagComment.split('—')[0].trim()}`,
-      `設置比率${jagInstallRate.toFixed(1)}%に対し利益比率${jagProfitRate.toFixed(1)}%・アウト比率${jagInRate.toFixed(1)}%。${jagInComment}`, 3);
+      `設置比率${jagInstallRate.toFixed(1)}%に対し利益比率${jagProfitRate.toFixed(1)}%・アウト比率${jagInRate.toFixed(1)}%。${jagInComment}`, 3, jagVis, 'rivalAnalysisCard');
 
     html += `<div class="rival-section">
       <div class="rival-section-title" style="color:#f59e0b;">🫐 ジャグラーシリーズ分析</div>
@@ -3879,8 +3975,12 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
         <span style="font-size:10px;font-weight:800;color:#a78bfa;letter-spacing:.4px;">📝 総評</span><br>
         <span style="font-size:12.5px;line-height:1.7;color:var(--text);">${summary}</span>
       </div>`;
-      // ── インサイトフィードへ登録 ──
-      _pushInsight('trend', '📊', parts[0], summary, 2);
+      // ── インサイトフィードへ登録（月内パターン + 棒グラフ） ──
+      const _patVals  = [avgJou, avgChu, avgKa].map(v => v !== null ? Math.max(0, v) : 0);
+      const _patMax   = Math.max(..._patVals, 1);
+      const _patCols  = _patVals.map(v => v === Math.max(..._patVals) ? '#a78bfa' : '#4b5563');
+      const _patVis   = _svgVBar(_patVals, ['上旬','中旬','下旬'], _patCols, 80, 44);
+      _pushInsight('trend', '📊', parts[0], summary, 2, _patVis, 'trendAnalysisCard');
     }
   }
 
@@ -3890,7 +3990,9 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     const pct = mean !== 0 ? Math.abs(diff/mean*100).toFixed(0) : '0';
     if (Math.abs(diff) > std*0.3) {
       const dir = diff > 0 ? '絞る（利益確保）傾向' : '放出し集客する傾向';
-      _pushInsight('trend', '💰', `給料日（25〜29日）に${dir}`, `給料日帯の平均が全体平均比 ${diff>0?'+':''}${pct}%。給料日に合わせてイベント戦略を調整すると効果的。`, 3);
+      const salCol = diff > 0 ? '#f87171' : '#34d399';
+      const salVis = _svgRatio2(Math.abs(avgSalary), Math.abs(mean), '給料日帯', '全体平均', salCol, '#475569', 88);
+      _pushInsight('trend', '💰', `給料日（25〜29日）に${dir}`, `給料日帯の平均が全体平均比 ${diff>0?'+':''}${pct}%。給料日に合わせてイベント戦略を調整すると効果的。`, 3, salVis, 'trendAnalysisCard');
     }
   }
   if (avgPension !== null && pensionZone.length >= 2) {
@@ -3898,26 +4000,42 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     const pct = mean !== 0 ? Math.abs(diff/mean*100).toFixed(0) : '0';
     if (Math.abs(diff) > std*0.3) {
       const dir = diff > 0 ? '絞る傾向' : '放出気味の傾向';
-      _pushInsight('trend', '👴', `年金日（偶数月15〜19日）に${dir}`, `年金支給日帯の平均が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして把握しておきたい。`, 4);
+      const penCol = diff > 0 ? '#f87171' : '#34d399';
+      const penVis = _svgRatio2(Math.abs(avgPension), Math.abs(mean), '年金日帯', '全体平均', penCol, '#475569', 88);
+      _pushInsight('trend', '👴', `年金日（偶数月15〜19日）に${dir}`, `年金支給日帯の平均が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして把握しておきたい。`, 4, penVis, 'trendAnalysisCard');
     }
   }
   if (bestDow && worstDow && bestDow.dow !== worstDow.dow) {
     const spread = bestDow.avg - worstDow.avg;
     if (Math.abs(spread) > std*0.4) {
-      _pushInsight('trend', '📅', `${bestDow.name}曜日が最強・${worstDow.name}曜日が最弱`, `曜日間の差が統計的に有意。${bestDow.name}曜日に合わせてイベントを仕掛けると対抗効果が高い。`, 4);
+      // 曜日順（日〜土）に並べた棒グラフ
+      const _dowOrder = [1,2,3,4,5,6,0]; // 月〜日
+      const _dowLabels = ['月','火','水','木','金','土','日'];
+      const _dowVals = _dowOrder.map(di => { const d = dowAvgs.find(x=>x.dow===di); return d ? Math.max(0,d.avg) : 0; });
+      const _dowMax  = Math.max(..._dowVals,1);
+      const _dowCols = _dowOrder.map(di => {
+        if (bestDow.dow===di)  return '#34d399';
+        if (worstDow.dow===di) return '#f87171';
+        return '#4b5563';
+      });
+      const dowVis = _svgVBar(_dowVals, _dowLabels, _dowCols, 96, 44);
+      _pushInsight('trend', '📅', `${bestDow.name}曜日が最強・${worstDow.name}曜日が最弱`, `曜日間の差が統計的に有意。${bestDow.name}曜日に合わせてイベントを仕掛けると対抗効果が高い。`, 4, dowVis, 'trendAnalysisCard');
     }
   }
   if (storeVsBench.length >= 5) {
     const recent10 = storeVsBench.slice(-10);
     const recentAbove = recent10.filter(x=>x.diff>=0).length;
-    if (recentAbove >= 7)      _pushInsight('trend','📈','直近は業界平均を上回る日が多い',`直近10日中${recentAbove}日が業界ベンチマーク超え。強い時期に自店イベントを集中させるのが有効。`,5);
-    else if (recentAbove <= 3) _pushInsight('trend','📉','直近は業界平均を下回る日が続いている',`直近10日中${recent10.length-recentAbove}日が業界平均以下。この店舗が苦手な時期に自店の集客を強化するチャンス。`,3);
+    const recentBelow = recent10.length - recentAbove;
+    const benchVis = _svgAboveBelow(recentAbove, recentBelow);
+    if (recentAbove >= 7)      _pushInsight('trend','📈','直近は業界平均を上回る日が多い',`直近10日中${recentAbove}日が業界ベンチマーク超え。強い時期に自店イベントを集中させるのが有効。`,5, benchVis,'trendAnalysisCard');
+    else if (recentAbove <= 3) _pushInsight('trend','📉','直近は業界平均を下回る日が続いている',`直近10日中${recentBelow}日が業界平均以下。この店舗が苦手な時期に自店の集客を強化するチャンス。`,3, benchVis,'trendAnalysisCard');
   }
   if (anomalies.length > 0) {
-    const ups = anomalies.filter(a=>a.z>0).length;
-    const downs = anomalies.filter(a=>a.z<0).length;
+    const ups   = anomalies.filter(a=>a.z>0).length;
+    const downs  = anomalies.filter(a=>a.z<0).length;
     const dominant = ups > downs ? `突出した回収日が${ups}日` : `突出した放出日が${downs}日`;
-    _pushInsight('trend','⚡',`統計的異常日 ${anomalies.length}日を検出`,`${dominant}検出。異常日は競合の特別施策が絡んでいる可能性があり、自店の仕掛けタイミングの参考に。`, 4);
+    const anomVis = _svgAboveBelow(downs, ups); // 放出=上（グリーン）、回収=下（レッド）
+    _pushInsight('trend','⚡',`統計的異常日 ${anomalies.length}日を検出`,`${dominant}検出。異常日は競合の特別施策が絡んでいる可能性があり、自店の仕掛けタイミングの参考に。`, 4, anomVis,'trendAnalysisCard');
   }
 
   // ② 注目日（異常日フラグ）
