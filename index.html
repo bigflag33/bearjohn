@@ -76,7 +76,7 @@
 
   .main { padding: 20px 24px; }
 
-  .filter-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+  .filter-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; position: sticky; top: 0; z-index: 120; box-shadow: 0 4px 16px rgba(0,0,0,0.35); backdrop-filter: blur(8px); }
   .filter-group { display: flex; flex-direction: column; gap: 6px; }
   .filter-group label { font-size: 11px; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
   .filter-group input, .filter-group select { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 12px; font-size: 13px; min-width: 140px; }
@@ -3362,15 +3362,39 @@ function renderRivalAnalysis() {
     attractComment = `💡 <b style="color:#60a5fa">${top.name}曜日</b>に最も集客傾向（${top.at}/${top.total}日・${rate}%）。${pattern}。集客日のアウトは通常日比 <b style="color:#60a5fa">+${inUpRate}%</b>。この曜日に自店も放出を合わせると客の取り合いになる。`;
   }
 
-  // ── インサイトフィードへ登録（攻略分析） ──
-  if (squeezeComment) {
-    const sqTop = [...dowType].sort((a,b)=>b.sq/Math.max(b.total,1)-a.sq/Math.max(a.total,1))[0];
-    const sqRate = sqTop ? Math.round(sqTop.sq/sqTop.total*100) : 0;
-    _pushInsight('rival','🟡',`${sqTop ? sqTop.name+'曜日' : ''}に絞り傾向 — 翌日が仕掛けどき`, squeezeComment.replace(/<[^>]*>/g,''), 1);
+  // ── インサイトフィードへ登録（攻略分析）──
+  // ※ squeezeComment/attractComment の「N/M日」表記は日付と混同されるため
+  //    インサイト用テキストは別途構築する
+  if (squeezeComment && dowType.length > 0 && squeezeDays.length > 0) {
+    const sqTop  = [...dowType].sort((a,b)=>b.sq/Math.max(b.total,1)-a.sq/Math.max(a.total,1))[0];
+    const sqRate = Math.round(sqTop.sq / sqTop.total * 100);
+    const sqWeekendSq = dowType.filter(d=>d.dow===0||d.dow===6).reduce((a,d)=>a+d.sq,0);
+    const sqWeekdaySq = dowType.filter(d=>d.dow>=1&&d.dow<=5).reduce((a,d)=>a+d.sq,0);
+    const sqWeekendT  = dowType.filter(d=>d.dow===0||d.dow===6).reduce((a,d)=>a+d.total,0);
+    const sqWeekdayT  = dowType.filter(d=>d.dow>=1&&d.dow<=5).reduce((a,d)=>a+d.total,0);
+    const sqPattern = (sqWeekdayT>0&&sqWeekendT>0)
+      ? (sqWeekdaySq/sqWeekdayT > sqWeekendSq/sqWeekendT + 0.15 ? '平日に絞る傾向'
+       : sqWeekendSq/sqWeekendT > sqWeekdaySq/sqWeekdayT + 0.15 ? '週末に絞る傾向' : '曜日に関係なく絞り日が点在') : '';
+    _pushInsight('rival','🟡',
+      `${sqTop.name}曜日に絞り傾向 — 翌日が仕掛けどき`,
+      `${sqTop.name}曜日の絞り率が最も高い（全${sqTop.total}日中${sqTop.sq}日・${sqRate}%）。${sqPattern}。翌日に自店イベントを集中させるのが有効。`, 1);
   }
-  if (attractComment) {
-    const atTop = [...dowType].sort((a,b)=>b.at/Math.max(b.total,1)-a.at/Math.max(a.total,1))[0];
-    _pushInsight('rival','🔵',`${atTop ? atTop.name+'曜日' : ''}が集客日 — 真っ向勝負は避けよ`, attractComment.replace(/<[^>]*>/g,''), 1);
+  if (attractComment && dowType.length > 0 && attractDays.length > 0) {
+    const atTop    = [...dowType].sort((a,b)=>b.at/Math.max(b.total,1)-a.at/Math.max(a.total,1))[0];
+    const atRate   = Math.round(atTop.at / atTop.total * 100);
+    const avgAtIN  = attractDays.reduce((a,d)=>a+d.avgI,0) / Math.max(attractDays.length,1);
+    const avgNrmIN = dayTypes.filter(d=>d.type!=='attract').reduce((a,d)=>a+d.avgI,0) / Math.max(dayTypes.filter(d=>d.type!=='attract').length,1);
+    const inUpRate = avgNrmIN>0 ? Math.round((avgAtIN-avgNrmIN)/avgNrmIN*100) : 0;
+    const atWeekendAt = dowType.filter(d=>d.dow===0||d.dow===6).reduce((a,d)=>a+d.at,0);
+    const atWeekdayAt = dowType.filter(d=>d.dow>=1&&d.dow<=5).reduce((a,d)=>a+d.at,0);
+    const atWeekendT  = dowType.filter(d=>d.dow===0||d.dow===6).reduce((a,d)=>a+d.total,0);
+    const atWeekdayT  = dowType.filter(d=>d.dow>=1&&d.dow<=5).reduce((a,d)=>a+d.total,0);
+    const atPattern = (atWeekendT>0&&atWeekdayT>0)
+      ? (atWeekendAt/atWeekendT > atWeekdayAt/atWeekdayT + 0.2 ? '週末集中型の集客スタイル'
+       : atWeekdayAt/atWeekdayT > atWeekendAt/atWeekendT + 0.2 ? '平日に集客日を置くスタイル' : '曜日を問わず集客日を配置') : '';
+    _pushInsight('rival','🔵',
+      `${atTop.name}曜日が集客日 — 真っ向勝負は避けよ`,
+      `${atTop.name}曜日の集客率が最も高い（全${atTop.total}日中${atTop.at}日・${atRate}%）。${atPattern}。集客日のアウトは通常日比+${inUpRate}%。この曜日に自店も放出を合わせると客の取り合いになる。`, 1);
   }
 
   html += `<div class="rival-section">
