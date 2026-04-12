@@ -3265,7 +3265,8 @@ function renderRivalAnalysis() {
   const el = document.getElementById('rivalAnalysisBody');
   if (!el) return;
 
-  const all = loadAllData();
+  // フィルター適用済みデータを使用（期間・機種フィルターを反映）
+  const all = filtered && filtered.length ? filtered : loadAllData();
   if (all.length < 10) {
     el.innerHTML = '<span style="color:var(--text2);font-size:12px;">データをアップロードすると攻略分析が表示されます</span>';
     return;
