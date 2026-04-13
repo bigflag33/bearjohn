@@ -3634,33 +3634,58 @@ function renderRivalAnalysis() {
       </span>`;
     };
 
+    const _tileColors = {
+      p1: { border:'#ef4444', bg:'rgba(239,68,68,0.07)',   bgOpen:'rgba(239,68,68,0.13)'  },
+      p2: { border:'#eab308', bg:'rgba(234,179,8,0.07)',   bgOpen:'rgba(234,179,8,0.13)'  },
+      p3: { border:'#f97316', bg:'rgba(249,115,22,0.07)',  bgOpen:'rgba(249,115,22,0.13)' },
+      p4: { border:'#22c55e', bg:'rgba(34,197,94,0.07)',   bgOpen:'rgba(34,197,94,0.13)'  },
+    };
+
     html += `<div class="rival-section">
-      <div class="rival-section-title">📡 機種トレンドアラート — 今どこに向かっているか</div>
-      <div style="font-size:11px;color:var(--text2);margin-bottom:14px;line-height:1.6;">アウト推移（前半/後半比較）× 粗利水準 の2軸で全機種をMECE分類。横ばい機種は除外。</div>
-      <div class="trend-alert-grid">`;
+      <div class="rival-section-title">機種トレンドアラート — 今どこに向かっているか</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.6;">アウト推移（前半/後半比較）× 粗利水準 の2軸で全機種をMECE分類。タイルをタップで詳細を開閉。</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">`;
 
     alertDefs.forEach(def => {
       const models = classified[def.key];
-      html += `<div class="trend-alert-card ${def.priority}">
-        <div class="trend-alert-level">${def.trendIcon} ${def.icon} ${def.level}
-          <span class="action-badge ${def.badge}" style="margin-left:4px;">${def.badgeText}</span>
-          <span style="color:var(--text2);font-size:10px;font-weight:400;margin-left:auto;">${models.length}機種</span>
-        </div>
-        <div class="trend-alert-title">${def.title}</div>
-        <div class="trend-alert-desc">${def.desc}</div>
-        <div>
-          ${models.slice(0, 10).map(m => makeChip(m, def)).join('')}
-          ${models.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
-          ${models.length > 10 ? `<span style="color:var(--text2);font-size:10px;margin-left:4px;">他${models.length - 10}機種</span>` : ''}
+      const tc = _tileColors[def.priority];
+      html += `<div
+        id="trendTile_${def.key}"
+        data-open="false"
+        onclick="toggleTrendDetail('${def.key}')"
+        style="border:1px solid ${tc.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${tc.bg};transition:background .15s;user-select:none;">
+        <div style="font-size:56px;font-weight:900;line-height:1;color:${tc.border};letter-spacing:-3px;font-variant-numeric:tabular-nums;">${models.length}</div>
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${tc.border};margin-top:10px;">${def.level}</div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">${def.title}</div>
+        <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+          <span class="action-badge ${def.badge}">${def.badgeText}</span>
+          <span style="font-size:10px;color:var(--text2);">▾</span>
         </div>
       </div>`;
     });
 
-    // 横ばい機種は小リストで末尾表示
+    html += `</div>`;
+
+    // 展開パネル（デフォルト非表示、toggleTrendDetailで開閉）
+    alertDefs.forEach(def => {
+      const models = classified[def.key];
+      const tc = _tileColors[def.priority];
+      html += `<div id="trendDetail_${def.key}" style="display:none;margin-top:10px;padding:16px 18px;border-radius:12px;border:1px solid ${tc.border};background:rgba(0,0,0,0.18);">
+        <div style="font-size:12px;font-weight:800;color:${tc.border};margin-bottom:8px;">${def.title} <span style="font-weight:400;font-size:10.5px;color:var(--text2);">${models.length}機種</span></div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.65;margin-bottom:12px;">${def.desc}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:2px;">
+          ${models.slice(0, 15).map(m => makeChip(m, def)).join('')}
+          ${models.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+          ${models.length > 15 ? `<span style="color:var(--text2);font-size:10.5px;margin-left:4px;align-self:center;">他${models.length - 15}機種</span>` : ''}
+        </div>
+      </div>`;
+    });
+
+    // 横ばい機種
     const stableModels = classified.stable;
     if (stableModels.length > 0) {
       html += `<div class="trend-alert-stable">
-        <span style="font-size:10px;font-weight:700;color:var(--text2);">→ 横ばい機種（様子見）${stableModels.length}機種：</span>
+        <span style="font-size:10.5px;font-weight:700;color:var(--text2);">横ばい機種（様子見）${stableModels.length}機種：</span>
         ${stableModels.slice(0, 15).map(m => {
           const profitStr = (m.avgProfit >= 0 ? '+' : '') + Math.round(m.avgProfit).toLocaleString() + '円';
           return `<span class="rival-model-chip" style="background:rgba(100,116,139,0.1);border:1px solid rgba(100,116,139,0.25);color:#94a3b8;"
@@ -3670,8 +3695,7 @@ function renderRivalAnalysis() {
       </div>`;
     }
 
-    html += `</div>
-      <div style="font-size:10.5px;color:var(--text2);margin-top:12px;line-height:1.6;">
+    html += `<div style="font-size:10.5px;color:var(--text2);margin-top:12px;line-height:1.6;">
         閾値：アウト上昇/下降 ±5%以上（前半/後半比較）、粗利高い = 全体平均の${Math.round(HIGH_PROFIT_TH*100)}%以上
       </div>
     </div>`;
@@ -3776,7 +3800,8 @@ function renderRivalAnalysis() {
         <div class="rival-section-title" style="color:#a78bfa;">🔧 運用努力機種 — 設定の上げ下げが見える機種</div>
         <div style="font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.65;">
           店舗平均アウト以上の機種のうち、「毎週◯曜日」または「◯の付く日」で
-          ±20%以上の特異パターンを検出した機種。意図的な設定変更が疑われる。
+          <b style="color:var(--text);">IN枚数（1台あたり平均）</b>が±20%以上ズレている機種。
+          稼働量の変動が曜日・日付でパターン化しており、意図的な設定変更が疑われる。
         </div>
         <div style="display:flex;flex-direction:column;gap:10px;">
           ${effortModels.slice(0, 12).map(m => {
@@ -3801,7 +3826,7 @@ function renderRivalAnalysis() {
           ${effortModels.length > 12 ? `<div style="font-size:11px;color:var(--text2);padding:4px 10px;">他 ${effortModels.length - 12} 機種でも類似パターンを検出</div>` : ''}
         </div>
         <div style="font-size:10.5px;color:var(--text2);margin-top:12px;line-height:1.6;">
-          閾値：グループ内3日以上・平均比±20%以上。曜日判定は祝日を除外。
+          閾値：グループ内3日以上・IN枚数（1台あたり平均）の平均比±20%以上。曜日判定は祝日を除外。
         </div>
       </div>`;
     } else {
@@ -5670,6 +5695,24 @@ function navigateToPinpoint(dateStr) {
   document.getElementById('pinDateInput').value = dateStr;
   document.getElementById('pinCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   runPinpoint();
+}
+
+function toggleTrendDetail(key) {
+  const el = document.getElementById('trendDetail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  // 全パネルを閉じる
+  ['rising_profit','rising_low','falling_profit','falling_low'].forEach(k => {
+    const p = document.getElementById('trendDetail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('trendTile_' + k);
+    if (t) t.setAttribute('data-open', 'false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('trendTile_' + key);
+    if (tile) tile.setAttribute('data-open', 'true');
+  }
 }
 
 function navigateToModel(modelName) {
