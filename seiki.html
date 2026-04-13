@@ -438,9 +438,18 @@
     border: 1px solid rgba(100,116,139,0.2);
   }
   .rival-model-chip {
-    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 999px;
     font-size: 11px; margin: 2px 3px; font-weight: 600;
-    max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 200px; overflow: hidden;
+    white-space: nowrap;
+  }
+  .rival-model-chip .chip-name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0; flex: 1 1 auto;
+  }
+  .rival-model-chip .chip-pct {
+    flex-shrink: 0; white-space: nowrap; font-size: 9px; opacity: 0.85;
   }
   /* バラエティ機種 */
   .rival-variety-grid {
@@ -3616,8 +3625,7 @@ function renderRivalAnalysis() {
         style="background:${def.chipBg};border:1px solid ${def.chipBorder};color:${def.chipColor};cursor:pointer;"
         onclick="navigateToModel('${safeName}')"
         title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜アウト推移 ${pctStr}｜${m.estimatedMachines}台設置推定 — クリックで機種別集計へ">
-        ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
-        <span style="font-size:9px;opacity:0.8;">${pctStr}</span>
+        <span class="chip-name">${m.name}</span><span class="chip-pct">${pctStr}</span>
       </span>`;
     };
 
@@ -3825,8 +3833,7 @@ function renderRivalAnalysis() {
           return `<span class="rival-model-chip" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:${profitCol};cursor:pointer;"
             onclick="navigateToModel('${sn}')"
             title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
-            ${m.name.length > 14 ? m.name.slice(0,14)+'…' : m.name}
-            <span style="font-size:10px;opacity:.8;">${profitStr}</span>
+            <span class="chip-name">${m.name}</span><span class="chip-pct">${profitStr}</span>
           </span>`;
         }).join('')}
       </div>
