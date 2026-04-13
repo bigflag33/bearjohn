@@ -3827,61 +3827,96 @@ function renderRivalAnalysis() {
       'rgba(251,191,36,0.1)','rgba(167,139,250,0.1)',
       'rgba(251,191,36,0.35)','rgba(167,139,250,0.35)');
 
-    if (effortModels.length > 0) {
-      html += `<div class="rival-section">
-        <div class="rival-section-title" style="color:#a78bfa;">運用努力機種 — 設定の上げ下げが見える機種</div>
-        <div style="font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.65;">
-          店舗平均アウト以上の機種のうち、「毎週◯曜日」または「◯の付く日」で
-          稼働（IN枚数）または利益（台粗利）が±20%以上ズレている機種。
-          意図的な設定変更が疑われる。
+    // タイル用リスト分離
+    const effortInModels     = effortModels.filter(m => m.inPatterns.length > 0);
+    const effortProfitModels = effortModels.filter(m => m.profitPatterns.filter(p => p.dir === 'down').length > 0);
+
+    // バッジ描画
+    const _eBadge = (p, col, bg, bdr) => {
+      const arr = p.dir === 'up' ? '▲' : '▼';
+      return `<span style="display:inline-flex;align-items:center;gap:4px;background:${bg};border:1px solid ${bdr};border-radius:6px;padding:3px 9px;font-size:10.5px;color:${col};white-space:nowrap;">
+        ${arr} ${p.label} <b>${p.diffStr}</b><span style="opacity:.5;font-size:9px;">${p.samples}日</span>
+      </span>`;
+    };
+    const _inBadge2     = p => _eBadge(p,
+      p.dir === 'up' ? '#34d399' : '#f87171',
+      p.dir === 'up' ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
+      p.dir === 'up' ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)');
+    const _profitBadge2 = p => _eBadge(p, '#a78bfa', 'rgba(167,139,250,0.1)', 'rgba(167,139,250,0.35)');
+
+    html += `<div class="rival-section">
+      <div class="rival-section-title" style="color:#a78bfa;">運用努力機種 — 設定の上げ下げが見える機種</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
+        店舗平均アウト以上の機種のうち、「毎週◯曜日」または「◯の付く日」で
+        稼働（IN枚数）または利益（台粗利）が±20%以上ズレている機種。タイルをタップで詳細を開閉。
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div id="effortTile_in" data-open="false" onclick="toggleEffortDetail('in')"
+          style="border:1px solid #34d399;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(52,211,153,0.07);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#34d399;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${effortInModels.length}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#34d399;margin-top:10px;">稼働パターン検出</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">IN枚数が曜日・日付で変動</div>
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          ${effortModels.slice(0, 12).map(m => {
+        <div id="effortTile_profit" data-open="false" onclick="toggleEffortDetail('profit')"
+          style="border:1px solid #a78bfa;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(167,139,250,0.07);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#a78bfa;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${effortProfitModels.length}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#a78bfa;margin-top:10px;">利益（放出）パターン検出</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">台粗利が下落する日が判明</div>
+          <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="effortDetail_in" style="display:none;margin-top:10px;padding:16px 18px;border-radius:12px;border:1px solid #34d399;background:rgba(0,0,0,0.18);">
+        <div style="font-size:12px;font-weight:800;color:#34d399;margin-bottom:8px;">稼働パターン検出機種 <span style="font-weight:400;font-size:10.5px;color:var(--text2);">${effortInModels.length}機種</span></div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.65;margin-bottom:12px;">IN枚数（1台あたり平均）が曜日または日付末尾でパターンを示す機種。緑↑=稼働高い日、赤↓=稼働低い日。</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${effortInModels.slice(0, 15).map(m => {
             const sn = m.name.replace(/'/g, "\\'");
             const inStr = Math.round(m.avgIn).toLocaleString() + _inUnit() + '/台';
-            const allPats = [
-              ...m.inPatterns.slice(0, 3).map(p => ({ ...p, axis: 'in' })),
-              // 利益↓（放出した日）のみ表示。利益↑（抜けた日）は加味しない
-              ...m.profitPatterns.filter(p => p.dir === 'down').slice(0, 3).map(p => ({ ...p, axis: 'profit' })),
-            ];
-            const patHtml = allPats.map(p => {
-              const isIn = p.axis === 'in';
-              const col = isIn
-                ? (p.dir === 'up' ? '#34d399' : '#f87171')
-                : (p.dir === 'up' ? '#fbbf24' : '#a78bfa');
-              const bg  = isIn
-                ? (p.dir === 'up' ? 'rgba(52,211,153,0.1)'  : 'rgba(248,113,113,0.1)')
-                : (p.dir === 'up' ? 'rgba(251,191,36,0.1)'  : 'rgba(167,139,250,0.1)');
-              const bdr = isIn
-                ? (p.dir === 'up' ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)')
-                : (p.dir === 'up' ? 'rgba(251,191,36,0.35)' : 'rgba(167,139,250,0.35)');
-              const arr  = p.dir === 'up' ? '▲' : '▼';
-              const axis = isIn ? '稼働' : '利益';
-              return `<span style="display:inline-flex;align-items:center;gap:4px;background:${bg};border:1px solid ${bdr};border-radius:6px;padding:3px 9px;font-size:10.5px;color:${col};white-space:nowrap;">
-                <span style="opacity:.65;font-size:9px;">${axis}</span>${arr} ${p.label} <b>${p.diffStr}</b><span style="opacity:.5;font-size:9px;">${p.samples}日</span>
-              </span>`;
-            }).join('');
-            return `<div style="background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.18);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;"
+            const badges = m.inPatterns.slice(0, 4).map(_inBadge2).join('');
+            return `<div style="background:rgba(52,211,153,0.05);border:1px solid rgba(52,211,153,0.18);border-radius:8px;padding:10px 14px;cursor:pointer;"
               onclick="navigateToModel('${sn}')" title="${m.name} — クリックで機種別集計へ">
-              <span style="font-size:12.5px;font-weight:700;color:var(--text);flex:1;min-width:100px;">${m.name}</span>
-              <span style="font-size:10.5px;color:var(--text2);white-space:nowrap;">${m.estimatedMachines}台｜${inStr}</span>
-              <div style="display:flex;flex-wrap:wrap;gap:5px;">${patHtml}</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <span style="font-size:12px;font-weight:700;color:var(--text);flex:1;">${m.name}</span>
+                <span style="font-size:10px;color:var(--text2);white-space:nowrap;">${m.estimatedMachines}台｜${inStr}</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>
             </div>`;
           }).join('')}
-          ${effortModels.length > 12 ? `<div style="font-size:11px;color:var(--text2);padding:4px 10px;">他 ${effortModels.length - 12} 機種でも類似パターンを検出</div>` : ''}
+          ${effortInModels.length > 15 ? `<div style="font-size:11px;color:var(--text2);padding:2px 6px;">他 ${effortInModels.length - 15} 機種</div>` : ''}
         </div>
-        <div style="font-size:10.5px;color:var(--text2);margin-top:12px;line-height:1.6;">
-          閾値：グループ内3日以上・平均比±20%以上。曜日判定は祝日を除外。稼働↑緑 / 稼働↓赤、利益↑黄 / 利益↓紫。
+      </div>
+
+      <div id="effortDetail_profit" style="display:none;margin-top:10px;padding:16px 18px;border-radius:12px;border:1px solid #a78bfa;background:rgba(0,0,0,0.18);">
+        <div style="font-size:12px;font-weight:800;color:#a78bfa;margin-bottom:8px;">利益（放出）パターン検出機種 <span style="font-weight:400;font-size:10.5px;color:var(--text2);">${effortProfitModels.length}機種</span></div>
+        <div style="font-size:11px;color:var(--text2);line-height:1.65;margin-bottom:12px;">台粗利が特定の曜日または日付末尾で平均比−20%以上下落している機種。意図的な放出設定が疑われる。</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${effortProfitModels.slice(0, 15).map(m => {
+            const sn = m.name.replace(/'/g, "\\'");
+            const inStr = Math.round(m.avgIn).toLocaleString() + _inUnit() + '/台';
+            const badges = m.profitPatterns.filter(p => p.dir === 'down').slice(0, 4).map(_profitBadge2).join('');
+            return `<div style="background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.18);border-radius:8px;padding:10px 14px;cursor:pointer;"
+              onclick="navigateToModel('${sn}')" title="${m.name} — クリックで機種別集計へ">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <span style="font-size:12px;font-weight:700;color:var(--text);flex:1;">${m.name}</span>
+                <span style="font-size:10px;color:var(--text2);white-space:nowrap;">${m.estimatedMachines}台｜${inStr}</span>
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">${badges}</div>
+            </div>`;
+          }).join('')}
+          ${effortProfitModels.length > 15 ? `<div style="font-size:11px;color:var(--text2);padding:2px 6px;">他 ${effortProfitModels.length - 15} 機種</div>` : ''}
         </div>
-      </div>`;
-    } else {
-      html += `<div class="rival-section">
-        <div class="rival-section-title" style="color:#a78bfa;">運用努力機種</div>
-        <div style="font-size:11px;color:var(--text2);">
-          現在の期間では特異パターンを検出できませんでした。期間を広げると検出精度が上がります（目安：1〜2ヶ月以上）。
-        </div>
-      </div>`;
-    }
+      </div>
+
+      <div style="font-size:10.5px;color:var(--text2);margin-top:12px;line-height:1.6;">
+        閾値：グループ内3日以上・平均比±20%以上。曜日判定は祝日を除外。
+      </div>
+    </div>`;
   }
 
   // ④ バラエティ機種分析 — サマリー集計
@@ -3935,43 +3970,63 @@ function renderRivalAnalysis() {
         <span style="font-size:11.5px;color:var(--text2);line-height:1.7;">💡 ${varProfitComment}</span>
       </div>
     </div>
-    <div class="rival-variety-grid">
-      <div class="rival-variety-box copy">
-        <div class="rival-variety-box-title">✅ 利益管理が巧みな機種 <span class="action-badge copy">パクるべき</span>
-          <span style="color:var(--text2);font-size:10px;font-weight:400;"> ${varietyCopy.length}機種</span>
-        </div>
-        <div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.6;">少台数で継続的に粗利・アウトともに平均水準を維持。運用の腕が光る機種。自店に導入して甘めに使えば即戦力。</div>
-        <div>
-          ${varietyCopy.slice(0,8).map(m => {
-            const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
-            const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
-            const sn = m.name.replace(/'/g,"\\'");
-            return `<span class="rival-model-chip" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;cursor:pointer;"
-              onclick="navigateToModel('${sn}')"
-              title="${m.name}｜台粗利 ${profitStr}｜IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
-              ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
-            </span>`;
-          }).join('')}
-          ${varietyCopy.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div id="varietyTile_copy" data-open="false" onclick="toggleVarietyDetail('copy')"
+        style="border:1px solid #34d399;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(52,211,153,0.07);user-select:none;">
+        <div style="font-size:56px;font-weight:900;line-height:1;color:#34d399;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${varietyCopy.length}</div>
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#34d399;margin-top:10px;">利益管理が巧みな機種</div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">少台数で粗利・稼働ともに維持</div>
+        <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+          <span class="action-badge copy">パクるべき</span>
+          <span style="font-size:10px;color:var(--text2);">▾</span>
         </div>
       </div>
-      <div class="rival-variety-box spice">
-        <div class="rival-variety-box-title">🌶️ 集客スパイス機種 <span class="action-badge block">邪魔すべき</span>
-          <span style="color:var(--text2);font-size:10px;font-weight:400;"> ${varietySpice.length}機種</span>
+      <div id="varietyTile_spice" data-open="false" onclick="toggleVarietyDetail('spice')"
+        style="border:1px solid #60a5fa;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(96,165,250,0.07);user-select:none;">
+        <div style="font-size:56px;font-weight:900;line-height:1;color:#60a5fa;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${varietySpice.length}</div>
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#60a5fa;margin-top:10px;">集客スパイス機種</div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">放出で稼働が高く客を引く</div>
+        <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+          <span class="action-badge block">邪魔すべき</span>
+          <span style="font-size:10px;color:var(--text2);">▾</span>
         </div>
-        <div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.6;">放出を伴いアウトが平均以上。1〜2台でも集客効果を発揮している。同機種でさらに甘く使い客を先取りせよ。</div>
-        <div>
-          ${varietySpice.slice(0,8).map(m => {
-            const inStr = Math.round(m.avgIn).toLocaleString() + _inUnit();
-            const sn = m.name.replace(/'/g,"\\'");
-            return `<span class="rival-model-chip" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;cursor:pointer;"
-              onclick="navigateToModel('${sn}')"
-              title="${m.name}｜IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
-              ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
-            </span>`;
-          }).join('')}
-          ${varietySpice.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
-        </div>
+      </div>
+    </div>
+
+    <div id="varietyDetail_copy" style="display:none;margin-top:10px;padding:16px 18px;border-radius:12px;border:1px solid #34d399;background:rgba(0,0,0,0.18);">
+      <div style="font-size:12px;font-weight:800;color:#34d399;margin-bottom:8px;">利益管理が巧みな機種 <span style="font-weight:400;font-size:10.5px;color:var(--text2);">${varietyCopy.length}機種</span></div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.65;margin-bottom:12px;">少台数で継続的に粗利・アウトともに平均水準を維持。運用の腕が光る機種。自店に導入して甘めに使えば即戦力。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        ${varietyCopy.slice(0,12).map(m => {
+          const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
+          const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
+          const sn = m.name.replace(/'/g,"\\'");
+          return `<span class="rival-model-chip" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;cursor:pointer;"
+            onclick="navigateToModel('${sn}')"
+            title="${m.name}｜台粗利 ${profitStr}｜IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
+            <span class="chip-name">${m.name}</span>
+          </span>`;
+        }).join('')}
+        ${varietyCopy.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+        ${varietyCopy.length > 12 ? `<span style="color:var(--text2);font-size:10.5px;align-self:center;">他${varietyCopy.length-12}機種</span>` : ''}
+      </div>
+    </div>
+
+    <div id="varietyDetail_spice" style="display:none;margin-top:10px;padding:16px 18px;border-radius:12px;border:1px solid #60a5fa;background:rgba(0,0,0,0.18);">
+      <div style="font-size:12px;font-weight:800;color:#60a5fa;margin-bottom:8px;">集客スパイス機種 <span style="font-weight:400;font-size:10.5px;color:var(--text2);">${varietySpice.length}機種</span></div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.65;margin-bottom:12px;">放出を伴いアウトが平均以上。1〜2台でも集客効果を発揮している。同機種でさらに甘く使い客を先取りせよ。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;">
+        ${varietySpice.slice(0,12).map(m => {
+          const inStr = Math.round(m.avgIn).toLocaleString() + _inUnit();
+          const sn = m.name.replace(/'/g,"\\'");
+          return `<span class="rival-model-chip" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;cursor:pointer;"
+            onclick="navigateToModel('${sn}')"
+            title="${m.name}｜IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
+            <span class="chip-name">${m.name}</span>
+          </span>`;
+        }).join('')}
+        ${varietySpice.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
+        ${varietySpice.length > 12 ? `<span style="color:var(--text2);font-size:10.5px;align-self:center;">他${varietySpice.length-12}機種</span>` : ''}
       </div>
     </div>
   </div>`;
@@ -5744,6 +5799,40 @@ function navigateToPinpoint(dateStr) {
   document.getElementById('pinDateInput').value = dateStr;
   document.getElementById('pinCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   runPinpoint();
+}
+
+function toggleEffortDetail(key) {
+  const el = document.getElementById('effortDetail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  ['in','profit'].forEach(k => {
+    const p = document.getElementById('effortDetail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('effortTile_' + k);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('effortTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
+}
+
+function toggleVarietyDetail(key) {
+  const el = document.getElementById('varietyDetail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  ['copy','spice'].forEach(k => {
+    const p = document.getElementById('varietyDetail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('varietyTile_' + k);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('varietyTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
 }
 
 function toggleTrendDetail(key) {
