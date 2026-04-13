@@ -197,7 +197,8 @@
   .dow-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
   .dow-sub { font-size: 11px; color: var(--text2); font-weight: 400; margin-left: 4px; }
 
-  .dow-badges { display: grid; grid-template-columns: repeat(7,1fr); gap: 8px; margin-bottom: 20px; }
+  .dow-badges { display: grid; grid-template-columns: repeat(7,1fr) auto; gap: 8px; margin-bottom: 20px; }
+  .dow-badge.holiday { border-color: #fbbf24; background: rgba(251,191,36,0.07); min-width: 72px; }
   .dow-badge { border-radius: 10px; padding: 12px 8px; text-align: center; border: 1px solid var(--border); }
   .dow-badge .dow-name { font-size: 16px; font-weight: 800; margin-bottom: 6px; }
   .dow-badge .dow-cnt { font-size: 10px; color: var(--text2); margin-bottom: 8px; }
@@ -3865,8 +3866,8 @@ function renderForecast() {
           avgJou, avgChu, avgKa, avgMonthInit, avgSalary, avgPension,
           dowAvgs, avgHoliday, slope } = fs;
 
-  const metricUnit = metricKey === 'IN枚数' ? _inUnit() : '円';
-  const metricLabel = {'IN枚数': _inLabel(), '台粗利': '推定粗利', '台売上': '推定売上'}[metricKey] || metricKey;
+  const metricUnit = metricKey === 'IN枚数' ? _inUnit() + '/台' : '円';
+  const metricLabel = {'IN枚数': _inLabel() + '（台あたり）', '台粗利': '推定粗利', '台売上': '推定売上'}[metricKey] || metricKey;
 
   // ── 予測期間 ──
   const horizon = Math.min(45, Math.max(7, Math.round(filteredDates.length * 0.4)));
@@ -4095,7 +4096,8 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   }
 
   const n = filteredDates.length;
-  const metricUnit = metricKey === 'IN枚数' ? _inUnit() : '円';
+  // IN枚数は台あたり平均として渡ってくるので単位に「/台」を付ける
+  const metricUnit = metricKey === 'IN枚数' ? _inUnit() + '/台' : '円';
 
   // 基本統計
   const mean = trendData.reduce((a,b)=>a+b,0) / n;
@@ -4513,7 +4515,24 @@ function renderCharts() {
   const metricLabel = {'IN枚数': _inLabel(),'台粗利':'推定粗利','台売上':'推定売上'}[metricKey] || metricKey;
   const filteredDates = [...new Set(filtered.map(d => d.date))].sort();
 
-  const trendData = filteredDates.map(date => sum(filtered.filter(d => d.date === date), metricKey));
+  // IN枚数は台あたり平均、粗利/売上は日次合計
+  const isInMetric = metricKey === 'IN枚数';
+  const trendData = filteredDates.map(date => {
+    const dayData = filtered.filter(d => d.date === date);
+    if (isInMetric) {
+      return dayData.length > 0 ? sum(dayData, metricKey) / dayData.length : 0;
+    }
+    return sum(dayData, metricKey);
+  });
+  const trendBarLabel  = isInMetric ? metricLabel + '（台あたり平均）' : metricLabel + '（日次合計）';
+  const trendLineLabel = isInMetric ? metricLabel + '（期間移動平均）' : metricLabel + '（累計）';
+  // 累計 or 移動平均（IN枚数は7日移動平均、粗利/売上は累計）
+  const trendLineData = isInMetric
+    ? trendData.map((_, i, a) => {
+        const w = a.slice(Math.max(0, i - 6), i + 1);
+        return w.reduce((s, v) => s + v, 0) / w.length;
+      })
+    : trendData.reduce((acc, v) => { acc.push((acc[acc.length - 1] || 0) + v); return acc; }, []);
 
   if (trendChart) trendChart.destroy();
   trendChart = new Chart(document.getElementById('trendChart').getContext('2d'), {
@@ -4521,14 +4540,14 @@ function renderCharts() {
     data: {
       labels: filteredDates.map(d => d.slice(5)),
       datasets: [{
-        label: metricLabel + '（日次合計）',
+        label: trendBarLabel,
         data: trendData,
         backgroundColor: trendData.map(v => v >= 0 ? 'rgba(67,233,123,0.7)' : 'rgba(255,77,109,0.7)'),
         borderColor: trendData.map(v => v >= 0 ? '#43e97b' : '#ff4d6d'),
         borderWidth: 1, borderRadius: 4,
       },{
-        label: metricLabel + '（累計）',
-        data: trendData.reduce((acc,v,i) => { acc.push((acc[i-1]||0)+v); return acc; }, []),
+        label: trendLineLabel,
+        data: trendLineData,
         type: 'line', borderColor: '#6c63ff', backgroundColor: 'rgba(108,99,255,0.1)',
         tension: 0.3, fill: false, pointRadius: 4, yAxisID: 'y2',
       }]
@@ -6339,9 +6358,12 @@ function renderDigitDetailCharts(rows) {
 // ─── 曜日クリック詳細 ───
 const DOW_NAMES_JP = ['日','月','火','水','木','金','土'];
 function showDowDetail(dowIdx) {
-  // 対象曜日の日付を収集
+  // 対象日付を収集（dowIdx=7 は祝日）
   const datesForDow = [...new Set(
-    filtered.map(r=>r.date).filter(d => new Date(d).getDay() === dowIdx)
+    filtered.map(r=>r.date).filter(d => {
+      if (dowIdx === 7) return isHoliday(d);
+      return new Date(d + 'T00:00:00').getDay() === dowIdx && !isHoliday(d);
+    })
   )];
   if (!datesForDow.length) return;
 
@@ -6349,7 +6371,8 @@ function showDowDetail(dowIdx) {
   const modelRows = _buildDetailModelRows(datesForDow);
   _dowDetailLastRows = modelRows;
 
-  document.getElementById('dowDetailTitle').textContent = DOW_NAMES_JP[dowIdx] + '曜日の平均';
+  const titleLabel = dowIdx === 7 ? '🎌 祝日の平均' : DOW_NAMES_JP[dowIdx] + '曜日の平均';
+  document.getElementById('dowDetailTitle').textContent = titleLabel;
   document.getElementById('dowDetailKPI').innerHTML = _renderDetailKPIHtml(kpi);
   _renderDetailTable('dowDetailTableHead', 'dowDetailTableBody', modelRows);
 
@@ -6361,8 +6384,8 @@ function showDowDetail(dowIdx) {
   document.getElementById('dowDetailBtnChart').classList.remove('active');
 
   // 時系列グラフ
-  renderTsChart('dowTsChart', 'dowTsBox', 'dowTsTitle',
-    DOW_NAMES_JP[dowIdx] + '曜日', datesForDow);
+  const tsLabel = dowIdx === 7 ? '祝日' : DOW_NAMES_JP[dowIdx] + '曜日';
+  renderTsChart('dowTsChart', 'dowTsBox', 'dowTsTitle', tsLabel, datesForDow);
 
   const panel = document.getElementById('dowDetailPanel');
   panel.style.display = '';
@@ -6421,28 +6444,42 @@ function renderDOW() {
     dateTotals[d.date].count  += 1;
   });
 
-  // 曜日別集計
-  const dow = Array.from({length:7}, () => ({profit:0,sales:0,inmai:0,count:0,days:0}));
+  // 曜日別集計（祝日は除外）＋ 祝日別集計
+  const dow     = Array.from({length:7}, () => ({profit:0,sales:0,inmai:0,count:0,days:0}));
+  const holiday = {profit:0,sales:0,inmai:0,count:0,days:0};
   Object.entries(dateTotals).forEach(([date, t]) => {
-    const dt = new Date(date);
-    const d = dt.getDay(); // 0=日,1=月...6=土
-    dow[d].profit += t.profit;
-    dow[d].sales  += t.sales;
-    dow[d].inmai  += t.inmai;
-    dow[d].count  += t.count;
-    dow[d].days   += 1;
+    if (isHoliday(date)) {
+      holiday.profit += t.profit;
+      holiday.sales  += t.sales;
+      holiday.inmai  += t.inmai;
+      holiday.count  += t.count;
+      holiday.days   += 1;
+    } else {
+      const d = new Date(date + 'T00:00:00').getDay(); // 0=日,1=月...6=土
+      dow[d].profit += t.profit;
+      dow[d].sales  += t.sales;
+      dow[d].inmai  += t.inmai;
+      dow[d].count  += t.count;
+      dow[d].days   += 1;
+    }
   });
 
   const avgProfit = dow.map(d => d.days > 0 ? Math.round(d.profit / d.days) : null);
   const avgIN     = dow.map(d => d.count > 0 ? Math.round(d.inmai / d.count) : null);
   const rate      = dow.map(d => d.sales > 0 ? parseFloat((d.profit/d.sales*100).toFixed(1)) : null);
 
-  // バッジ
+  // 祝日の平均値
+  const holAvgProfit = holiday.days  > 0 ? Math.round(holiday.profit / holiday.days)  : null;
+  const holAvgIN     = holiday.count > 0 ? Math.round(holiday.inmai  / holiday.count) : null;
+  const holRate      = holiday.sales > 0 ? parseFloat((holiday.profit/holiday.sales*100).toFixed(1)) : null;
+
+  // バッジ（7曜日 ＋ 祝日）
   const badges = document.getElementById('dowBadges');
-  const validProfit = avgProfit.filter(v => v !== null);
-  const maxP = Math.max(...validProfit);
-  const minP = Math.min(...validProfit);
-  badges.innerHTML = DOW_NAMES.map((name, i) => {
+  const validProfit = [...avgProfit.filter(v=>v!==null), ...(holAvgProfit!==null?[holAvgProfit]:[])];
+  const maxP = validProfit.length ? Math.max(...validProfit) : 0;
+  const minP = validProfit.length ? Math.min(...validProfit) : 0;
+
+  const dowBadgeHtml = DOW_NAMES.map((name, i) => {
     const d = dow[i];
     if (d.days === 0) return `<div class="dow-badge"><div class="dow-name" style="color:var(--text2)">${name}</div><div class="dow-cnt">データなし</div></div>`;
     const ap = avgProfit[i];
@@ -6455,8 +6492,8 @@ function renderDOW() {
     const nameColor = i===0?'#ff6b6b':i===6?'#60a5fa':'var(--text)';
     const badge = isBest ? '👑' : isWorst ? '📉' : '';
     const profitColor = ap >= 0 ? 'var(--green)' : 'var(--red)';
-    const rateStr     = r != null ? r + '%' : '-';
-    const rateColor   = r != null && r >= 0 ? 'var(--green)' : 'var(--red)';
+    const rateStr = r != null ? r + '%' : '-';
+    const rateColor = r != null && r >= 0 ? 'var(--green)' : 'var(--red)';
     return `<div class="${cls}" style="cursor:pointer;" onclick="showDowDetail(${i})" title="クリックで機種別詳細を表示">
       <div class="dow-name" style="color:${nameColor}">${badge}${name}</div>
       <div class="dow-cnt">${d.days}日分</div>
@@ -6466,58 +6503,89 @@ function renderDOW() {
     </div>`;
   }).join('');
 
-  const labels = DOW_NAMES;
-  const barBgProfit = avgProfit.map((v,i) => v===null?'transparent': v>=0?'rgba(67,233,123,0.75)':'rgba(255,77,109,0.75)');
+  // 祝日バッジ
+  let holBadgeHtml = '';
+  if (holiday.days > 0) {
+    const ap = holAvgProfit;
+    const ai = holAvgIN;
+    const r  = holRate;
+    const isBestH  = ap !== null && ap === maxP;
+    const isWorstH = ap !== null && ap === minP;
+    const cls = isBestH ? 'dow-badge holiday best' : isWorstH ? 'dow-badge holiday worst' : 'dow-badge holiday';
+    const badge = isBestH ? '👑' : isWorstH ? '📉' : '🎌';
+    const profitColor = ap >= 0 ? 'var(--green)' : 'var(--red)';
+    const rateStr = r != null ? r + '%' : '-';
+    const rateColor = r != null && r >= 0 ? 'var(--green)' : 'var(--red)';
+    holBadgeHtml = `<div class="${cls}" style="cursor:pointer;" onclick="showDowDetail(7)" title="祝日の機種別詳細を表示">
+      <div class="dow-name" style="color:#fbbf24">${badge}祝</div>
+      <div class="dow-cnt">${holiday.days}日分</div>
+      <div class="dow-metric">粗利 <span style="color:${profitColor}">${ap>=0?'+':''}${ap.toLocaleString()}円</span></div>
+      <div class="dow-metric">${_inLabel(true)} <span style="color:var(--accent4)">${(ai||0).toLocaleString()}</span></div>
+      <div class="dow-metric">利益率 <span style="color:${rateColor}">${rateStr}</span></div>
+    </div>`;
+  }
+  badges.innerHTML = dowBadgeHtml + holBadgeHtml;
+
+  // チャート用ラベル・データ（祝日を末尾に追加）
+  const chartLabels     = [...DOW_NAMES, ...(holiday.days > 0 ? ['祝'] : [])];
+  const chartAvgProfit  = [...avgProfit,  ...(holiday.days > 0 ? [holAvgProfit]  : [])];
+  const chartAvgIN      = [...avgIN,      ...(holiday.days > 0 ? [holAvgIN]      : [])];
+  const chartRate       = [...rate,       ...(holiday.days > 0 ? [holRate]       : [])];
+  const chartColors     = [...DOW_COLORS, ...(holiday.days > 0 ? ['#fbbf24']     : [])];
+
+  const barBgProfit = chartAvgProfit.map((v,i) =>
+    i === 7 ? 'rgba(251,191,36,0.7)' : v===null ? 'transparent' : v>=0 ? 'rgba(67,233,123,0.75)' : 'rgba(255,77,109,0.75)');
   const tc = getThemeColors();
 
   // 粗利バー
   if (dowProfitChart) dowProfitChart.destroy();
   dowProfitChart = new Chart(document.getElementById('dowProfitChart').getContext('2d'), {
     type:'bar',
-    data:{ labels, datasets:[{ data:avgProfit, backgroundColor:barBgProfit, borderRadius:5 }] },
+    data:{ labels:chartLabels, datasets:[{ data:chartAvgProfit, backgroundColor:barBgProfit, borderRadius:5 }] },
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{
-        x:{ticks:{color:(ctx)=>DOW_COLORS[ctx.index]||tc.tick,font:{size:13,weight:'bold'}}, grid:{color:tc.grid}},
+        x:{ticks:{color:(ctx)=>chartColors[ctx.index]||tc.tick,font:{size:13,weight:'bold'}}, grid:{color:tc.grid}},
         y:{ticks:{color:tc.tick}, grid:{color:tc.grid}}
       }
     }
   });
 
   // INバー
-  const barBgIN = avgIN.map((v,i) => v===null?'transparent':DOW_COLORS[i]==='#9499b7'?'rgba(108,99,255,0.7)':i===6?'rgba(96,165,250,0.7)':'rgba(255,107,107,0.7)');
   if (dowINChart) dowINChart.destroy();
   dowINChart = new Chart(document.getElementById('dowINChart').getContext('2d'), {
     type:'bar',
-    data:{ labels, datasets:[{ data:avgIN, backgroundColor:'rgba(247,151,30,0.7)', borderRadius:5 }] },
+    data:{ labels:chartLabels, datasets:[{ data:chartAvgIN, backgroundColor:chartAvgIN.map((v,i)=>
+      i===7?'rgba(251,191,36,0.7)':'rgba(247,151,30,0.7)'), borderRadius:5 }] },
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{
-        x:{ticks:{color:(ctx)=>DOW_COLORS[ctx.index]||tc.tick,font:{size:13,weight:'bold'}}, grid:{color:tc.grid}},
+        x:{ticks:{color:(ctx)=>chartColors[ctx.index]||tc.tick,font:{size:13,weight:'bold'}}, grid:{color:tc.grid}},
         y:{ticks:{color:tc.tick}, grid:{color:tc.grid}}
       }
     }
   });
 
   // 利益率バー
-  const barBgRate = rate.map(v => v===null?'transparent': v>=0?'rgba(67,233,123,0.75)':'rgba(255,77,109,0.75)');
+  const barBgRate = chartRate.map((v,i) =>
+    i===7?'rgba(251,191,36,0.7)':v===null?'transparent':v>=0?'rgba(67,233,123,0.75)':'rgba(255,77,109,0.75)');
   if (dowRateChart) dowRateChart.destroy();
   dowRateChart = new Chart(document.getElementById('dowRateChart').getContext('2d'), {
     type:'bar',
-    data:{ labels, datasets:[{ data:rate, backgroundColor:barBgRate, borderRadius:5 }] },
+    data:{ labels:chartLabels, datasets:[{ data:chartRate, backgroundColor:barBgRate, borderRadius:5 }] },
     options:{
       responsive:true, maintainAspectRatio:false,
       plugins:{legend:{display:false}},
       scales:{
-        x:{ticks:{color:(ctx)=>DOW_COLORS[ctx.index]||tc.tick,font:{size:13,weight:'bold'}}, grid:{color:tc.grid}},
+        x:{ticks:{color:(ctx)=>chartColors[ctx.index]||tc.tick,font:{size:13,weight:'bold'}}, grid:{color:tc.grid}},
         y:{ticks:{color:tc.tick,callback:v=>v+'%'}, grid:{color:tc.grid}}
       }
     }
   });
 
-  // レーダーチャート（正規化 0-100）
+  // レーダーチャート（正規化 0-100、祝日は除外して7角形を維持）
   function normalize(arr) {
     const valid = arr.filter(v=>v!==null);
     if (!valid.length) return arr.map(()=>0);
@@ -6532,11 +6600,11 @@ function renderDOW() {
   dowRadarChart = new Chart(document.getElementById('dowRadarChart').getContext('2d'), {
     type:'radar',
     data:{
-      labels,
+      labels: DOW_NAMES,
       datasets:[
         { label:'平均粗利', data:nProfit, borderColor:'rgba(67,233,123,0.9)', backgroundColor:'rgba(67,233,123,0.15)', pointBackgroundColor:'#43e97b', borderWidth:2, pointRadius:4 },
-        { label:_inLabel(true),   data:nIN,     borderColor:'rgba(247,151,30,0.9)',  backgroundColor:'rgba(247,151,30,0.1)',  pointBackgroundColor:'#f7971e', borderWidth:2, pointRadius:4 },
-        { label:'利益率',   data:nRate,   borderColor:'rgba(108,99,255,0.9)', backgroundColor:'rgba(108,99,255,0.1)', pointBackgroundColor:'#6c63ff', borderWidth:2, pointRadius:4 },
+        { label:_inLabel(true), data:nIN, borderColor:'rgba(247,151,30,0.9)', backgroundColor:'rgba(247,151,30,0.1)', pointBackgroundColor:'#f7971e', borderWidth:2, pointRadius:4 },
+        { label:'利益率', data:nRate, borderColor:'rgba(108,99,255,0.9)', backgroundColor:'rgba(108,99,255,0.1)', pointBackgroundColor:'#6c63ff', borderWidth:2, pointRadius:4 },
       ]
     },
     options:{
