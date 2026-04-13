@@ -1571,7 +1571,7 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'aviva',         label: 'アビバさん専用',            stores: ['ジアス大船','ZAPプレステージ','ガイアネクスト海老名駅前','デイズ新杉田','タイガー7綱島','M&M綱島','ジアス上大岡','プラザ上大岡アンドミラージュ','スーパーハリウッド伊勢佐木','吉兆横浜駒岡','横須賀マリーン','パラッツォ湘南台','鶴見UNO','アビバアネックススクエア','アビバ三春町','アビバ上大岡','アビバ南足柄','アビバ新杉田','アビバ横須賀中央','アビバ海老名','アビバ綱島南','アビバ綱島樽町','アビバ逗子駅前','アフェスタ三春町','アビバ三浦海岸','クリエ湘南台','COSMO 405','ダイナム四街道','アビバ四街道','クレストプラス姉崎'] },
   { file: 'concerto',      label: 'コンチェルトさん専用',      stores: ['楽園ハッピーロード大山','ピーアーク北千住SSS'] },
   { file: 'ishiyama',      label: '石山オメガさん専用',        stores: ['レークプラザ','ダラムS-1'] },
-  { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴','メガフェイス朝倉'] },
+  { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴','メガフェイス朝倉','ジアス大船'] },
   { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園アメ横（4P）','楽園町田','楽園町田（4P）','エスパス上野新館','エスパス上野新館（4P）','エスパス上野本館','エスパス上野本館（4P）','ジアス大船','ジアス大船（4P）','楽園川崎','楽園川崎（4P）','楽園柏','楽園柏（4P）'] },
   { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT梅坪','ZENT豊田本店','メガガイア一宮','リブレ遊援館'] },
   { file: 'kowa',          label: '興和商事さん専用',          stores: ['サンコー梅島'] },
@@ -4224,7 +4224,6 @@ function renderRivalAnalysis() {
 
         let okiEvents = 0;
         const okiDetail = [];
-        const okiMachineSet = new Set(); // 据え置きパターンが1回以上あった台番
 
         Object.values(byTai).forEach(entry => {
           // 対象日: IN >= storeAvgIn AND 差枚 >= 0（出玉率100%以上）
@@ -4242,7 +4241,6 @@ function renderRivalAnalysis() {
             } else {
               if (run.length >= 3) {
                 okiEvents++;
-                okiMachineSet.add(entry.model + ' ' + entry.tai);
                 okiDetail.push({ model: entry.model, tai: entry.tai, startDate: run[0], days: run.length });
               }
               run = [eligDays[i]];
@@ -4250,15 +4248,9 @@ function renderRivalAnalysis() {
           }
           if (run.length >= 3) {
             okiEvents++;
-            okiMachineSet.add(entry.model + ' ' + entry.tai);
             okiDetail.push({ model: entry.model, tai: entry.tai, startDate: run[0], days: run.length });
           }
         });
-
-        // 台ベース率: 据え置き疑い台数 / ジャグラー全ユニーク台番数
-        const totalJagTai = Object.keys(byTai).length;
-        const okiMachineCount = okiMachineSet.size;
-        const okiRate = totalJagTai > 0 ? okiMachineCount / totalJagTai * 100 : 0;
 
         // ── ドボン台設定上げ: date×model×tai 集計 ──
         const byDMT = {};
@@ -4315,7 +4307,7 @@ function renderRivalAnalysis() {
         const dobonRate = dobonTotal > 0 ? dobonHits / dobonTotal * 100 : 0;
 
         // ── Jersey Tiles ──
-        const okiCol  = okiMachineCount > 0 ? { border:'#f59e0b', bg:'rgba(245,158,11,0.08)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
+        const okiCol  = okiEvents > 0  ? { border:'#f59e0b', bg:'rgba(245,158,11,0.08)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
         const dobCol  = dobonRate >= 30 ? { border:'#34d399', bg:'rgba(52,211,153,0.07)' } : dobonRate >= 15 ? { border:'#fbbf24', bg:'rgba(251,191,36,0.06)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
         const dobBadge = dobonRate >= 30 ? 'badge-alert' : dobonRate >= 15 ? 'badge-warn' : 'badge-ok';
 
@@ -4327,12 +4319,11 @@ function renderRivalAnalysis() {
           <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
             <div id="jagTile_oki" data-open="false" onclick="toggleJagDetail('oki')"
               style="border:1px solid ${okiCol.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${okiCol.bg};user-select:none;">
-              <div style="font-size:48px;font-weight:900;line-height:1;color:${okiCol.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${okiMachineCount}<span style="font-size:20px;font-weight:700;">台</span></div>
-              <div style="font-size:11px;font-weight:700;color:${okiCol.border};margin-top:4px;font-variant-numeric:tabular-nums;">${totalJagTai > 0 ? okiRate.toFixed(0) + '%' : '—'} <span style="font-size:9.5px;font-weight:500;color:var(--text2);">(${okiMachineCount}/${totalJagTai}台)</span></div>
-              <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${okiCol.border};margin-top:8px;">据え置き疑い台率</div>
+              <div style="font-size:56px;font-weight:900;line-height:1;color:${okiCol.border};letter-spacing:-3px;font-variant-numeric:tabular-nums;">${okiEvents}</div>
+              <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${okiCol.border};margin-top:10px;">据え置き検出</div>
               <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3日以上連続<br>出玉率100%超の台</div>
               <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
-                <span class="action-badge ${okiMachineCount > 0 ? 'badge-warn' : 'badge-ok'}">${okiMachineCount > 0 ? okiEvents + 'パターン検出' : 'なし'}</span>
+                <span class="action-badge ${okiEvents > 0 ? 'badge-warn' : 'badge-ok'}">${okiEvents > 0 ? '設定据え置き疑い' : 'なし'}</span>
                 <span style="font-size:10px;color:var(--text2);">▾</span>
               </div>
             </div>
@@ -4349,8 +4340,8 @@ function renderRivalAnalysis() {
           </div>
 
           <div id="jagDetail_oki" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
-            <div style="font-size:11.5px;font-weight:700;color:#f59e0b;margin-bottom:4px;">据え置き疑い — ${okiMachineCount}台 / ${totalJagTai}台中（${okiRate.toFixed(1)}%）</div>
-            <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">条件: 店舗平均IN以上 かつ 差枚≥0 が3日以上カレンダー連続 ｜ 計${okiDetail.length}パターン検出</div>
+            <div style="font-size:11.5px;font-weight:700;color:#f59e0b;margin-bottom:4px;">3日以上連続 出玉率100%超 — 据え置き台リスト（${okiDetail.length}件）</div>
+            <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">条件: 店舗平均IN以上 かつ 差枚≥0 が3日以上カレンダー連続</div>
             ${okiDetail.length === 0
               ? '<div style="font-size:11px;color:var(--text2);">該当なし（期間内に3日連続の据え置きパターンは検出されませんでした）</div>'
               : `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
