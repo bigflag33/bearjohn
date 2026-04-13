@@ -3558,39 +3558,6 @@ function renderRivalAnalysis() {
       `${atTop.name}曜日の集客率が最も高い（全${atTop.total}日中${atTop.at}日・${atRate}%）。${atPattern}。集客日のアウトは通常日比+${inUpRate}%。この曜日に自店も放出を合わせると客の取り合いになる。`, 1, atVis, 'rivalAnalysisCard');
   }
 
-  html += `<div class="rival-section">
-    <div class="rival-section-title">📅 運用日分類 — 絞り日・集客日を把握せよ</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:4px;">
-      <div>
-        <div style="font-size:11px;font-weight:800;color:#fbbf24;margin-bottom:6px;">
-          🟡 絞り日（利益確保日）<span class="action-badge attack">狙い目：翌日に仕掛けよ</span>
-          <span style="color:var(--text2);font-weight:400;"> ${squeezeDays.length}日/${dateEntries.length}日</span>
-        </div>
-        <div class="rival-day-grid">
-          ${squeezeDays.slice(0,20).map(d =>
-            `<span class="rival-day-chip squeeze" style="cursor:pointer;" title="台粗利 ${Math.round(d.avgP)}円 / IN ${Math.round(d.avgI)}枚 — クリックでピンポイント分析へ" onclick="navigateToPinpoint('${d.date}')">${d.date.slice(5)}</span>`
-          ).join('')}
-          ${squeezeDays.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
-        </div>
-        <div style="font-size:10px;color:var(--text2);margin-top:4px;">※台粗利が平均${Math.round(SQUEEZE_PROFIT_TH*100)}%超 かつ アウトが平均${Math.round(SQUEEZE_IN_TH*100)}%以下</div>
-        ${squeezeComment ? `<div style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6;">${squeezeComment}</div>` : ''}
-      </div>
-      <div>
-        <div style="font-size:11px;font-weight:800;color:#60a5fa;margin-bottom:6px;">
-          🔵 集客日（アウト確保日）<span class="action-badge block">要注意：客が集まっている</span>
-          <span style="color:var(--text2);font-weight:400;"> ${attractDays.length}日/${dateEntries.length}日</span>
-        </div>
-        <div class="rival-day-grid">
-          ${attractDays.slice(0,20).map(d =>
-            `<span class="rival-day-chip attract" style="cursor:pointer;" title="台粗利 ${Math.round(d.avgP)}円 / IN ${Math.round(d.avgI)}枚 / 放出率 ${(d.diffRate*100).toFixed(1)}% — クリックでピンポイント分析へ" onclick="navigateToPinpoint('${d.date}')">${d.date.slice(5)}</span>`
-          ).join('')}
-          ${attractDays.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
-        </div>
-        <div style="font-size:10px;color:var(--text2);margin-top:4px;">※アウトが平均${Math.round(ATTRACT_IN_TH*100)}%超</div>
-        ${attractComment ? `<div style="font-size:11px;color:var(--text2);margin-top:8px;line-height:1.6;">${attractComment}</div>` : ''}
-      </div>
-    </div>
-  </div>`;
 
   // ② 機種トレンドアラート（2×2 MECE）
   {
@@ -3707,6 +3674,134 @@ function renderRivalAnalysis() {
         閾値：アウト上昇/下降 ±5%以上（前半/後半比較）、粗利高い = 全体平均の${Math.round(HIGH_PROFIT_TH*100)}%以上
       </div>
     </div>`;
+  }
+
+  // ②-b 全台系イベント検出
+  {
+    const ZENTAI_MIN_MACHINES = 3;
+    const ZENTAI_MIN_IN       = 20000;
+    const ZENTAI_MIN_PAYOUT   = 1.05;
+
+    const hasTaiban = all.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
+
+    const zentaiEvents = [];
+
+    if (hasTaiban) {
+      // 日付×機種×台番 ごとに集計
+      const byKey = {};
+      all.forEach(r => {
+        const date  = r.date;
+        const model = r['機種名'];
+        const tai   = String(r['台番'] || '').trim();
+        if (!date || !model || !tai) return;
+        const k = date + '\x00' + model + '\x00' + tai;
+        if (!byKey[k]) byKey[k] = { date, model, tai, inSum: 0, diffSum: 0 };
+        byKey[k].inSum   += r['IN枚数'] || 0;
+        byKey[k].diffSum += r['差枚']   || 0;
+      });
+
+      // 日付×機種 にまとめて全台判定
+      const byDateModel = {};
+      Object.values(byKey).forEach(v => {
+        const k = v.date + '\x00' + v.model;
+        if (!byDateModel[k]) byDateModel[k] = { date: v.date, model: v.model, tais: [] };
+        byDateModel[k].tais.push({
+          inAmt:   v.inSum,
+          payout:  v.inSum > 0 ? (v.inSum + v.diffSum) / v.inSum : 0,
+        });
+      });
+
+      Object.values(byDateModel).forEach(({ date, model, tais }) => {
+        if (tais.length < ZENTAI_MIN_MACHINES)                  return;
+        if (!tais.every(t => t.inAmt  >= ZENTAI_MIN_IN))        return;
+        if (!tais.every(t => t.payout >= ZENTAI_MIN_PAYOUT))    return;
+        zentaiEvents.push({
+          date,
+          model,
+          taiCount:   tais.length,
+          minIn:      Math.min(...tais.map(t => t.inAmt)),
+          avgIn:      tais.reduce((a,t) => a + t.inAmt, 0) / tais.length,
+          minPayout:  Math.min(...tais.map(t => t.payout)),
+          avgPayout:  tais.reduce((a,t) => a + t.payout, 0) / tais.length,
+        });
+      });
+      zentaiEvents.sort((a, b) => b.date.localeCompare(a.date) || b.taiCount - a.taiCount);
+    }
+
+    window._zentaiEvents = zentaiEvents;
+    _zentaiSortKey = 'date';
+    _zentaiSortDir = 'desc';
+
+    // インサイト登録
+    if (zentaiEvents.length > 0) {
+      const top = zentaiEvents[0];
+      _pushInsight('rival', '',
+        `全台系イベント ${zentaiEvents.length}件を検出`,
+        `直近: ${top.date.slice(5)} ${top.model}（${top.taiCount}台・最低出玉率${(top.minPayout*100).toFixed(1)}%）`,
+        2, null, 'rivalAnalysisCard');
+    }
+
+    const thStyle = 'padding:8px 10px;font-size:10.5px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap;user-select:none;';
+    const headers = [
+      ['date',      '日付',       'left'],
+      ['model',     '機種名',     'left'],
+      ['taiCount',  '台数',       'center'],
+      ['minIn',     '最低IN枚数', 'right'],
+      ['minPayout', '最低出玉率', 'right'],
+      ['avgIn',     '平均IN枚数', 'right'],
+      ['avgPayout', '平均出玉率', 'right'],
+    ];
+
+    html += `<div class="rival-section">
+      <div class="rival-section-title" style="color:#f59e0b;">全台系イベント検出</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
+        3台以上設置の機種で、全台それぞれがIN枚数2万枚超・出玉率105%超を達成した日。台番単位で個別判定。
+      </div>`;
+
+    if (!hasTaiban) {
+      html += `<div style="font-size:11px;color:var(--text2);">台番データが含まれていないため検出できません。</div>`;
+    } else {
+      html += `
+      <div id="zentaiTile" data-open="false" onclick="toggleZentaiDetail()"
+        style="border:1px solid #f59e0b;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(245,158,11,0.07);user-select:none;display:inline-block;min-width:220px;">
+        <div style="font-size:56px;font-weight:900;line-height:1;color:#f59e0b;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${zentaiEvents.length}</div>
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f59e0b;margin-top:10px;">全台系イベント</div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3台以上・全台IN2万枚超・出玉率105%超</div>
+        <div style="margin-top:10px;display:flex;justify-content:flex-end;">
+          <span style="font-size:10px;color:var(--text2);">▾</span>
+        </div>
+      </div>
+
+      <div id="zentaiDetail" style="display:none;margin-top:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(245,158,11,0.35);background:rgba(0,0,0,0.18);">
+        ${zentaiEvents.length === 0
+          ? `<div style="font-size:11px;color:var(--text2);">該当するイベントが見つかりませんでした。期間を広げると検出精度が上がります。</div>`
+          : `<div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr style="border-bottom:1px solid rgba(245,158,11,0.25);">
+                    ${headers.map(([key, label, align]) =>
+                      `<th id="zentaiTh_${key}" onclick="sortZentaiTable('${key}')"
+                        style="${thStyle}text-align:${align};">
+                        ${label} <span class="zi" style="font-size:9px;opacity:.6;">${key==='date'?'▼':'⇅'}</span>
+                      </th>`
+                    ).join('')}
+                  </tr>
+                </thead>
+                <tbody id="zentaiTableBody"></tbody>
+              </table>
+            </div>`
+        }
+      </div>`;
+    }
+
+    html += `<div style="font-size:10.5px;color:var(--text2);margin-top:12px;line-height:1.6;">
+        閾値：3台以上設置・全台IN枚数20,000枚以上・全台出玉率105%以上（台番単位で個別判定）
+      </div>
+    </div>`;
+
+    if (hasTaiban && zentaiEvents.length > 0) {
+      setTimeout(_renderZentaiRows, 0);
+    }
   }
 
   // ③ 運用努力機種分析 — 「◯曜日」「◯の付く日」稼働・利益の2軸パターン検出
@@ -5799,6 +5894,53 @@ function navigateToPinpoint(dateStr) {
   document.getElementById('pinDateInput').value = dateStr;
   document.getElementById('pinCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   runPinpoint();
+}
+
+// ── 全台系ソート ──
+let _zentaiSortKey = 'date';
+let _zentaiSortDir = 'desc';
+
+function toggleZentaiDetail() {
+  const el = document.getElementById('zentaiDetail');
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  const tile = document.getElementById('zentaiTile');
+  if (tile) tile.setAttribute('data-open', String(!isOpen));
+}
+
+function sortZentaiTable(key) {
+  if (_zentaiSortKey === key) {
+    _zentaiSortDir = _zentaiSortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    _zentaiSortKey = key;
+    _zentaiSortDir = 'desc';
+  }
+  _renderZentaiRows();
+}
+
+function _renderZentaiRows() {
+  const el = document.getElementById('zentaiTableBody');
+  if (!el || !window._zentaiEvents) return;
+  const events = [...window._zentaiEvents];
+  const k = _zentaiSortKey, dir = _zentaiSortDir === 'asc' ? 1 : -1;
+  events.sort((a, b) => typeof a[k] === 'string'
+    ? dir * a[k].localeCompare(b[k])
+    : dir * (a[k] - b[k]));
+  ['date','model','taiCount','minIn','minPayout','avgIn','avgPayout'].forEach(key => {
+    const ic = document.querySelector(`#zentaiTh_${key} .zi`);
+    if (ic) ic.textContent = key === _zentaiSortKey ? (_zentaiSortDir === 'desc' ? '▼' : '▲') : '⇅';
+  });
+  el.innerHTML = events.map(e => `
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+      <td style="padding:8px 10px;font-size:11px;color:var(--text2);white-space:nowrap;">${e.date.slice(5)}</td>
+      <td style="padding:8px 10px;font-size:11px;color:var(--text);font-weight:600;">${e.model}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#60a5fa;text-align:center;font-weight:700;">${e.taiCount}台</td>
+      <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;">${Math.round(e.minIn).toLocaleString()}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;font-weight:700;">${(e.minPayout*100).toFixed(1)}%</td>
+      <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;opacity:.7;">${Math.round(e.avgIn).toLocaleString()}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;opacity:.7;">${(e.avgPayout*100).toFixed(1)}%</td>
+    </tr>`).join('');
 }
 
 function toggleEffortDetail(key) {
