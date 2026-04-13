@@ -3502,7 +3502,7 @@ function renderRivalAnalysis() {
         </div>
         <div class="rival-day-grid">
           ${squeezeDays.slice(0,20).map(d =>
-            `<span class="rival-day-chip squeeze" title="台粗利 ${Math.round(d.avgP)}円 / IN ${Math.round(d.avgI)}枚">${d.date.slice(5)}</span>`
+            `<span class="rival-day-chip squeeze" style="cursor:pointer;" title="台粗利 ${Math.round(d.avgP)}円 / IN ${Math.round(d.avgI)}枚 — クリックでピンポイント分析へ" onclick="navigateToPinpoint('${d.date}')">${d.date.slice(5)}</span>`
           ).join('')}
           ${squeezeDays.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
         </div>
@@ -3516,7 +3516,7 @@ function renderRivalAnalysis() {
         </div>
         <div class="rival-day-grid">
           ${attractDays.slice(0,20).map(d =>
-            `<span class="rival-day-chip attract" title="台粗利 ${Math.round(d.avgP)}円 / IN ${Math.round(d.avgI)}枚 / 放出率 ${(d.diffRate*100).toFixed(1)}%">${d.date.slice(5)}</span>`
+            `<span class="rival-day-chip attract" style="cursor:pointer;" title="台粗利 ${Math.round(d.avgP)}円 / IN ${Math.round(d.avgI)}枚 / 放出率 ${(d.diffRate*100).toFixed(1)}% — クリックでピンポイント分析へ" onclick="navigateToPinpoint('${d.date}')">${d.date.slice(5)}</span>`
           ).join('')}
           ${attractDays.length === 0 ? '<span style="color:var(--text2);font-size:11px;">該当なし</span>' : ''}
         </div>
@@ -3567,9 +3567,11 @@ function renderRivalAnalysis() {
       const profitStr = (m.avgProfit >= 0 ? '+' : '') + Math.round(m.avgProfit).toLocaleString() + '円';
       const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
       const pctStr    = (m.inTrend >= 0 ? '+' : '') + Math.round(m.inTrend * 100) + '%';
+      const safeName  = m.name.replace(/'/g, "\\'");
       return `<span class="rival-model-chip"
-        style="background:${def.chipBg};border:1px solid ${def.chipBorder};color:${def.chipColor};"
-        title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜アウト推移 ${pctStr}｜${m.estimatedMachines}台設置推定">
+        style="background:${def.chipBg};border:1px solid ${def.chipBorder};color:${def.chipColor};cursor:pointer;"
+        onclick="navigateToModel('${safeName}')"
+        title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜アウト推移 ${pctStr}｜${m.estimatedMachines}台設置推定 — クリックで機種別集計へ">
         ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
         <span style="font-size:9px;opacity:0.8;">${pctStr}</span>
       </span>`;
@@ -3679,8 +3681,10 @@ function renderRivalAnalysis() {
           ${varietyCopy.slice(0,8).map(m => {
             const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
             const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
-            return `<span class="rival-model-chip" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;"
-              title="${m.name}｜台粗利 ${profitStr}｜IN ${inStr}｜推定${m.estimatedMachines}台">
+            const sn = m.name.replace(/'/g,"\\'");
+            return `<span class="rival-model-chip" style="background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.3);color:#34d399;cursor:pointer;"
+              onclick="navigateToModel('${sn}')"
+              title="${m.name}｜台粗利 ${profitStr}｜IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
               ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
             </span>`;
           }).join('')}
@@ -3695,8 +3699,10 @@ function renderRivalAnalysis() {
         <div>
           ${varietySpice.slice(0,8).map(m => {
             const inStr = Math.round(m.avgIn).toLocaleString() + _inUnit();
-            return `<span class="rival-model-chip" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;"
-              title="${m.name}｜IN ${inStr}｜推定${m.estimatedMachines}台">
+            const sn = m.name.replace(/'/g,"\\'");
+            return `<span class="rival-model-chip" style="background:rgba(96,165,250,0.1);border:1px solid rgba(96,165,250,0.3);color:#60a5fa;cursor:pointer;"
+              onclick="navigateToModel('${sn}')"
+              title="${m.name}｜IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
               ${m.name.length > 12 ? m.name.slice(0,12)+'…' : m.name}
             </span>`;
           }).join('')}
@@ -3771,8 +3777,10 @@ function renderRivalAnalysis() {
           const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
           const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
           const profitCol = m.avgProfit >= storeAvgProfit ? '#f59e0b' : m.avgProfit >= 0 ? '#fcd34d' : '#f87171';
-          return `<span class="rival-model-chip" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:${profitCol};"
-            title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜推定${m.estimatedMachines}台">
+          const sn = m.name.replace(/'/g,"\\'");
+          return `<span class="rival-model-chip" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:${profitCol};cursor:pointer;"
+            onclick="navigateToModel('${sn}')"
+            title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
             ${m.name.length > 14 ? m.name.slice(0,14)+'…' : m.name}
             <span style="font-size:10px;opacity:.8;">${profitStr}</span>
           </span>`;
@@ -5005,6 +5013,46 @@ function navigateToPinpoint(dateStr) {
   document.getElementById('pinDateInput').value = dateStr;
   document.getElementById('pinCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   runPinpoint();
+}
+
+function navigateToModel(modelName) {
+  // 機種別集計カードへスクロール
+  const card = document.getElementById('modelAggCard');
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // テーブルモードに切り替え
+  const tableView = document.getElementById('modelAggTableView');
+  const chartView = document.getElementById('modelAggChartView');
+  const tabTable  = document.getElementById('modelAggViewTable');
+  const tabChart  = document.getElementById('modelAggViewChart');
+  if (tableView) tableView.style.display = '';
+  if (chartView) chartView.style.display = 'none';
+  if (tabTable)  tabTable.classList.add('active');
+  if (tabChart)  tabChart.classList.remove('active');
+
+  // 該当行を検索してハイライト
+  setTimeout(() => {
+    const tbody = document.getElementById('modelTableBody');
+    if (!tbody) return;
+    // 既存ハイライトをリセット
+    tbody.querySelectorAll('tr.model-highlight').forEach(r => {
+      r.classList.remove('model-highlight');
+      r.style.outline = '';
+    });
+    // 機種名が一致する行を探す
+    const rows = tbody.querySelectorAll('tr');
+    for (const row of rows) {
+      const firstCell = row.querySelector('td');
+      if (firstCell && firstCell.textContent.trim() === modelName) {
+        row.classList.add('model-highlight');
+        row.style.outline = '2px solid var(--accent)';
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => { row.style.outline = ''; row.classList.remove('model-highlight'); }, 2000);
+        break;
+      }
+    }
+  }, 500);
 }
 
 const DOW_LABEL = ['日','月','火','水','木','金','土'];
