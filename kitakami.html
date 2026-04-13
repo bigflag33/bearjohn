@@ -3672,7 +3672,144 @@ function renderRivalAnalysis() {
     </div>`;
   }
 
-  // ③ バラエティ機種分析 — サマリー集計
+  // ③ 運用努力機種分析 — 「◯曜日」「◯の付く日」特異パターン検出
+  {
+    // 機種×日付ごとの1台平均IN枚数を構築
+    const byModelDate = {};
+    all.forEach(r => {
+      const mk = r['機種名'], d = r.date;
+      if (!mk || !d) return;
+      const key = mk + '\x00' + d;
+      if (!byModelDate[key]) byModelDate[key] = { model: mk, date: d, inSum: 0, cnt: 0 };
+      byModelDate[key].inSum += r['IN枚数'] || 0;
+      byModelDate[key].cnt++;
+    });
+    const modelDailyMap = {}; // { name: [{date, avgIn}] }
+    Object.values(byModelDate).forEach(v => {
+      if (!modelDailyMap[v.model]) modelDailyMap[v.model] = [];
+      modelDailyMap[v.model].push({ date: v.date, avgIn: v.cnt > 0 ? v.inSum / v.cnt : 0 });
+    });
+
+    const EFFORT_DEV_TH    = 0.20; // ±20%以上の乖離
+    const EFFORT_MIN_SAMP  = 3;    // グループ内3日以上
+    const EFFORT_MIN_DAYS  = 10;   // 機種全体の日数
+    const DOW_JP = ['日','月','火','水','木','金','土'];
+
+    const effortModels = [];
+
+    modelList.forEach(m => {
+      // 店舗平均アウト以上の機種のみ対象
+      if (m.avgIn < storeAvgIn) return;
+
+      const daily = modelDailyMap[m.name] || [];
+      if (daily.length < EFFORT_MIN_DAYS) return;
+
+      const modelMean = daily.reduce((a, d) => a + d.avgIn, 0) / daily.length;
+      if (modelMean <= 0) return;
+
+      // 曜日グループ（祝日除外）
+      const dowG   = Array.from({length: 7}, () => []);
+      // 末尾数字グループ
+      const digitG = Array.from({length: 10}, () => []);
+
+      daily.forEach(({date, avgIn}) => {
+        const digit = parseInt(date.slice(-1));
+        digitG[digit].push(avgIn);
+        if (!isHoliday(date)) {
+          const dow = new Date(date + 'T00:00:00').getDay();
+          dowG[dow].push(avgIn);
+        }
+      });
+
+      const patterns = [];
+
+      // 曜日パターン検出
+      dowG.forEach((vals, dow) => {
+        if (vals.length < EFFORT_MIN_SAMP) return;
+        const gMean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const diff  = (gMean - modelMean) / modelMean;
+        if (Math.abs(diff) >= EFFORT_DEV_TH) {
+          patterns.push({ type: 'dow', label: `毎週${DOW_JP[dow]}曜日`,
+            diff, diffStr: (diff > 0 ? '+' : '') + Math.round(diff * 100) + '%',
+            samples: vals.length, dir: diff > 0 ? 'up' : 'down' });
+        }
+      });
+
+      // 末尾数字パターン検出
+      digitG.forEach((vals, digit) => {
+        if (vals.length < EFFORT_MIN_SAMP) return;
+        const gMean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const diff  = (gMean - modelMean) / modelMean;
+        if (Math.abs(diff) >= EFFORT_DEV_TH) {
+          patterns.push({ type: 'digit', label: `${digit}の付く日`,
+            diff, diffStr: (diff > 0 ? '+' : '') + Math.round(diff * 100) + '%',
+            samples: vals.length, dir: diff > 0 ? 'up' : 'down' });
+        }
+      });
+
+      if (patterns.length === 0) return;
+      patterns.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+      effortModels.push({ ...m, patterns });
+    });
+
+    // パターン数→avgIn順でソート
+    effortModels.sort((a, b) =>
+      b.patterns.length - a.patterns.length || b.avgIn - a.avgIn);
+
+    // インサイト登録（上位1件）
+    if (effortModels.length > 0) {
+      const top = effortModels[0];
+      const topPat = top.patterns[0];
+      _pushInsight('rival', '🔧',
+        `運用努力機種 ${effortModels.length}機種を検出`,
+        `${top.name} は${topPat.label}のアウトが全体平均比 ${topPat.diffStr}。意図的な設定変更の可能性。`,
+        3, null, 'rivalAnalysisCard');
+    }
+
+    if (effortModels.length > 0) {
+      html += `<div class="rival-section">
+        <div class="rival-section-title" style="color:#a78bfa;">🔧 運用努力機種 — 設定の上げ下げが見える機種</div>
+        <div style="font-size:10.5px;color:var(--text2);margin-bottom:10px;">
+          店舗平均アウト以上の機種のうち、「毎週◯曜日」または「◯の付く日」で
+          ±20%以上の特異パターンを検出した機種。意図的な設定変更が疑われる。
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;">
+          ${effortModels.slice(0, 12).map(m => {
+            const sn = m.name.replace(/'/g, "\\'");
+            const patHtml = m.patterns.slice(0, 5).map(p => {
+              const col = p.dir === 'up' ? '#34d399' : '#f87171';
+              const bg  = p.dir === 'up' ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)';
+              const bdr = p.dir === 'up' ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)';
+              const arr = p.dir === 'up' ? '▲' : '▼';
+              return `<span style="background:${bg};border:1px solid ${bdr};border-radius:6px;padding:2px 8px;font-size:10.5px;color:${col};white-space:nowrap;">
+                ${arr} ${p.label} <b>${p.diffStr}</b><span style="opacity:.55;font-size:9px;"> ${p.samples}日</span>
+              </span>`;
+            }).join('');
+            const inStr = Math.round(m.avgIn).toLocaleString() + _inUnit() + '/台';
+            return `<div style="background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.18);border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;cursor:pointer;"
+              onclick="navigateToModel('${sn}')" title="${m.name} — クリックで機種別集計へ">
+              <span style="font-size:12px;font-weight:700;color:var(--text);flex:1;min-width:100px;">${m.name}</span>
+              <span style="font-size:10px;color:var(--text2);white-space:nowrap;">${m.estimatedMachines}台｜${inStr}</span>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">${patHtml}</div>
+            </div>`;
+          }).join('')}
+          ${effortModels.length > 12 ? `<div style="font-size:11px;color:var(--text2);padding:2px 8px;">他 ${effortModels.length - 12} 機種でも類似パターンを検出</div>` : ''}
+        </div>
+        <div style="font-size:10px;color:var(--text2);margin-top:8px;">
+          閾値：グループ内3日以上・平均比±20%以上。曜日判定は祝日を除外。
+        </div>
+      </div>`;
+    } else {
+      html += `<div class="rival-section">
+        <div class="rival-section-title" style="color:#a78bfa;">🔧 運用努力機種</div>
+        <div style="font-size:11px;color:var(--text2);">
+          現在の期間では特異パターンを検出できませんでした。期間を広げると検出精度が上がります（目安：1〜2ヶ月以上）。
+        </div>
+      </div>`;
+    }
+  }
+
+  // ④ バラエティ機種分析 — サマリー集計
   const allTotalMachines   = modelList.reduce((a,m) => a + m.estimatedMachines, 0);
   const varTotalMachines   = varietyModels.reduce((a,m) => a + m.estimatedMachines, 0);
   const allTotalProfit     = modelList.reduce((a,m) => a + m.totalProfit, 0);
