@@ -408,7 +408,7 @@
   .rival-day-chip.normal   { background:rgba(100,116,139,0.1);  color:#94a3b8; border:1px solid rgba(100,116,139,0.2); }
   /* 機種トレンドアラート */
   .trend-alert-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    display: grid; grid-template-columns: 1fr; gap: 10px;
   }
   .trend-alert-card {
     border-radius: 10px; padding: 12px 14px;
@@ -3646,7 +3646,7 @@ function renderRivalAnalysis() {
     // 横ばい機種は小リストで末尾表示
     const stableModels = classified.stable;
     if (stableModels.length > 0) {
-      html += `<div class="trend-alert-stable" style="grid-column:span 2;">
+      html += `<div class="trend-alert-stable">
         <span style="font-size:10px;font-weight:700;color:var(--text2);">→ 横ばい機種（様子見）${stableModels.length}機種：</span>
         ${stableModels.slice(0, 15).map(m => {
           const profitStr = (m.avgProfit >= 0 ? '+' : '') + Math.round(m.avgProfit).toLocaleString() + '円';
@@ -3831,6 +3831,88 @@ function renderRivalAnalysis() {
         }).join('')}
       </div>
     </div>`;
+  }
+
+  // ⑤ メイン機種分析 — 総アウト上位5機種
+  {
+    const mainModels = [...modelList]
+      .map(m => ({ ...m, totalIn: m.avgIn * m.dayCount * m.estimatedMachines }))
+      .sort((a, b) => b.totalIn - a.totalIn)
+      .slice(0, 5);
+
+    if (mainModels.length > 0) {
+      const mainTotalMachines = mainModels.reduce((a,m) => a + m.estimatedMachines, 0);
+      const mainTotalProfit   = mainModels.reduce((a,m) => a + m.totalProfit, 0);
+      const mainTotalIn       = mainModels.reduce((a,m) => a + m.totalIn, 0);
+      const mainInstallRate   = allTotalMachines > 0 ? mainTotalMachines / allTotalMachines * 100 : 0;
+      const mainProfitRate    = allTotalProfit !== 0  ? mainTotalProfit  / Math.abs(allTotalProfit) * 100 : 0;
+      const mainInRate        = allTotalIn > 0        ? mainTotalIn      / allTotalIn * 100 : 0;
+
+      const mainProfitComment = mainProfitRate > mainInstallRate + 10
+        ? 'メイン機種が設置比率を超えた利益貢献 — 収益の主軸として機能している'
+        : mainProfitRate < mainInstallRate - 10
+        ? 'メイン機種の利益比率が設置比率を下回る — 稼働は高いが収益効率は低め'
+        : 'メイン機種の利益貢献は設置比率とほぼ同水準';
+      const mainInComment = mainInRate > mainInstallRate + 8
+        ? 'アウト比率が設置比率を上回る — メイン機種に客が集まっている（稼働効率◎）'
+        : mainInRate < mainInstallRate - 8
+        ? 'アウト比率が設置比率を下回る — メイン機種の稼働が上がりきっていない'
+        : '稼働はほぼ設置比率通り';
+
+      // インサイトフィード登録
+      const mainVis = _svgVBar(
+        [mainInstallRate, mainProfitRate, mainInRate],
+        ['設置','利益','アウト'],
+        ['#60a5fa', mainProfitRate > mainInstallRate ? '#34d399' : '#f87171', '#818cf8'],
+        84, 44);
+      _pushInsight('rival', '🏆',
+        `メイン機種 ${mainTotalMachines}台（${mainInstallRate.toFixed(0)}%）— ${mainProfitComment.split('—')[0].trim()}`,
+        `設置比率${mainInstallRate.toFixed(1)}%に対し利益比率${mainProfitRate.toFixed(1)}%・アウト比率${mainInRate.toFixed(1)}%。${mainInComment}`,
+        2, mainVis, 'rivalAnalysisCard');
+
+      const _kpiBox = (label, value, unit, color) => `
+        <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.25);border-radius:10px;padding:8px 16px;min-width:130px;">
+          <div style="font-size:10px;color:var(--text2);font-weight:700;margin-bottom:2px;">${label}</div>
+          <div style="font-size:18px;font-weight:800;color:${color};">${value}<span style="font-size:11px;color:var(--text2);">${unit}</span></div>
+        </div>`;
+
+      html += `<div class="rival-section">
+        <div class="rival-section-title" style="color:#60a5fa;">🏆 メイン機種分析 — 総アウト上位5機種</div>
+        <div style="font-size:10.5px;color:var(--text2);margin-bottom:10px;">総アウト（推定）が最も大きい上位5機種。店舗稼働の主軸となっている機種群。</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+          ${_kpiBox('メイン機種 総台数', mainTotalMachines + '<span style="font-size:11px;color:var(--text2);"> / ' + allTotalMachines + '台</span>', '', '#60a5fa')}
+          ${_kpiBox('設置比率', mainInstallRate.toFixed(1), '%', '#60a5fa')}
+          ${_kpiBox('利益比率', mainProfitRate.toFixed(1), '%', mainProfitRate >= 0 ? '#60a5fa' : '#f87171')}
+          ${_kpiBox('アウト比率', mainInRate.toFixed(1), '%', '#818cf8')}
+          <div style="flex:1;min-width:220px;background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.2);border-radius:10px;padding:8px 14px;">
+            <div style="font-size:11px;color:var(--text2);line-height:1.6;">💡 ${mainProfitComment}<br>${mainInComment}</div>
+          </div>
+        </div>
+        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px;">機種別内訳（総アウト順）</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          ${mainModels.map((m, idx) => {
+            const profitStr  = (m.avgProfit >= 0 ? '+' : '') + Math.round(m.avgProfit).toLocaleString() + '円';
+            const inStr      = Math.round(m.avgIn).toLocaleString() + _inUnit();
+            const instR      = allTotalMachines > 0 ? (m.estimatedMachines / allTotalMachines * 100).toFixed(1) : '0.0';
+            const profR      = allTotalProfit !== 0 ? (m.totalProfit / Math.abs(allTotalProfit) * 100).toFixed(1) : '0.0';
+            const mInR       = allTotalIn > 0 ? (m.totalIn / allTotalIn * 100).toFixed(1) : '0.0';
+            const profCol    = m.avgProfit >= storeAvgProfit ? '#34d399' : m.avgProfit >= 0 ? '#60a5fa' : '#f87171';
+            const sn         = m.name.replace(/'/g, "\\'");
+            const medal      = ['🥇','🥈','🥉','4️⃣','5️⃣'][idx] || '';
+            return `<div style="display:flex;align-items:center;gap:10px;background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.18);border-radius:8px;padding:8px 12px;flex-wrap:wrap;cursor:pointer;"
+              onclick="navigateToModel('${sn}')" title="${m.name} — クリックで機種別集計へ">
+              <span style="font-size:14px;min-width:22px;">${medal}</span>
+              <span style="font-size:12.5px;font-weight:700;color:var(--text);flex:1;min-width:120px;">${m.name}</span>
+              <span style="font-size:11px;color:var(--text2);">${m.estimatedMachines}台</span>
+              <span style="font-size:10.5px;background:rgba(96,165,250,0.12);border-radius:6px;padding:2px 7px;color:#93c5fd;">設置 ${instR}%</span>
+              <span style="font-size:10.5px;background:rgba(${m.totalProfit>=0?'52,211,153':'248,113,113'},0.12);border-radius:6px;padding:2px 7px;color:${m.totalProfit>=0?'#34d399':'#f87171'};">利益 ${profR}%</span>
+              <span style="font-size:10.5px;background:rgba(129,140,248,0.12);border-radius:6px;padding:2px 7px;color:#818cf8;">アウト ${mInR}%</span>
+              <span style="font-size:10.5px;color:${profCol};font-weight:600;">${profitStr}/台</span>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
   }
 
   // 免責メモ
