@@ -3841,7 +3841,8 @@ function renderRivalAnalysis() {
             const inStr = Math.round(m.avgIn).toLocaleString() + _inUnit() + '/台';
             const allPats = [
               ...m.inPatterns.slice(0, 3).map(p => ({ ...p, axis: 'in' })),
-              ...m.profitPatterns.slice(0, 3).map(p => ({ ...p, axis: 'profit' })),
+              // 利益↓（放出した日）のみ表示。利益↑（抜けた日）は加味しない
+              ...m.profitPatterns.filter(p => p.dir === 'down').slice(0, 3).map(p => ({ ...p, axis: 'profit' })),
             ];
             const patHtml = allPats.map(p => {
               const isIn = p.axis === 'in';
