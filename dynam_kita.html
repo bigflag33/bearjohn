@@ -4099,6 +4099,22 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   // IN枚数は台あたり平均として渡ってくるので単位に「/台」を付ける
   const metricUnit = metricKey === 'IN枚数' ? _inUnit() + '/台' : '円';
 
+  // メトリクス軸の種類（関数全体で共通利用）
+  // profit=台粗利（絞り/放出軸）、in=IN枚数（稼働量軸）、sales=台売上（売上量軸）
+  const metricMode = metricKey === '台粗利' ? 'profit' : metricKey === 'IN枚数' ? 'in' : 'sales';
+  const isIN = metricMode === 'in';
+  const _diffColor = diff => metricMode === 'profit'
+    ? (diff >= 0 ? 'var(--red)' : 'var(--green)')
+    : (diff >= 0 ? 'var(--green)' : 'var(--red)');
+  const _diffJudge = diff => {
+    if (metricMode === 'profit') return diff > std*0.3 ? '絞っている' : diff < -std*0.3 ? '集客で放出' : '特徴薄い';
+    if (metricMode === 'in')     return diff > std*0.3 ? '稼働が高め' : diff < -std*0.3 ? '稼働が低め' : '稼働は平均的';
+    /* sales */                  return diff > std*0.3 ? '売上が高め' : diff < -std*0.3 ? '売上が低め' : '売上は平均的';
+  };
+  const _diffJudgeCol = diff => metricMode === 'profit'
+    ? (diff > std*0.3 ? 'var(--red)'   : diff < -std*0.3 ? 'var(--green)' : 'var(--text2)')
+    : (diff > std*0.3 ? 'var(--green)' : diff < -std*0.3 ? 'var(--red)'   : 'var(--text2)');
+
   // 基本統計
   const mean = trendData.reduce((a,b)=>a+b,0) / n;
   const std  = Math.sqrt(trendData.reduce((a,b)=>a+(b-mean)**2,0) / n);
@@ -4182,29 +4198,52 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     const maxV = vals3.reduce((a,b) => a.avg > b.avg ? a : b);
     const minV = vals3.reduce((a,b) => a.avg < b.avg ? a : b);
     const maxMin = maxV.avg - minV.avg;
-    // パターン判定
+    // パターン判定（metricModeで表現を切り替え）
+    const _pc = (profit, inTxt, sales) =>
+      metricMode === 'profit' ? profit : metricMode === 'in' ? inTxt : sales;
     let pattern, pIcon, pComment;
     if (maxMin < TH) {
       pattern='フラット型'; pIcon='🔁';
-      pComment='月を通じて安定した運用。規則性が読みにくい。';
+      pComment=_pc(
+        '月を通じて安定した運用。規則性が読みにくい。',
+        '月を通じて稼働が安定。大きな偏りは見られない。',
+        '月を通じて売上が安定。大きな偏りは見られない。');
     } else if (avgJou > avgChu + TH && avgJou > avgKa + TH) {
       pattern='月初突出型'; pIcon='🌅';
-      pComment='上旬だけ突出。給料・月初のタイミングで素早く回収するスタイル。';
+      pComment=_pc(
+        '上旬だけ突出。給料・月初のタイミングで素早く回収するスタイル。',
+        '上旬に稼働が集中。月初の来店が多く、中旬以降に落ちる傾向。',
+        '上旬に売上が集中。月初の客入りが多い傾向。');
     } else if (avgKa > avgJou + TH && avgKa > avgChu + TH) {
       pattern='月末追い込み型'; pIcon='🌇';
-      pComment='下旬だけ突出。給料日前後に合わせて絞るスタイル。';
+      pComment=_pc(
+        '下旬だけ突出。給料日前後に合わせて絞るスタイル。',
+        '下旬に稼働が集中。給料日前後に来店が増える傾向。',
+        '下旬に売上が集中。給料日前後の客入りが多い傾向。');
     } else if (avgChu > avgJou + TH && avgChu > avgKa + TH) {
       pattern='山型（中旬ピーク）'; pIcon='⛰️';
-      pComment='中旬に最も稼ぐ。月初・月末は緩め、中旬で回収する独特なスタイル。';
+      pComment=_pc(
+        '中旬に最も稼ぐ。月初・月末は緩め、中旬で回収する独特なスタイル。',
+        '中旬に稼働がピーク。上旬・下旬より中旬の来店が多い独特なパターン。',
+        '中旬に売上がピーク。中旬に来店が集中する独特なパターン。');
     } else if (avgChu < avgJou - TH && avgChu < avgKa - TH) {
-      pattern='谷型（中旬放出）'; pIcon='🔻';
-      pComment='中旬が最低。上旬・下旬で稼ぎ、中旬で客を呼び込む。';
+      pattern='谷型（中旬低下）'; pIcon='🔻';
+      pComment=_pc(
+        '中旬が最低。上旬・下旬で稼ぎ、中旬で客を呼び込む。',
+        '中旬に稼働が落ち込む。上旬・下旬と比べて中旬の来店が少ない傾向。',
+        '中旬に売上が落ち込む。上旬・下旬と比べて中旬の客入りが少ない傾向。');
     } else if (avgJou <= avgChu && avgChu <= avgKa && avgKa - avgJou > TH) {
       pattern='右肩上がり型'; pIcon='📈';
-      pComment='上旬→中旬→下旬と段階的に上昇。月末に向けて絞っていくスタイル。';
+      pComment=_pc(
+        '上旬→中旬→下旬と段階的に上昇。月末に向けて絞っていくスタイル。',
+        '上旬→中旬→下旬と稼働が段階的に上昇。月末に向けて来店が増える傾向。',
+        '上旬→中旬→下旬と売上が段階的に上昇。月末に向けて客入りが増える傾向。');
     } else if (avgJou >= avgChu && avgChu >= avgKa && avgJou - avgKa > TH) {
       pattern='右肩下がり型'; pIcon='📉';
-      pComment='上旬→中旬→下旬と段階的に下降。月初回収・後半解放スタイル。';
+      pComment=_pc(
+        '上旬→中旬→下旬と段階的に下降。月初回収・後半解放スタイル。',
+        '上旬→中旬→下旬と稼働が段階的に低下。月末に向けて来店が減る傾向。',
+        '上旬→中旬→下旬と売上が段階的に低下。月末に向けて客入りが減る傾向。');
     } else {
       pattern='複合型'; pIcon='〰️';
       pComment='明確な月内パターンは検出されませんでした。';
@@ -4223,22 +4262,6 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   }
 
   // 入金タイミング効果（月初 / 給料日 / 年金 — それぞれ独立ボックス）
-  // メトリクス軸の種類：profit=絞り/放出軸、in=稼働軸、sales=売上量軸
-  // 台粗利のみ絞り/放出の概念を適用。IN枚数・台売上は量の増減で表現する。
-  const metricMode = metricKey === '台粗利' ? 'profit' : metricKey === 'IN枚数' ? 'in' : 'sales';
-  const isIN = metricMode === 'in'; // 後方互換用
-  const _diffColor  = diff => metricMode === 'profit'
-    ? (diff >= 0 ? 'var(--red)' : 'var(--green)')   // 粗利高=回収(赤)、低=放出(緑)
-    : (diff >= 0 ? 'var(--green)' : 'var(--red)');   // IN/売上高=良好(緑)、低=低調(赤)
-  const _diffJudge  = diff => {
-    if (metricMode === 'profit') return diff > std*0.3 ? '絞っている' : diff < -std*0.3 ? '集客で放出' : '特徴薄い';
-    if (metricMode === 'in')     return diff > std*0.3 ? '稼働が高め' : diff < -std*0.3 ? '稼働が低め' : '稼働は平均的';
-    /* sales */                  return diff > std*0.3 ? '売上が高め' : diff < -std*0.3 ? '売上が低め' : '売上は平均的';
-  };
-  const _diffJudgeCol = diff => metricMode === 'profit'
-    ? (diff > std*0.3 ? 'var(--red)'   : diff < -std*0.3 ? 'var(--green)' : 'var(--text2)')
-    : (diff > std*0.3 ? 'var(--green)' : diff < -std*0.3 ? 'var(--red)'   : 'var(--text2)');
-
   const _inkinBox = (icon, title, avg, zone, minDays) => {
     if (avg === null || zone.length < minDays) return '';
     const diff = avg - mean;
@@ -4328,13 +4351,21 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     if (avgJou !== null && avgChu !== null && avgKa !== null) {
       const TH = std * 0.25;
       const maxMin = Math.max(avgJou,avgChu,avgKa) - Math.min(avgJou,avgChu,avgKa);
-      if (maxMin < TH)                                              parts.push('月内はフラットな運用');
-      else if (avgJou > avgChu+TH && avgJou > avgKa+TH)            parts.push('月初に回収する運用スタイル');
-      else if (avgKa  > avgJou+TH && avgKa  > avgChu+TH)           parts.push('月末に向けて絞る運用スタイル');
-      else if (avgChu > avgJou+TH && avgChu > avgKa+TH)            parts.push('中旬にピークを持つ独特なスタイル');
-      else if (avgChu < avgJou-TH && avgChu < avgKa-TH)            parts.push('中旬に放出し上下旬で回収するスタイル');
-      else if (avgJou<=avgChu && avgChu<=avgKa && avgKa-avgJou>TH) parts.push('月末に向かって段階的に絞るスタイル');
-      else if (avgJou>=avgChu && avgChu>=avgKa && avgJou-avgKa>TH) parts.push('月初から段階的に解放するスタイル');
+      const _pp = (p, i, s) => metricMode==='profit' ? p : metricMode==='in' ? i : s;
+      if (maxMin < TH)
+        parts.push(_pp('月内はフラットな運用', '月内の稼働は安定', '月内の売上は安定'));
+      else if (avgJou > avgChu+TH && avgJou > avgKa+TH)
+        parts.push(_pp('月初に回収する運用スタイル', '月初に稼働が集中するスタイル', '月初に売上が集中するスタイル'));
+      else if (avgKa  > avgJou+TH && avgKa  > avgChu+TH)
+        parts.push(_pp('月末に向けて絞る運用スタイル', '月末に稼働が集中するスタイル', '月末に売上が集中するスタイル'));
+      else if (avgChu > avgJou+TH && avgChu > avgKa+TH)
+        parts.push(_pp('中旬にピークを持つ独特なスタイル', '中旬に稼働がピークになる独特なパターン', '中旬に売上がピークになる独特なパターン'));
+      else if (avgChu < avgJou-TH && avgChu < avgKa-TH)
+        parts.push(_pp('中旬に放出し上下旬で回収するスタイル', '中旬に稼働が落ち込む谷型パターン', '中旬に売上が落ち込む谷型パターン'));
+      else if (avgJou<=avgChu && avgChu<=avgKa && avgKa-avgJou>TH)
+        parts.push(_pp('月末に向かって段階的に絞るスタイル', '月末に向かって稼働が段階的に上昇', '月末に向かって売上が段階的に上昇'));
+      else if (avgJou>=avgChu && avgChu>=avgKa && avgJou-avgKa>TH)
+        parts.push(_pp('月初から段階的に解放するスタイル', '月初から稼働が段階的に低下', '月初から売上が段階的に低下'));
     }
 
     // 給料日効果
