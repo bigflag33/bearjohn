@@ -4223,14 +4223,30 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   }
 
   // 入金タイミング効果（月初 / 給料日 / 年金 — それぞれ独立ボックス）
+  // メトリクス軸の種類：profit=絞り/放出軸、in=稼働軸、sales=売上量軸
+  // 台粗利のみ絞り/放出の概念を適用。IN枚数・台売上は量の増減で表現する。
+  const metricMode = metricKey === '台粗利' ? 'profit' : metricKey === 'IN枚数' ? 'in' : 'sales';
+  const isIN = metricMode === 'in'; // 後方互換用
+  const _diffColor  = diff => metricMode === 'profit'
+    ? (diff >= 0 ? 'var(--red)' : 'var(--green)')   // 粗利高=回収(赤)、低=放出(緑)
+    : (diff >= 0 ? 'var(--green)' : 'var(--red)');   // IN/売上高=良好(緑)、低=低調(赤)
+  const _diffJudge  = diff => {
+    if (metricMode === 'profit') return diff > std*0.3 ? '絞っている' : diff < -std*0.3 ? '集客で放出' : '特徴薄い';
+    if (metricMode === 'in')     return diff > std*0.3 ? '稼働が高め' : diff < -std*0.3 ? '稼働が低め' : '稼働は平均的';
+    /* sales */                  return diff > std*0.3 ? '売上が高め' : diff < -std*0.3 ? '売上が低め' : '売上は平均的';
+  };
+  const _diffJudgeCol = diff => metricMode === 'profit'
+    ? (diff > std*0.3 ? 'var(--red)'   : diff < -std*0.3 ? 'var(--green)' : 'var(--text2)')
+    : (diff > std*0.3 ? 'var(--green)' : diff < -std*0.3 ? 'var(--red)'   : 'var(--text2)');
+
   const _inkinBox = (icon, title, avg, zone, minDays) => {
     if (avg === null || zone.length < minDays) return '';
     const diff = avg - mean;
     const pct  = mean !== 0 ? (diff / Math.abs(mean) * 100).toFixed(0) : '0';
     const sign = diff >= 0 ? '+' : '';
-    const col  = diff >= 0 ? 'var(--red)' : 'var(--green)';
-    const judge = diff > std*0.3 ? '絞っている' : diff < -std*0.3 ? '集客で放出' : '特徴薄い';
-    const judgeCol = diff > std*0.3 ? 'var(--red)' : diff < -std*0.3 ? 'var(--green)' : 'var(--text2)';
+    const col      = _diffColor(diff);
+    const judge    = _diffJudge(diff);
+    const judgeCol = _diffJudgeCol(diff);
     return `<div class="trend-analysis-box">
       <div class="tab-box-title">${icon} ${title}</div>
       <div class="tab-box-body">
@@ -4263,9 +4279,14 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     const diff = avgHoliday - mean;
     const pct  = mean !== 0 ? (diff / Math.abs(mean) * 100).toFixed(0) : '0';
     const sign = diff >= 0 ? '+' : '';
-    const col  = diff >= 0 ? 'var(--red)' : 'var(--green)';
-    const judge = diff > std*0.3 ? '祝日は絞る傾向' : diff < -std*0.3 ? '祝日は放出・集客傾向' : '祝日の特徴は薄い';
-    const judgeCol = diff > std*0.3 ? 'var(--red)' : diff < -std*0.3 ? 'var(--green)' : 'var(--text2)';
+    const col  = _diffColor(diff);
+    const _holLabel = diff > std*0.3
+      ? (metricMode==='profit' ? '祝日は絞る傾向' : metricMode==='in' ? '祝日は稼働高め' : '祝日は売上高め')
+      : diff < -std*0.3
+      ? (metricMode==='profit' ? '祝日は放出・集客傾向' : metricMode==='in' ? '祝日は稼働低め' : '祝日は売上低め')
+      : '祝日の特徴は薄い';
+    const judge    = _holLabel;
+    const judgeCol = _diffJudgeCol(diff);
     html += `<div class="trend-analysis-box">
       <div class="tab-box-title">🎌 祝日バイアス（${holidayBucket.length}日）</div>
       <div class="tab-box-body">
@@ -4319,22 +4340,34 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     // 給料日効果
     if (avgSalary !== null && salaryZone.length >= 3) {
       const diff = avgSalary - mean;
-      if (diff > std*0.3)       parts.push('給料日に絞る傾向あり');
-      else if (diff < -std*0.3) parts.push('給料日は放出で集客');
+      if (diff > std*0.3) parts.push(
+        metricMode==='profit' ? '給料日に絞る傾向あり' :
+        metricMode==='in'     ? '給料日帯は稼働が高め' : '給料日帯は売上が高め');
+      else if (diff < -std*0.3) parts.push(
+        metricMode==='profit' ? '給料日は放出で集客' :
+        metricMode==='in'     ? '給料日帯は稼働が低め' : '給料日帯は売上が低め');
     }
 
     // 年金日効果
     if (avgPension !== null && pensionZone.length >= 2) {
       const diff = avgPension - mean;
-      if (diff > std*0.3)       parts.push('年金日にも絞る傾向あり');
-      else if (diff < -std*0.3) parts.push('年金日は放出気味');
+      if (diff > std*0.3) parts.push(
+        metricMode==='profit' ? '年金日にも絞る傾向あり' :
+        metricMode==='in'     ? '年金日帯は稼働が高め' : '年金日帯は売上が高め');
+      else if (diff < -std*0.3) parts.push(
+        metricMode==='profit' ? '年金日は放出気味' :
+        metricMode==='in'     ? '年金日帯は稼働が低め' : '年金日帯は売上が低め');
     }
 
     // 月初効果
     if (avgMonthInit !== null && monthInitZone.length >= 3) {
       const diff = avgMonthInit - mean;
-      if (diff > std*0.3)       parts.push('月初も回収重視');
-      else if (diff < -std*0.3) parts.push('月初は集客優先で放出');
+      if (diff > std*0.3) parts.push(
+        metricMode==='profit' ? '月初も回収重視' :
+        metricMode==='in'     ? '月初は稼働が高め' : '月初は売上が高め');
+      else if (diff < -std*0.3) parts.push(
+        metricMode==='profit' ? '月初は集客優先で放出' :
+        metricMode==='in'     ? '月初は稼働が低め' : '月初は売上が低め');
     }
 
     // 曜日バイアス
@@ -4373,20 +4406,34 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     const diff = avgSalary - mean;
     const pct = mean !== 0 ? Math.abs(diff/mean*100).toFixed(0) : '0';
     if (Math.abs(diff) > std*0.3) {
-      const dir = diff > 0 ? '絞る（利益確保）傾向' : '放出し集客する傾向';
-      const salCol = diff > 0 ? '#f87171' : '#34d399';
+      const salCol = metricMode==='profit' ? (diff>0?'#f87171':'#34d399') : (diff>0?'#34d399':'#f87171');
       const salVis = _svgRatio2(Math.abs(avgSalary), Math.abs(mean), '給料日帯', '全体平均', salCol, '#475569', 88);
-      _pushInsight('trend', '💰', `給料日（25〜29日）に${dir}`, `給料日帯の平均が全体平均比 ${diff>0?'+':''}${pct}%。給料日に合わせてイベント戦略を調整すると効果的。`, 3, salVis, 'trendAnalysisCard');
+      const dir = metricMode==='profit' ? (diff>0?'絞る（利益確保）傾向':'放出し集客する傾向')
+                : metricMode==='in'     ? (diff>0?'稼働が上昇する':'稼働が低下する')
+                :                         (diff>0?'売上が上昇する':'売上が低下する');
+      const body = metricMode==='profit'
+        ? `給料日帯の平均が全体平均比 ${diff>0?'+':''}${pct}%。給料日に合わせてイベント戦略を調整すると効果的。`
+        : metricMode==='in'
+        ? `給料日帯の稼働が全体平均比 ${diff>0?'+':''}${pct}%。稼働の変化を把握してイベント戦略の参考に。`
+        : `給料日帯の売上が全体平均比 ${diff>0?'+':''}${pct}%。給料日の売上動向を把握してイベント戦略の参考に。`;
+      _pushInsight('trend', '💰', `給料日（25〜29日）に${dir}`, body, 3, salVis, 'trendAnalysisCard');
     }
   }
   if (avgPension !== null && pensionZone.length >= 2) {
     const diff = avgPension - mean;
     const pct = mean !== 0 ? Math.abs(diff/mean*100).toFixed(0) : '0';
     if (Math.abs(diff) > std*0.3) {
-      const dir = diff > 0 ? '絞る傾向' : '放出気味の傾向';
-      const penCol = diff > 0 ? '#f87171' : '#34d399';
+      const penCol = metricMode==='profit' ? (diff>0?'#f87171':'#34d399') : (diff>0?'#34d399':'#f87171');
       const penVis = _svgRatio2(Math.abs(avgPension), Math.abs(mean), '年金日帯', '全体平均', penCol, '#475569', 88);
-      _pushInsight('trend', '👴', `年金日（偶数月15〜19日）に${dir}`, `年金支給日帯の平均が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして把握しておきたい。`, 4, penVis, 'trendAnalysisCard');
+      const dir = metricMode==='profit' ? (diff>0?'絞る傾向':'放出気味の傾向')
+                : metricMode==='in'     ? (diff>0?'稼働が高め':'稼働が低め')
+                :                         (diff>0?'売上が高め':'売上が低め');
+      const body = metricMode==='profit'
+        ? `年金支給日帯の平均が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして把握しておきたい。`
+        : metricMode==='in'
+        ? `年金日帯の稼働が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして稼働の変化に注目。`
+        : `年金日帯の売上が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして売上の変化に注目。`;
+      _pushInsight('trend', '👴', `年金日（偶数月15〜19日）に${dir}`, body, 4, penVis, 'trendAnalysisCard');
     }
   }
   if (bestDow && worstDow && bestDow.dow !== worstDow.dow) {
