@@ -4199,6 +4199,200 @@ function renderRivalAnalysis() {
           </span>`;
         }).join('')}
       </div>
+      ${(() => {
+        // ── ジャグラー台別運用パターン (据え置き率 & ドボン台設定上げ) ──
+        const jagRaw = all.filter(r => r['機種名'] && r['機種名'].includes('ジャグラー'));
+        if (!jagRaw.length) return '';
+
+        // 店舗全体の平均IN枚数（ジャグラー含む全台）
+        const storeAvgInAll = all.length > 0
+          ? all.reduce((s, r) => s + (r['IN枚数'] || 0), 0) / all.length : 0;
+
+        // ── 据え置き率: date×model×tai 集計 ──
+        const byTai = {};
+        jagRaw.forEach(r => {
+          const model = r['機種名'] || '';
+          const tai   = String(r['台番'] || '').trim();
+          if (!tai) return;
+          const key = model + '\x00' + tai;
+          if (!byTai[key]) byTai[key] = { model, tai, days: {} };
+          const d = byTai[key].days;
+          if (!d[r.date]) d[r.date] = { inSum: 0, diffSum: 0 };
+          d[r.date].inSum   += r['IN枚数'] || 0;
+          d[r.date].diffSum += r['差枚']   || 0;
+        });
+
+        let okiEvents = 0;
+        const okiDetail = [];
+
+        Object.values(byTai).forEach(entry => {
+          // 対象日: IN >= storeAvgIn AND 差枚 >= 0（出玉率100%以上）
+          const eligDays = Object.entries(entry.days)
+            .filter(([, v]) => v.inSum >= storeAvgInAll && v.diffSum >= 0)
+            .map(([dt]) => dt)
+            .sort();
+          if (eligDays.length < 3) return;
+
+          let run = [eligDays[0]];
+          for (let i = 1; i < eligDays.length; i++) {
+            const diff = (new Date(eligDays[i]) - new Date(eligDays[i-1])) / 86400000;
+            if (diff === 1) {
+              run.push(eligDays[i]);
+            } else {
+              if (run.length >= 3) {
+                okiEvents++;
+                okiDetail.push({ model: entry.model, tai: entry.tai, startDate: run[0], days: run.length });
+              }
+              run = [eligDays[i]];
+            }
+          }
+          if (run.length >= 3) {
+            okiEvents++;
+            okiDetail.push({ model: entry.model, tai: entry.tai, startDate: run[0], days: run.length });
+          }
+        });
+
+        // ── ドボン台設定上げ: date×model×tai 集計 ──
+        const byDMT = {};
+        jagRaw.forEach(r => {
+          const tai = String(r['台番'] || '').trim();
+          if (!r.date || !r['機種名'] || !tai) return;
+          const k = r.date + '\x00' + r['機種名'] + '\x00' + tai;
+          if (!byDMT[k]) byDMT[k] = { date: r.date, model: r['機種名'], tai, inSum: 0, diffSum: 0 };
+          byDMT[k].inSum   += r['IN枚数'] || 0;
+          byDMT[k].diffSum += r['差枚']   || 0;
+        });
+
+        // date × model でグループ化
+        const byDM = {};
+        Object.values(byDMT).forEach(e => {
+          const k = e.date + '\x00' + e.model;
+          if (!byDM[k]) byDM[k] = { date: e.date, model: e.model, tais: [] };
+          const payout = e.inSum > 0 ? (e.inSum + e.diffSum) / e.inSum : 0;
+          byDM[k].tais.push({ tai: e.tai, inSum: e.inSum, payout });
+        });
+
+        let dobonTotal = 0, dobonHits = 0;
+        const dobonDetail = [];
+
+        Object.values(byDM).forEach(group => {
+          if (group.tais.length < 2) return;
+          // 最低IN台：IN=0も含めて全台対象
+          const minIn = Math.min(...group.tais.map(t => t.inSum));
+          // 最低出玉率台：IN=0（出玉率0%）は除外し、稼働ある台の中で最低を探す
+          const activeTais = group.tais.filter(t => t.inSum > 0);
+          const minPayout  = activeTais.length > 0
+            ? Math.min(...activeTais.map(t => t.payout))
+            : null;
+          // ドボン台: 最低IN台 と 最低出玉率台 をそれぞれ独立して特定（ダブル判定）
+          // 同一台なら1台、別々の台なら最大2台がドボン台になる
+          const dobonTaiSet = new Set([
+            ...group.tais.filter(t => t.inSum === minIn).map(t => t.tai),
+            ...(minPayout !== null ? activeTais.filter(t => t.payout === minPayout).map(t => t.tai) : []),
+          ]);
+          const dobons = group.tais.filter(t => dobonTaiSet.has(t.tai));
+          const d = new Date(group.date);
+          d.setDate(d.getDate() + 1);
+          const nextDate = d.toISOString().split('T')[0];
+          dobons.forEach(dobon => {
+            dobonTotal++;
+            const nextDay = byDMT[nextDate + '\x00' + group.model + '\x00' + dobon.tai];
+            const nextPayout = nextDay && nextDay.inSum > 0 ? (nextDay.inSum + nextDay.diffSum) / nextDay.inSum : null;
+            const hit = nextPayout !== null && nextPayout >= 1.0 && nextDay.inSum >= storeAvgInAll;
+            if (hit) dobonHits++;
+            dobonDetail.push({ date: group.date, model: group.model, tai: dobon.tai, payout: dobon.payout, nextPayout, hit: !!hit });
+          });
+        });
+
+        const dobonRate = dobonTotal > 0 ? dobonHits / dobonTotal * 100 : 0;
+
+        // ── Jersey Tiles ──
+        const okiCol  = okiEvents > 0  ? { border:'#f59e0b', bg:'rgba(245,158,11,0.08)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
+        const dobCol  = dobonRate >= 30 ? { border:'#34d399', bg:'rgba(52,211,153,0.07)' } : dobonRate >= 15 ? { border:'#fbbf24', bg:'rgba(251,191,36,0.06)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
+        const dobBadge = dobonRate >= 30 ? 'badge-alert' : dobonRate >= 15 ? 'badge-warn' : 'badge-ok';
+
+        const hasTaiData = Object.keys(byTai).length > 0;
+
+        return `
+        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">台別運用パターン${!hasTaiData ? '<span style="font-size:10px;color:#f87171;margin-left:8px;">※台番データなし</span>' : ''}</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+            <div id="jagTile_oki" data-open="false" onclick="toggleJagDetail('oki')"
+              style="border:1px solid ${okiCol.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${okiCol.bg};user-select:none;">
+              <div style="font-size:56px;font-weight:900;line-height:1;color:${okiCol.border};letter-spacing:-3px;font-variant-numeric:tabular-nums;">${okiEvents}</div>
+              <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${okiCol.border};margin-top:10px;">据え置き検出</div>
+              <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3日以上連続<br>出玉率100%超の台</div>
+              <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+                <span class="action-badge ${okiEvents > 0 ? 'badge-warn' : 'badge-ok'}">${okiEvents > 0 ? '設定据え置き疑い' : 'なし'}</span>
+                <span style="font-size:10px;color:var(--text2);">▾</span>
+              </div>
+            </div>
+            <div id="jagTile_dobon" data-open="false" onclick="toggleJagDetail('dobon')"
+              style="border:1px solid ${dobCol.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${dobCol.bg};user-select:none;">
+              <div style="font-size:48px;font-weight:900;line-height:1;color:${dobCol.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${dobonRate.toFixed(0)}<span style="font-size:20px;font-weight:700;">%</span></div>
+              <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${dobCol.border};margin-top:10px;">ドボン台 翌日回収率</div>
+              <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">最低IN台・最低出玉率台（各1台）が<br>翌日に改善した割合</div>
+              <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+                <span class="action-badge ${dobBadge}">${dobonTotal > 0 ? dobonHits + '/' + dobonTotal + '回' : 'データ不足'}</span>
+                <span style="font-size:10px;color:var(--text2);">▾</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="jagDetail_oki" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div style="font-size:11.5px;font-weight:700;color:#f59e0b;margin-bottom:4px;">3日以上連続 出玉率100%超 — 据え置き台リスト（${okiDetail.length}件）</div>
+            <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">条件: 店舗平均IN以上 かつ 差枚≥0 が3日以上カレンダー連続</div>
+            ${okiDetail.length === 0
+              ? '<div style="font-size:11px;color:var(--text2);">該当なし（期間内に3日連続の据え置きパターンは検出されませんでした）</div>'
+              : `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+                <tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+                  <th style="text-align:left;padding:7px 8px;font-weight:700;">機種名</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">台番</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">開始日</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">連続日数</th>
+                </tr>
+                ${okiDetail.sort((a,b)=>b.days-a.days).slice(0,25).map(e=>`
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                  <td style="padding:6px 8px;color:var(--text);">${e.model}</td>
+                  <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.tai}</td>
+                  <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.startDate}</td>
+                  <td style="padding:6px 8px;color:#f59e0b;text-align:center;font-weight:800;">${e.days}日</td>
+                </tr>`).join('')}
+                ${okiDetail.length>25?`<tr><td colspan="4" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${okiDetail.length-25} 件</td></tr>`:''}
+              </table></div>`}
+          </div>
+
+          <div id="jagDetail_dobon" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div style="font-size:11.5px;font-weight:700;color:#34d399;margin-bottom:4px;">ドボン台（最低IN台 + 最低出玉率台）→ 翌日改善の記録</div>
+            <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">出現率 ${dobonRate.toFixed(1)}%（${dobonHits}/${dobonTotal}件）— 翌日の出玉率100%超 かつ 店舗平均IN以上に改善した台を「ヒット」とカウント</div>
+            <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;padding:8px 10px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:8px;line-height:1.7;">
+              ⚡ <b style="color:#fbbf24;">ダブル判定</b>：「最低IN台」と「最低出玉率台」をそれぞれ独立して特定。同一台なら1台、別々の台なら最大2台がドボン台になります。
+            </div>
+            ${dobonDetail.length === 0
+              ? '<div style="font-size:11px;color:var(--text2);">該当なし（台番データがあり複数台の記録が必要です）</div>'
+              : `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+                <tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+                  <th style="text-align:left;padding:7px 8px;font-weight:700;">日付</th>
+                  <th style="text-align:left;padding:7px 8px;font-weight:700;">機種名</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">台番</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">当日出玉率</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">翌日出玉率</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">改善</th>
+                </tr>
+                ${dobonDetail.filter(e=>e.nextPayout!==null).sort((a,b)=>b.hit-a.hit||b.date.localeCompare(a.date)).slice(0,25).map(e=>`
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);${e.hit?'background:rgba(52,211,153,0.05);':''}">
+                  <td style="padding:6px 8px;color:var(--text2);">${e.date}</td>
+                  <td style="padding:6px 8px;color:var(--text);">${e.model}</td>
+                  <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.tai}</td>
+                  <td style="padding:6px 8px;color:#f87171;text-align:center;">${(e.payout*100).toFixed(1)}%</td>
+                  <td style="padding:6px 8px;color:${e.nextPayout>=1.0?'#34d399':'#f87171'};text-align:center;font-weight:700;">${(e.nextPayout*100).toFixed(1)}%</td>
+                  <td style="padding:6px 8px;text-align:center;">${e.hit?'<span style="color:#34d399;font-weight:800;">◎</span>':'<span style="color:var(--text2);">—</span>'}</td>
+                </tr>`).join('')}
+                ${dobonDetail.filter(e=>e.nextPayout!==null).length>25?`<tr><td colspan="6" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${dobonDetail.filter(e=>e.nextPayout!==null).length-25} 件</td></tr>`:''}
+              </table></div>`}
+          </div>
+        </div>`;
+      })()}
     </div>`;
   }
 
@@ -5941,6 +6135,23 @@ function _renderZentaiRows() {
       <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;opacity:.7;">${Math.round(e.avgIn).toLocaleString()}</td>
       <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;opacity:.7;">${(e.avgPayout*100).toFixed(1)}%</td>
     </tr>`).join('');
+}
+
+function toggleJagDetail(key) {
+  const el = document.getElementById('jagDetail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  ['oki','dobon'].forEach(k => {
+    const p = document.getElementById('jagDetail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('jagTile_' + k);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('jagTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
 }
 
 function toggleEffortDetail(key) {
