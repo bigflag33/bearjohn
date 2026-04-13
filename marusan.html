@@ -484,6 +484,14 @@
     font-size: 11px; cursor: pointer;
     transition: background .15s;
   }
+  /* 予測グラフ */
+  #forecastCard { border: 1px solid rgba(96,165,250,0.25); }
+  #forecastCard .chart-title { color: #93c5fd; }
+  .forecast-legend-dot { display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px; }
+  .forecast-tag {
+    display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;
+    margin:2px 4px 2px 0;
+  }
   .anomaly-chip:hover { background: rgba(251,191,36,0.22); }
 
   /* ── インサイトフィード ── */
@@ -899,6 +907,16 @@
     <div class="chart-card full" id="trendAnalysisCard">
       <div class="chart-title"><div class="dot" style="background:#a78bfa"></div>📊 日次トレンド分析</div>
       <div id="trendAnalysisBody" style="padding:4px 4px 8px;"></div>
+    </div>
+    <div class="chart-card full" id="forecastCard" style="display:none;">
+      <div class="chart-title">
+        <div class="dot" style="background:linear-gradient(135deg,#60a5fa,#a78bfa)"></div>
+        🔮 未来予測グラフ
+        <span id="forecastMeta" style="margin-left:auto;font-size:10px;color:var(--text2);font-weight:600;"></span>
+      </div>
+      <div class="chart-wrapper" style="height:220px;"><canvas id="forecastChart"></canvas></div>
+      <div id="forecastLegend" style="display:flex;gap:14px;flex-wrap:wrap;padding:8px 12px 4px;font-size:11px;color:var(--text2);"></div>
+      <div id="forecastDetail" style="padding:6px 12px 10px;font-size:11.5px;line-height:1.75;color:var(--text);"></div>
     </div>
     <div class="chart-card">
       <div class="chart-title"><div class="dot" style="background:var(--accent2)"></div>機種別粗利 TOP15</div>
@@ -1485,6 +1503,31 @@
 
 </div>
 <script>
+// ── 日本の祝日（2024〜2027）──
+const JAPAN_HOLIDAYS = new Set([
+  // 2024
+  '2024-01-01','2024-01-08','2024-02-11','2024-02-12','2024-02-23',
+  '2024-03-20','2024-04-29','2024-05-03','2024-05-04','2024-05-05','2024-05-06',
+  '2024-07-15','2024-08-11','2024-08-12','2024-09-16','2024-09-22','2024-09-23',
+  '2024-10-14','2024-11-03','2024-11-04','2024-11-23',
+  // 2025
+  '2025-01-01','2025-01-13','2025-02-11','2025-02-23','2025-02-24',
+  '2025-03-20','2025-04-29','2025-05-03','2025-05-04','2025-05-05','2025-05-06',
+  '2025-07-21','2025-08-11','2025-09-15','2025-09-23','2025-10-13',
+  '2025-11-03','2025-11-23','2025-11-24',
+  // 2026
+  '2026-01-01','2026-01-12','2026-02-11','2026-02-23',
+  '2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05',
+  '2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23',
+  '2026-10-12','2026-11-03','2026-11-23',
+  // 2027
+  '2027-01-01','2027-01-11','2027-02-11','2027-02-23',
+  '2027-03-21','2027-04-29','2027-05-03','2027-05-04','2027-05-05',
+  '2027-07-19','2027-08-11','2027-09-20','2027-09-23',
+  '2027-10-11','2027-11-03','2027-11-23',
+]);
+const isHoliday = d => JAPAN_HOLIDAYS.has(d);
+
 const RAW_DATA = [];
 const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX-TP", "Lスマスロ北斗", "LモンキーターンVCE", "L北斗の拳 転生の章2", "Sゴーゴージャグラー3KA", "S沖ドキ!GOLD", "Lカバネリ海門決戦", "ネオアイムジャグラーEX", "L東京喰種", "S甲鉄城のカバネリ", "SハッピージャグラーVIII", "Lゴッドイーター リザレクション", "L鉄拳6", "L新鬼武者3", "L東京リベンジャーズ", "LからくりサーカスG", "Lカグヤ様は告らせたい", "L革命機ヴァルヴレイヴ2", "L吉宗", "Lバジリスク絆2天膳ZN", "L沖ドキ!DUO2 アンコール", "Lハナビ", "Sファンキージャグラー2KT", "ジャグラーガールズSS", "ウルトラミラクルジャグラー", "Lスーパーブラックジャック", "S炎炎ノ消防隊", "S押忍!番長ZERO", "S MHWアイスボーンZF", "L秘宝伝", "Lいざ!番長", "Lレヴュースタァライト", "L攻殻機動隊", "Lマギアレコード", "LゴブリンスレイヤーII", "L化物語", "Sバイオハザード RE:2", "L真・北斗無双", "Lアリフレタ職業デ世界最強", "L戦国乙女4S3", "L真・一騎当千", "L炎炎ノ消防隊", "L押忍!番長4", "Lデビルメイクライ5ST", "Lモンスターハンターライズ", "LBサンダーV", "LBクレアの秘宝伝", "LB SHAKE BT", "LBニューパルサー", "LBマタドールIII", "LBエヴァンゲリヲン約束の扉", "ダンまち2", "SグランベルムZXZ", "Sディスクアップ2", "S/新ハナビR/HA", "SエウレカセブンHIEVO XS", "L炎炎ノ消防隊2", "L七つの魔剣が支配", "Lダーリン・イン・ザ・フランキス", "L閃乱カグラ2 シノビマスター", "Lガールズ&パンツァー最終H1", "L絶対衝激IV", "Lラブ嬢3M4", "Lルパン三世大航海者", "Lネオプラネット", "Lトアル科学の超電磁砲2", "L範馬刃牙", "Lバイオハザード5", "L主役は銭形5", "L防振り", "Lバーニングエクスプレス", "L革命機ヴァルヴレイヴ", "L ToLOVEるダークネスS8", "LアズールレーンANIMATION", "L無職転生"];
 
@@ -3803,6 +3846,246 @@ function renderRivalAnalysis() {
 // ══════════════════════════════════════
 //  日次トレンド分析（①〜⑤）
 // ══════════════════════════════════════
+// ══════════════════════════════════════
+//  未来予測グラフ
+// ══════════════════════════════════════
+let forecastChart = null;
+
+function renderForecast() {
+  const card = document.getElementById('forecastCard');
+  if (!card) return;
+
+  const fs = window._forecastStats;
+  if (!fs || !fs.filteredDates || fs.filteredDates.length < 7) {
+    card.style.display = 'none';
+    return;
+  }
+
+  const { mean, std, filteredDates, trendData, metricKey,
+          avgJou, avgChu, avgKa, avgMonthInit, avgSalary, avgPension,
+          dowAvgs, avgHoliday, slope } = fs;
+
+  const metricUnit = metricKey === 'IN枚数' ? _inUnit() : '円';
+  const metricLabel = {'IN枚数': _inLabel(), '台粗利': '推定粗利', '台売上': '推定売上'}[metricKey] || metricKey;
+
+  // ── 予測期間 ──
+  const horizon = Math.min(45, Math.max(7, Math.round(filteredDates.length * 0.4)));
+
+  // 最後の日付から次の日を起点に予測日生成
+  const lastDate = new Date(filteredDates[filteredDates.length - 1] + 'T00:00:00');
+
+  function addDays(d, n) {
+    const r = new Date(d); r.setDate(r.getDate() + n); return r;
+  }
+  function fmtDate(d) {
+    return d.getFullYear() + '-'
+      + String(d.getMonth()+1).padStart(2,'0') + '-'
+      + String(d.getDate()).padStart(2,'0');
+  }
+
+  // ── 予測値計算 ──
+  function predictValue(dateStr, dayIndex) {
+    const d = new Date(dateStr + 'T00:00:00');
+    const dom  = d.getDate();
+    const mon  = d.getMonth() + 1;
+    const dow  = d.getDay();
+    const holiday = isHoliday(dateStr);
+
+    // 月内パターン乗数
+    let monMul = 1.0;
+    if (mean !== 0) {
+      if      (dom <= 10) monMul = avgJou  / mean;
+      else if (dom <= 20) monMul = avgChu  / mean;
+      else                monMul = avgKa   / mean;
+    }
+
+    // 特定日乗数（給料日 / 年金日 / 月初）
+    let specialMul = 1.0;
+    if (mean !== 0) {
+      if (dom >= 25 && dom <= 29) {
+        specialMul = avgSalary / mean;
+      } else if (dom >= 1 && dom <= 7) {
+        specialMul = avgMonthInit / mean;
+      } else if (mon % 2 === 0 && dom >= 15 && dom <= 19) {
+        specialMul = avgPension / mean;
+      }
+    }
+
+    // 曜日 or 祝日乗数
+    let dowMul = 1.0;
+    if (mean !== 0) {
+      if (holiday && avgHoliday) {
+        dowMul = avgHoliday / mean;
+      } else {
+        const dEntry = dowAvgs.find(x => x.dow === dow);
+        if (dEntry && dEntry.avg !== null) dowMul = dEntry.avg / mean;
+      }
+    }
+
+    // トレンドドリフト（線形回帰の傾きを適用、ただし±30%でクランプ）
+    const trendBase = filteredDates.length > 0
+      ? (trendData[trendData.length-1] || mean) + slope * (dayIndex + 1)
+      : mean;
+    const base = (trendBase + mean) / 2; // 平均とブレンド
+
+    // 合成（乗数を平均周辺に作用させる）
+    const combinedMul = (monMul * 0.35 + specialMul * 0.25 + dowMul * 0.4);
+    return base * Math.max(0.3, Math.min(2.5, combinedMul));
+  }
+
+  const forecastDates  = [];
+  const forecastValues = [];
+  for (let i = 0; i < horizon; i++) {
+    const d = addDays(lastDate, i + 1);
+    const ds = fmtDate(d);
+    forecastDates.push(ds);
+    forecastValues.push(predictValue(ds, i));
+  }
+
+  // ── グラフ描画 ──
+  card.style.display = '';
+
+  // 実績は直近30日（またはすべて）表示
+  const actualWindow = Math.min(filteredDates.length, 30);
+  const actualLabels = filteredDates.slice(-actualWindow).map(d => d.slice(5));
+  const actualData   = trendData.slice(-actualWindow);
+
+  const fcLabels = forecastDates.map(d => d.slice(5));
+  const allLabels = [...actualLabels, ...fcLabels];
+
+  // Chart.js 用データ
+  const actualDataset = {
+    label: `実績 ${metricLabel}`,
+    data: [...actualData, ...new Array(horizon).fill(null)],
+    borderColor: '#60a5fa',
+    backgroundColor: 'rgba(96,165,250,0.12)',
+    fill: false,
+    tension: 0.3,
+    pointRadius: actualData.map((_, i) => i === actualData.length - 1 ? 5 : 2),
+    pointBackgroundColor: '#60a5fa',
+    borderWidth: 2,
+  };
+  const forecastDataset = {
+    label: `予測 ${metricLabel}`,
+    data: [...new Array(actualWindow).fill(null), ...forecastValues],
+    borderColor: '#a78bfa',
+    backgroundColor: 'rgba(167,139,250,0.10)',
+    fill: false,
+    tension: 0.3,
+    borderDash: [5, 4],
+    pointRadius: 3,
+    pointBackgroundColor: '#a78bfa',
+    borderWidth: 2,
+  };
+  // 信頼帯（上限 / 下限）
+  const confUpper = {
+    label: '信頼帯（+1σ）',
+    data: [...new Array(actualWindow).fill(null), ...forecastValues.map(v => v + std)],
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(167,139,250,0.10)',
+    fill: '+1', // 下限との間を塗る
+    pointRadius: 0, tension: 0.3, borderWidth: 0,
+  };
+  const confLower = {
+    label: '信頼帯（−1σ）',
+    data: [...new Array(actualWindow).fill(null), ...forecastValues.map(v => Math.max(0, v - std))],
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(167,139,250,0.10)',
+    fill: false,
+    pointRadius: 0, tension: 0.3, borderWidth: 0,
+  };
+
+  if (forecastChart) { forecastChart.destroy(); forecastChart = null; }
+  const tc = getThemeColors();
+  forecastChart = new Chart(
+    document.getElementById('forecastChart').getContext('2d'), {
+      type: 'line',
+      data: { labels: allLabels, datasets: [actualDataset, forecastDataset, confUpper, confLower] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            mode: 'index', intersect: false,
+            callbacks: {
+              label: ctx => {
+                if (ctx.parsed.y == null) return null;
+                const val = Math.round(ctx.parsed.y).toLocaleString() + metricUnit;
+                return `${ctx.dataset.label}: ${val}`;
+              }
+            }
+          },
+          annotation: {
+            annotations: {
+              splitLine: {
+                type: 'line',
+                xMin: actualWindow - 0.5,
+                xMax: actualWindow - 0.5,
+                borderColor: 'rgba(167,139,250,0.5)',
+                borderWidth: 1,
+                borderDash: [4, 3],
+              }
+            }
+          }
+        },
+        scales: {
+          x: { ticks: { color: tc.tick, maxRotation: 45, font: { size: 10 } }, grid: { color: tc.grid } },
+          y: {
+            ticks: { color: tc.tick, callback: v => Math.round(v).toLocaleString() },
+            grid: { color: tc.grid }
+          }
+        }
+      }
+    }
+  );
+
+  // メタ情報
+  document.getElementById('forecastMeta').textContent =
+    `過去${actualWindow}日 + 今後${horizon}日予測`;
+
+  // 凡例
+  document.getElementById('forecastLegend').innerHTML = `
+    <span><span class="forecast-legend-dot" style="background:#60a5fa;"></span>実績</span>
+    <span><span class="forecast-legend-dot" style="background:#a78bfa;border:2px dashed #a78bfa;background:transparent;"></span>予測</span>
+    <span><span class="forecast-legend-dot" style="background:rgba(167,139,250,0.3);"></span>信頼帯 ±1σ</span>
+  `;
+
+  // 予測サマリー
+  const fcMean = forecastValues.reduce((a,b)=>a+b,0) / forecastValues.length;
+  const fcDiff = fcMean - mean;
+  const fcPct  = mean !== 0 ? (fcDiff / Math.abs(mean) * 100).toFixed(0) : '0';
+  const fcSign = fcDiff >= 0 ? '+' : '';
+  const fcCol  = fcDiff >= 0 ? '#f87171' : '#34d399'; // 高い=回収(赤), 低い=放出(緑)
+
+  // 注目予測日（holiday, 給料日）
+  const notableDays = [];
+  forecastDates.forEach((ds, i) => {
+    const dom = parseInt(ds.slice(8));
+    const mon = parseInt(ds.slice(5,7));
+    const tags = [];
+    if (isHoliday(ds)) tags.push({label:'🎌祝日', col:'#fbbf24'});
+    if (dom >= 25 && dom <= 29) tags.push({label:'💰給料日帯', col:'#60a5fa'});
+    if (dom >= 1  && dom <= 7)  tags.push({label:'💴月初', col:'#a78bfa'});
+    if (mon % 2 === 0 && dom >= 15 && dom <= 19) tags.push({label:'👴年金日帯', col:'#34d399'});
+    if (tags.length) notableDays.push({ ds, val: forecastValues[i], tags });
+  });
+
+  let detailHtml = `予測期間平均: <b style="color:${fcCol};">${fcSign}${fcPct}%</b>（全体実績平均比）
+    予測 ${Math.round(fcMean).toLocaleString()}${metricUnit} / 実績平均 ${Math.round(mean).toLocaleString()}${metricUnit}<br>`;
+
+  if (notableDays.length) {
+    detailHtml += `<span style="font-size:10.5px;color:var(--text2);">注目日：</span> `;
+    notableDays.forEach(nd => {
+      const valStr = Math.round(nd.val).toLocaleString() + metricUnit;
+      const tagHtml = nd.tags.map(t =>
+        `<span class="forecast-tag" style="background:${t.col}22;color:${t.col};border:1px solid ${t.col}44;">${t.label}</span>`
+      ).join('');
+      detailHtml += `<span style="font-size:11px;">${nd.ds.slice(5)} ${tagHtml}予測 ${valStr}</span>　`;
+    });
+  }
+  document.getElementById('forecastDetail').innerHTML = detailHtml;
+}
+
 function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   const el = document.getElementById('trendAnalysisBody');
   if (!el) return;
@@ -3854,16 +4137,25 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   const avgSalary    = avg3(salaryZone);
   const avgPension   = avg3(pensionZone);
 
-  // ③ 曜日バイアス
+  // ③ 曜日バイアス（祝日は別枠）
   const DOW_NAMES = ['日','月','火','水','木','金','土'];
-  const dowBuckets = [[], [], [], [], [], [], []];
-  filteredDates.forEach((d,i) => { dowBuckets[new Date(d+'T00:00:00').getDay()].push(trendData[i]); });
+  const dowBuckets   = [[], [], [], [], [], [], []];
+  const holidayBucket = []; // 祝日専用
+  filteredDates.forEach((d,i) => {
+    if (isHoliday(d)) {
+      holidayBucket.push(trendData[i]); // 祝日は曜日バケツに入れない
+    } else {
+      dowBuckets[new Date(d+'T00:00:00').getDay()].push(trendData[i]);
+    }
+  });
   const dowAvgs = dowBuckets
     .map((vals, dow) => ({ dow, name: DOW_NAMES[dow], count: vals.length,
       avg: vals.length >= 2 ? vals.reduce((a,b)=>a+b,0)/vals.length : null }))
     .filter(d => d.avg !== null);
-  const bestDow  = dowAvgs.length ? [...dowAvgs].sort((a,b)=>b.avg-a.avg)[0] : null;
-  const worstDow = dowAvgs.length ? [...dowAvgs].sort((a,b)=>a.avg-b.avg)[0] : null;
+  const bestDow    = dowAvgs.length ? [...dowAvgs].sort((a,b)=>b.avg-a.avg)[0] : null;
+  const worstDow   = dowAvgs.length ? [...dowAvgs].sort((a,b)=>a.avg-b.avg)[0] : null;
+  const avgHoliday = holidayBucket.length >= 2
+    ? holidayBucket.reduce((a,b)=>a+b,0)/holidayBucket.length : null;
 
   // ⑤ 業界ベンチマーク対比
   const benchByDate = {};
@@ -3960,6 +4252,24 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
         <span style="color:var(--green)">▲ ${bestDow.name}曜日が最強</span>（平均 ${Math.round(bestDow.avg).toLocaleString()}${metricUnit}）<br>
         <span style="color:var(--red)">▼ ${worstDow.name}曜日が最弱</span>（平均 ${Math.round(worstDow.avg).toLocaleString()}${metricUnit}）<br>
         <span style="color:var(--text2);font-size:11px;">最大差 ${Math.round(spread).toLocaleString()}${metricUnit}（平均比 ${spreadPct}%）</span>
+      </div>
+    </div>`;
+  }
+
+  // 祝日バイアス
+  if (avgHoliday !== null) {
+    const diff = avgHoliday - mean;
+    const pct  = mean !== 0 ? (diff / Math.abs(mean) * 100).toFixed(0) : '0';
+    const sign = diff >= 0 ? '+' : '';
+    const col  = diff >= 0 ? 'var(--red)' : 'var(--green)';
+    const judge = diff > std*0.3 ? '祝日は絞る傾向' : diff < -std*0.3 ? '祝日は放出・集客傾向' : '祝日の特徴は薄い';
+    const judgeCol = diff > std*0.3 ? 'var(--red)' : diff < -std*0.3 ? 'var(--green)' : 'var(--text2)';
+    html += `<div class="trend-analysis-box">
+      <div class="tab-box-title">🎌 祝日バイアス（${holidayBucket.length}日）</div>
+      <div class="tab-box-body">
+        全体平均比 <b style="color:${col};font-size:15px;">${sign}${pct}%</b><br>
+        <b style="color:${judgeCol};">→ ${judge}</b><br>
+        <span style="color:var(--text2);font-size:11px;">祝日平均 ${Math.round(avgHoliday).toLocaleString()}${metricUnit}（全体 ${Math.round(mean).toLocaleString()}${metricUnit}）</span>
       </div>
     </div>`;
   }
@@ -4130,6 +4440,25 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     });
     html += `</div></div>`;
   }
+
+  // ── 予測エンジン用に統計を保存 ──
+  window._forecastStats = {
+    mean, std, n,
+    filteredDates: [...filteredDates],
+    trendData: [...trendData],
+    metricKey,
+    avgJou:       avgJou       !== null ? avgJou       : mean,
+    avgChu:       avgChu       !== null ? avgChu       : mean,
+    avgKa:        avgKa        !== null ? avgKa        : mean,
+    avgMonthInit: avgMonthInit !== null ? avgMonthInit : mean,
+    avgSalary:    avgSalary    !== null ? avgSalary    : mean,
+    avgPension:   avgPension   !== null ? avgPension   : mean,
+    dowAvgs,        // [{dow, name, count, avg}, ...]
+    avgHoliday:   avgHoliday   !== null ? avgHoliday   : mean,
+    slope,
+  };
+  // 予測グラフを描画
+  try { renderForecast(); } catch(e) { console.warn('renderForecast', e); }
 
   el.innerHTML = html;
 }
