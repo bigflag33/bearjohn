@@ -1828,6 +1828,13 @@ async function exportUserData() {
   console.log(`[benchmark] ${Object.keys(benchByDate).length}日分・1日あたり平均台数=${benchByDate[Object.keys(benchByDate)[0]]?.count||0}台ベースで算出`);
   // ──────────────────────────────────────────────────────────────
 
+  // エクスポート対象期間：直近12ヶ月分のみ（GitHubの100MB制限対策）
+  const _cutoff = (() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 12);
+    return d.toISOString().split('T')[0]; // YYYY-MM-DD
+  })();
+
   for (const userConf of USERS_CONFIG) {
     const exportData = { generated: new Date().toISOString(), user: userConf.file, stores: {} };
     let storeCount = 0;
@@ -1836,9 +1843,11 @@ async function exportUserData() {
     for (const storeName of userConf.stores) {
       const store = allStores.find(s => normName(s.name) === normName(storeName));
       if (store) {
-        const records = DB_CACHE[store.key] && DB_CACHE[store.key].length
+        const allRecords = DB_CACHE[store.key] && DB_CACHE[store.key].length
           ? DB_CACHE[store.key]
           : await _idbGet(store.key);
+        // 直近12ヶ月分のみ書き出し
+        const records = allRecords.filter(r => r.date >= _cutoff);
         if (records.length > 0) {
           exportData.stores[storeName] = records;
           storeCount++;
@@ -1846,9 +1855,10 @@ async function exportUserData() {
         }
       }
     }
-    // 業界ベンチマークを全ユーザーに追加
-    if (benchmarkRecords.length > 0) {
-      exportData.stores[BENCHMARK_NAME] = benchmarkRecords;
+    // 業界ベンチマークを全ユーザーに追加（同じく12ヶ月分）
+    const benchFiltered = benchmarkRecords.filter(r => r.date >= _cutoff);
+    if (benchFiltered.length > 0) {
+      exportData.stores[BENCHMARK_NAME] = benchFiltered;
     }
 
     results.push({ name: `${userConf.file}_data.json`, data: exportData, storeCount, recordCount });
