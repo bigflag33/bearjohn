@@ -4446,9 +4446,10 @@ function renderRivalAnalysis() {
 
       // ── 勝率計算: 日別「出玉率100%以上台数 / 総台数」の平均 ──
       const mainWinRates = {};
+      const mainWinDaily = {}; // 日別データ保存（グラフ用）
       mainModels.forEach(m => {
         const modelRecs = all.filter(r => r['機種名'] === m.name);
-        if (!modelRecs.length) { mainWinRates[m.name] = null; return; }
+        if (!modelRecs.length) { mainWinRates[m.name] = null; mainWinDaily[m.name] = []; return; }
         // date × 台番 で集計
         const byDT = {};
         modelRecs.forEach(r => {
@@ -4466,9 +4467,13 @@ function renderRivalAnalysis() {
           byDate[e.date].total++;
           if (e.diffSum >= 0) byDate[e.date].win++;
         });
-        const days = Object.values(byDate).filter(d => d.total > 0);
+        const days = Object.entries(byDate)
+          .filter(([,d]) => d.total > 0)
+          .sort(([a],[b]) => a.localeCompare(b))
+          .map(([date, d]) => ({ date, win: d.win, total: d.total, rate: d.win / d.total }));
+        mainWinDaily[m.name] = days;
         if (!days.length) { mainWinRates[m.name] = null; return; }
-        mainWinRates[m.name] = days.reduce((s, d) => s + d.win / d.total, 0) / days.length * 100;
+        mainWinRates[m.name] = days.reduce((s, d) => s + d.rate, 0) / days.length * 100;
       });
 
       const _kpiBox = (label, value, unit, color) => `
@@ -4520,6 +4525,92 @@ function renderRivalAnalysis() {
             </div>`;
           }).join('')}
         </div>
+
+        <!-- 勝率 背番号タイル + 日別グラフ -->
+        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">機種別 勝率トレンド — 日別平均勝率</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">
+            ${mainModels.map((m, idx) => {
+              const wr  = mainWinRates[m.name];
+              const wrN = wr !== null && wr !== undefined ? Math.round(wr) : null;
+              const tc  = wrN === null ? { border:'#6b7280', bg:'rgba(107,114,128,0.05)' }
+                        : wrN >= 60   ? { border:'#34d399', bg:'rgba(52,211,153,0.07)' }
+                        : wrN >= 40   ? { border:'#93c5fd', bg:'rgba(147,197,253,0.07)' }
+                        :               { border:'#f87171', bg:'rgba(248,113,113,0.07)' };
+              const badge = wrN === null ? 'badge-ok' : wrN >= 60 ? 'badge-alert' : wrN >= 40 ? 'badge-warn' : 'badge-ok';
+              const shortName = m.name.length > 10 ? m.name.slice(0,10) + '…' : m.name;
+              return `<div id="mainWinTile_${idx}" data-open="false" onclick="toggleMainWinDetail(${idx})"
+                style="border:1px solid ${tc.border};border-radius:14px;padding:16px 12px 12px;cursor:pointer;background:${tc.bg};user-select:none;">
+                <div style="font-size:48px;font-weight:900;line-height:1;color:${tc.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${wrN !== null ? wrN : '—'}<span style="font-size:18px;font-weight:700;">${wrN !== null ? '%' : ''}</span></div>
+                <div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:${tc.border};margin-top:8px;">平均勝率</div>
+                <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">${shortName}</div>
+                <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
+                  <span class="action-badge ${badge}">${m.estimatedMachines}台設置</span>
+                  <span style="font-size:10px;color:var(--text2);">▾</span>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+
+          ${mainModels.map((m, idx) => {
+            const days = mainWinDaily[m.name] || [];
+            const W = 560, H = 110, padL = 32, padR = 8, padT = 8, padB = 24;
+            const cW = W - padL - padR, cH = H - padT - padB;
+            const n = days.length;
+            const barW = n > 0 ? Math.max(2, Math.min(18, cW / n - 2)) : 8;
+            const bars = days.map((d, i) => {
+              const x = padL + (n > 1 ? i / (n-1) * cW : cW/2) - barW/2;
+              const bH = d.rate * cH;
+              const y  = padT + cH - bH;
+              const col = d.rate >= 0.6 ? '#34d399' : d.rate >= 0.4 ? '#93c5fd' : '#f87171';
+              return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW}" height="${Math.max(1,bH).toFixed(1)}" fill="${col}" opacity="0.85" rx="1"
+                title="${d.date} 勝率${Math.round(d.rate*100)}%（${d.win}/${d.total}台）"/>`;
+            }).join('');
+            // 50%ライン
+            const midY = (padT + cH * 0.5).toFixed(1);
+            // x軸ラベル（最大6点）
+            const lblStep = Math.max(1, Math.ceil(n / 6));
+            const lbls = days.filter((_,i) => i % lblStep === 0 || i === n-1).map((d,i,arr) => {
+              const origIdx = days.indexOf(d);
+              const x = padL + (n > 1 ? origIdx / (n-1) * cW : cW/2);
+              const mm = d.date.slice(5,7), dd = d.date.slice(8,10);
+              return `<text x="${x.toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="8" fill="var(--text2)">${mm}/${dd}</text>`;
+            }).join('');
+            const wr = mainWinRates[m.name];
+            const avgLine = wr !== null && wr !== undefined ? (() => {
+              const ay = (padT + cH * (1 - wr/100)).toFixed(1);
+              return `<line x1="${padL}" y1="${ay}" x2="${W-padR}" y2="${ay}" stroke="#fbbf24" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>
+              <text x="${padL-2}" y="${ay}" text-anchor="end" font-size="8" fill="#fbbf24" dominant-baseline="middle">${Math.round(wr)}%</text>`;
+            })() : '';
+            return `<div id="mainWinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+              <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:10px;">${m.name} — 日別勝率</div>
+              ${n === 0 ? '<div style="font-size:11px;color:var(--text2);">台番データなし</div>' : `
+              <div style="overflow-x:auto;">
+                <svg width="${W}" height="${H}" style="min-width:320px;width:100%;max-width:${W}px;">
+                  <!-- グリッド -->
+                  <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+cH}" stroke="var(--border)" stroke-width="1"/>
+                  <line x1="${padL}" y1="${padT+cH}" x2="${W-padR}" y2="${padT+cH}" stroke="var(--border)" stroke-width="1"/>
+                  <!-- 50%ライン -->
+                  <line x1="${padL}" y1="${midY}" x2="${W-padR}" y2="${midY}" stroke="var(--border)" stroke-width="1" stroke-dasharray="4,3"/>
+                  <text x="${padL-2}" y="${midY}" text-anchor="end" font-size="8" fill="var(--text2)" dominant-baseline="middle">50%</text>
+                  <!-- 0%/100%ラベル -->
+                  <text x="${padL-2}" y="${padT}" text-anchor="end" font-size="8" fill="var(--text2)" dominant-baseline="middle">100</text>
+                  <text x="${padL-2}" y="${padT+cH}" text-anchor="end" font-size="8" fill="var(--text2)" dominant-baseline="middle">0</text>
+                  <!-- バー -->
+                  ${bars}
+                  <!-- 平均線 -->
+                  ${avgLine}
+                  <!-- x軸ラベル -->
+                  ${lbls}
+                </svg>
+              </div>
+              <div style="font-size:10px;color:var(--text2);margin-top:6px;">
+                🟢 60%以上（放出寄り）　🔵 40〜60%（均衡）　🔴 40%未満（回収寄り）　--- 期間平均
+              </div>`}
+            </div>`;
+          }).join('')}
+        </div>
+
       </div>`;
     }
   }
@@ -6177,6 +6268,23 @@ function _renderZentaiRows() {
       <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;opacity:.7;">${Math.round(e.avgIn).toLocaleString()}</td>
       <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;opacity:.7;">${(e.avgPayout*100).toFixed(1)}%</td>
     </tr>`).join('');
+}
+
+function toggleMainWinDetail(idx) {
+  const el = document.getElementById('mainWinDetail_' + idx);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  [0,1,2,3,4].forEach(i => {
+    const p = document.getElementById('mainWinDetail_' + i);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('mainWinTile_' + i);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('mainWinTile_' + idx);
+    if (tile) tile.setAttribute('data-open','true');
+  }
 }
 
 function toggleJagDetail(key) {
