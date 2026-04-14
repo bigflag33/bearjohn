@@ -4444,6 +4444,33 @@ function renderRivalAnalysis() {
         `ジャグラーシリーズを除く総アウト上位5機種。設置比率${mainInstallRate.toFixed(1)}%に対し利益比率${mainProfitRate.toFixed(1)}%・アウト比率${mainInRate.toFixed(1)}%。${mainInComment}`,
         2, mainVis, 'rivalAnalysisCard');
 
+      // ── 勝率計算: 日別「出玉率100%以上台数 / 総台数」の平均 ──
+      const mainWinRates = {};
+      mainModels.forEach(m => {
+        const modelRecs = all.filter(r => r['機種名'] === m.name);
+        if (!modelRecs.length) { mainWinRates[m.name] = null; return; }
+        // date × 台番 で集計
+        const byDT = {};
+        modelRecs.forEach(r => {
+          const tai = String(r['台番'] || '').trim();
+          if (!tai || !r.date) return;
+          const k = r.date + ' ' + tai;
+          if (!byDT[k]) byDT[k] = { date: r.date, inSum: 0, diffSum: 0 };
+          byDT[k].inSum   += r['IN枚数'] || 0;
+          byDT[k].diffSum += r['差枚']   || 0;
+        });
+        // 日別勝率
+        const byDate = {};
+        Object.values(byDT).forEach(e => {
+          if (!byDate[e.date]) byDate[e.date] = { win: 0, total: 0 };
+          byDate[e.date].total++;
+          if (e.diffSum >= 0) byDate[e.date].win++;
+        });
+        const days = Object.values(byDate).filter(d => d.total > 0);
+        if (!days.length) { mainWinRates[m.name] = null; return; }
+        mainWinRates[m.name] = days.reduce((s, d) => s + d.win / d.total, 0) / days.length * 100;
+      });
+
       const _kpiBox = (label, value, unit, color) => `
         <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
           <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">${label}</div>
@@ -4476,6 +4503,10 @@ function renderRivalAnalysis() {
             const profCol    = m.avgProfit >= storeAvgProfit ? '#34d399' : m.avgProfit >= 0 ? '#60a5fa' : '#f87171';
             const sn         = m.name.replace(/'/g, "\\'");
             const rank       = ['1','2','3','4','5'][idx] || String(idx+1);
+            const wr         = mainWinRates[m.name];
+            const wrStr      = wr !== null && wr !== undefined ? wr.toFixed(0) + '%' : '—';
+            const wrCol      = wr === null || wr === undefined ? 'var(--text2)' : wr >= 60 ? '#34d399' : wr >= 40 ? '#93c5fd' : '#f87171';
+            const wrBg       = wr === null || wr === undefined ? 'rgba(255,255,255,0.05)' : wr >= 60 ? 'rgba(52,211,153,0.1)' : wr >= 40 ? 'rgba(147,197,253,0.1)' : 'rgba(248,113,113,0.1)';
             return `<div style="display:flex;align-items:center;gap:10px;background:rgba(96,165,250,0.05);border:1px solid rgba(96,165,250,0.18);border-radius:10px;padding:12px 14px;flex-wrap:wrap;cursor:pointer;"
               onclick="navigateToModel('${sn}')" title="${m.name} — クリックで機種別集計へ">
               <span style="font-size:13px;font-weight:900;color:rgba(96,165,250,0.5);min-width:18px;text-align:right;font-variant-numeric:tabular-nums;">${rank}</span>
@@ -4485,6 +4516,7 @@ function renderRivalAnalysis() {
               <span style="font-size:10.5px;background:rgba(${m.totalProfit>=0?'52,211,153':'248,113,113'},0.12);border-radius:6px;padding:2px 7px;color:${m.totalProfit>=0?'#34d399':'#f87171'};">利益 ${profR}%</span>
               <span style="font-size:10.5px;background:rgba(129,140,248,0.12);border-radius:6px;padding:2px 7px;color:#818cf8;">アウト ${mInR}%</span>
               <span style="font-size:10.5px;color:${profCol};font-weight:600;">${profitStr}/台</span>
+              <span style="font-size:10.5px;background:${wrBg};border-radius:6px;padding:2px 7px;color:${wrCol};font-weight:700;">勝率 ${wrStr}</span>
             </div>`;
           }).join('')}
         </div>
