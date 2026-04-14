@@ -4623,6 +4623,44 @@ function renderRivalAnalysis() {
                 <span>🔴 40%未満（回収寄り）</span>
                 <span style="color:#fbbf24;">--- 期間平均</span>
               </div>
+              <!-- 日別テーブル -->
+              <div style="margin-top:14px;overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:11px;">
+                  <thead>
+                    <tr style="border-bottom:1px solid var(--border);">
+                      <th style="text-align:left;padding:6px 10px;font-weight:700;color:var(--text2);">日付</th>
+                      <th style="text-align:center;padding:6px 10px;font-weight:700;color:var(--text2);">総台数</th>
+                      <th style="text-align:center;padding:6px 10px;font-weight:700;color:var(--text2);">勝ち台数</th>
+                      <th style="text-align:center;padding:6px 10px;font-weight:700;color:var(--text2);">負け台数</th>
+                      <th style="text-align:center;padding:6px 10px;font-weight:700;color:var(--text2);">勝率</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${days.slice().reverse().map(d => {
+                      const rate = d.rate;
+                      const col  = rate >= 0.6 ? '#34d399' : rate >= 0.4 ? '#93c5fd' : '#f87171';
+                      const bg   = rate >= 0.6 ? 'rgba(52,211,153,0.05)' : rate >= 0.4 ? 'rgba(147,197,253,0.04)' : 'rgba(248,113,113,0.05)';
+                      const lose = d.total - d.win;
+                      const bar  = (() => {
+                        const pct = Math.round(rate*100);
+                        return `<div style="display:flex;align-items:center;gap:6px;">
+                          <div style="flex:1;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;min-width:60px;">
+                            <div style="width:${pct}%;height:100%;background:${col};border-radius:3px;"></div>
+                          </div>
+                          <span style="color:${col};font-weight:800;min-width:32px;text-align:right;">${pct}%</span>
+                        </div>`;
+                      })();
+                      return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);background:${bg};">
+                        <td style="padding:6px 10px;color:var(--text2);">${d.date}</td>
+                        <td style="padding:6px 10px;color:var(--text);text-align:center;font-weight:600;">${d.total}</td>
+                        <td style="padding:6px 10px;color:#34d399;text-align:center;font-weight:600;">${d.win}</td>
+                        <td style="padding:6px 10px;color:#f87171;text-align:center;font-weight:600;">${lose}</td>
+                        <td style="padding:6px 10px;">${bar}</td>
+                      </tr>`;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
             </div>`;
           }).join('')}
         </div>
