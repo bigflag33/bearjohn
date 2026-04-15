@@ -1829,10 +1829,10 @@ async function exportUserData() {
   console.log(`[benchmark] ${Object.keys(benchByDate).length}日分・1日あたり平均台数=${benchByDate[Object.keys(benchByDate)[0]]?.count||0}台ベースで算出`);
   // ──────────────────────────────────────────────────────────────
 
-  // エクスポート対象期間：直近12ヶ月分のみ（GitHubの100MB制限対策）
+  // エクスポート対象期間：直近6ヶ月分のみ（GitHubの100MB制限対策）
   const _cutoff = (() => {
     const d = new Date();
-    d.setMonth(d.getMonth() - 12);
+    d.setMonth(d.getMonth() - 6);
     return d.toISOString().split('T')[0]; // YYYY-MM-DD
   })();
 
