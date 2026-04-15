@@ -1722,8 +1722,19 @@ async function loadRemoteData() {
     let total = 0;
     for (const storeName of Object.keys(data.stores)) {
       const store = findOrCreateStore(storeName);
-      DB_CACHE[store.key] = data.stores[storeName];
-      total += data.stores[storeName].length;
+      const raw = data.stores[storeName];
+      // カラム形式（{cols, rows}）と旧来の配列形式に両対応
+      if (raw && raw.cols && raw.rows) {
+        const cols = raw.cols;
+        DB_CACHE[store.key] = raw.rows.map(row => {
+          const obj = {};
+          cols.forEach((c, i) => { obj[c] = row[i]; });
+          return obj;
+        });
+      } else {
+        DB_CACHE[store.key] = raw;
+      }
+      total += DB_CACHE[store.key].length;
     }
     console.log(`[remote] ${USER_ID}_data.json から ${total}件 ロード完了`);
     // データ配信済みバッジを表示
@@ -1850,7 +1861,12 @@ async function exportUserData() {
         // 直近12ヶ月分のみ書き出し
         const records = allRecords.filter(r => r.date >= _cutoff);
         if (records.length > 0) {
-          exportData.stores[storeName] = records;
+          // カラム形式でサイズ削減（フィールド名の繰り返しを排除）
+          const cols = records.length > 0 ? Object.keys(records[0]) : [];
+          exportData.stores[storeName] = {
+            cols,
+            rows: records.map(r => cols.map(c => r[c] !== undefined ? r[c] : null))
+          };
           storeCount++;
           recordCount += records.length;
         }
@@ -1859,7 +1875,11 @@ async function exportUserData() {
     // 業界ベンチマークを全ユーザーに追加（同じく12ヶ月分）
     const benchFiltered = benchmarkRecords.filter(r => r.date >= _cutoff);
     if (benchFiltered.length > 0) {
-      exportData.stores[BENCHMARK_NAME] = benchFiltered;
+      const bCols = benchFiltered.length > 0 ? Object.keys(benchFiltered[0]) : [];
+      exportData.stores[BENCHMARK_NAME] = {
+        cols: bCols,
+        rows: benchFiltered.map(r => bCols.map(c => r[c] !== undefined ? r[c] : null))
+      };
     }
 
     results.push({ name: `${userConf.file}_data.json`, data: exportData, storeCount, recordCount });
