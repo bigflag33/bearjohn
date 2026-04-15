@@ -3738,9 +3738,32 @@ function renderRivalAnalysis() {
       zentaiEvents.sort((a, b) => b.date.localeCompare(a.date) || b.taiCount - a.taiCount);
     }
 
-    window._zentaiEvents = zentaiEvents;
-    _zentaiSortKey = 'date';
-    _zentaiSortDir = 'desc';
+    // 100%以上バージョンも並行検出
+    const zentaiEvents100 = [];
+    if (hasTaiban) {
+      Object.values(byDateModel).forEach(({ date, model, tais }) => {
+        if (tais.length < ZENTAI_MIN_MACHINES)           return;
+        if (!tais.every(t => t.inAmt  >= ZENTAI_MIN_IN)) return;
+        if (!tais.every(t => t.payout >= 1.00))          return;
+        zentaiEvents100.push({
+          date,
+          model,
+          taiCount:   tais.length,
+          minIn:      Math.min(...tais.map(t => t.inAmt)),
+          avgIn:      tais.reduce((a,t) => a + t.inAmt, 0) / tais.length,
+          minPayout:  Math.min(...tais.map(t => t.payout)),
+          avgPayout:  tais.reduce((a,t) => a + t.payout, 0) / tais.length,
+        });
+      });
+      zentaiEvents100.sort((a, b) => b.date.localeCompare(a.date) || b.taiCount - a.taiCount);
+    }
+
+    window._zentaiEvents    = zentaiEvents;
+    window._zentaiEvents100 = zentaiEvents100;
+    _zentaiSortKey  = 'date';
+    _zentaiSortDir  = 'desc';
+    _zentai100SortKey = 'date';
+    _zentai100SortDir = 'desc';
 
     // インサイト登録
     if (zentaiEvents.length > 0) {
@@ -3765,23 +3788,39 @@ function renderRivalAnalysis() {
     html += `<div class="rival-section">
       <div class="rival-section-title" style="color:#f59e0b;">全台系イベント検出</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
-        3台以上設置の機種で、全台それぞれがIN枚数2万枚超・出玉率105%超を達成した日。台番単位で個別判定。
+        3台以上設置の機種で、全台それぞれがIN枚数2万枚超を達成した日。出玉率の閾値で2段階検出。台番単位で個別判定。
       </div>`;
 
     if (!hasTaiban) {
       html += `<div style="font-size:11px;color:var(--text2);">台番データが含まれていないため検出できません。</div>`;
     } else {
       html += `
-      <div id="zentaiTile" data-open="false" onclick="toggleZentaiDetail()"
-        style="border:1px solid #f59e0b;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(245,158,11,0.07);user-select:none;display:inline-block;min-width:220px;">
-        <div style="font-size:56px;font-weight:900;line-height:1;color:#f59e0b;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${zentaiEvents.length}</div>
-        <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f59e0b;margin-top:10px;">全台系イベント</div>
-        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3台以上・全台IN2万枚超・出玉率105%超</div>
-        <div style="margin-top:10px;display:flex;justify-content:flex-end;">
-          <span style="font-size:10px;color:var(--text2);">▾</span>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:560px;">
+        <!-- 105%以上タイル -->
+        <div id="zentaiTile" data-open="false" onclick="toggleZentaiDetail()"
+          style="border:1px solid #f59e0b;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(245,158,11,0.07);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#f59e0b;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${zentaiEvents.length}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f59e0b;margin-top:10px;">全台系 105%以上</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3台以上・全台IN2万枚超<br>出玉率105%超</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge ${zentaiEvents.length > 0 ? 'badge-alert' : 'badge-ok'}">${zentaiEvents.length > 0 ? '高確度イベント' : 'なし'}</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
+        </div>
+        <!-- 100%以上タイル -->
+        <div id="zentaiTile100" data-open="false" onclick="toggleZentai100Detail()"
+          style="border:1px solid #fbbf24;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(251,191,36,0.06);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#fbbf24;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${zentaiEvents100.length}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#fbbf24;margin-top:10px;">全台系 100%以上</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3台以上・全台IN2万枚超<br>出玉率100%以上</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge ${zentaiEvents100.length > 0 ? 'badge-warn' : 'badge-ok'}">${zentaiEvents100.length > 0 ? 'イベント候補' : 'なし'}</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
         </div>
       </div>
 
+      <!-- 105%詳細パネル -->
       <div id="zentaiDetail" style="display:none;margin-top:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(245,158,11,0.35);background:rgba(0,0,0,0.18);">
         ${zentaiEvents.length === 0
           ? `<div style="font-size:11px;color:var(--text2);">該当するイベントが見つかりませんでした。期間を広げると検出精度が上がります。</div>`
@@ -3801,11 +3840,33 @@ function renderRivalAnalysis() {
               </table>
             </div>`
         }
+      </div>
+
+      <!-- 100%詳細パネル -->
+      <div id="zentaiDetail100" style="display:none;margin-top:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(251,191,36,0.3);background:rgba(0,0,0,0.18);">
+        ${zentaiEvents100.length === 0
+          ? `<div style="font-size:11px;color:var(--text2);">該当するイベントが見つかりませんでした。期間を広げると検出精度が上がります。</div>`
+          : `<div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr style="border-bottom:1px solid rgba(251,191,36,0.25);">
+                    ${headers.map(([key, label, align]) =>
+                      `<th id="zentaiTh100_${key}" onclick="sortZentai100Table('${key}')"
+                        style="${thStyle}text-align:${align};">
+                        ${label} <span class="zi100" style="font-size:9px;opacity:.6;">${key==='date'?'▼':'⇅'}</span>
+                      </th>`
+                    ).join('')}
+                  </tr>
+                </thead>
+                <tbody id="zentaiTableBody100"></tbody>
+              </table>
+            </div>`
+        }
       </div>`;
     }
 
     html += `<div style="font-size:10.5px;color:var(--text2);margin-top:12px;line-height:1.6;">
-        閾値：3台以上設置・全台IN枚数20,000枚以上・全台出玉率105%以上（台番単位で個別判定）
+        閾値：3台以上設置・全台IN枚数20,000枚以上 ／ 🟠 105%以上（高確度）・🟡 100%以上（候補）（台番単位で個別判定）
       </div>
     </div>`;
 
@@ -6277,15 +6338,72 @@ function navigateToPinpoint(dateStr) {
 }
 
 // ── 全台系ソート ──
-let _zentaiSortKey = 'date';
-let _zentaiSortDir = 'desc';
+let _zentaiSortKey    = 'date';
+let _zentaiSortDir    = 'desc';
+let _zentai100SortKey = 'date';
+let _zentai100SortDir = 'desc';
 
-function toggleZentaiDetail() {
-  const el = document.getElementById('zentaiDetail');
+function toggleZentai100Detail() {
+  const el   = document.getElementById('zentaiDetail100');
+  const tile = document.getElementById('zentaiTile100');
   if (!el) return;
   const isOpen = el.style.display !== 'none';
-  el.style.display = isOpen ? 'none' : 'block';
+  // 両パネルを閉じる
+  const d1 = document.getElementById('zentaiDetail');
+  const t1 = document.getElementById('zentaiTile');
+  if (d1) d1.style.display = 'none';
+  if (t1) t1.setAttribute('data-open','false');
+  el.style.display = 'none';
+  if (tile) tile.setAttribute('data-open','false');
+  if (!isOpen) {
+    el.style.display = 'block';
+    if (tile) tile.setAttribute('data-open','true');
+    renderZentai100Table();
+  }
+}
+
+function renderZentai100Table() {
+  const body = document.getElementById('zentaiTableBody100');
+  if (!body) return;
+  const events = window._zentaiEvents100 || [];
+  const sorted = [...events].sort((a,b) => {
+    let va = a[_zentai100SortKey], vb = b[_zentai100SortKey];
+    if (typeof va === 'string') return _zentai100SortDir==='asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    return _zentai100SortDir==='asc' ? va-vb : vb-va;
+  });
+  body.innerHTML = sorted.map(e => `
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <td style="padding:8px 10px;font-size:11px;color:var(--text2);">${e.date}</td>
+      <td style="padding:8px 10px;font-size:11px;color:var(--text);font-weight:600;">${e.model}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:center;font-weight:700;">${e.taiCount}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;">${Math.round(e.minIn).toLocaleString()}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;font-weight:700;">${(e.minPayout*100).toFixed(1)}%</td>
+      <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;opacity:.7;">${Math.round(e.avgIn).toLocaleString()}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;opacity:.7;">${(e.avgPayout*100).toFixed(1)}%</td>
+    </tr>`).join('');
+  // ヘッダーインジケーター更新
+  document.querySelectorAll('.zi100').forEach(el => el.textContent = '⇅');
+  const th = document.getElementById('zentaiTh100_' + _zentai100SortKey);
+  if (th) { const zi = th.querySelector('.zi100'); if (zi) zi.textContent = _zentai100SortDir==='asc'?'▲':'▼'; }
+}
+
+function sortZentai100Table(key) {
+  if (_zentai100SortKey === key) { _zentai100SortDir = _zentai100SortDir==='asc'?'desc':'asc'; }
+  else { _zentai100SortKey = key; _zentai100SortDir = key==='date'?'desc':'desc'; }
+  renderZentai100Table();
+}
+
+function toggleZentaiDetail() {
+  const el   = document.getElementById('zentaiDetail');
   const tile = document.getElementById('zentaiTile');
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  // 100%パネルを閉じる
+  const d2 = document.getElementById('zentaiDetail100');
+  const t2 = document.getElementById('zentaiTile100');
+  if (d2) d2.style.display = 'none';
+  if (t2) t2.setAttribute('data-open','false');
+  el.style.display = isOpen ? 'none' : 'block';
   if (tile) tile.setAttribute('data-open', String(!isOpen));
 }
 
