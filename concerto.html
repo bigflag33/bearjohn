@@ -34,7 +34,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Segoe UI','Hiragino Sans',sans-serif; min-height: 100vh; }
 
-  .header { background: var(--header-bg); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+  .header { background: var(--header-bg); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 130; }
   .header h1 { font-size: 18px; font-weight: 700; }
   .theme-switcher { display:flex; gap:6px; align-items:center; }
   .theme-btn { width:28px; height:28px; border-radius:50%; border:2px solid transparent; cursor:pointer; transition:all .2s; flex-shrink:0; }
@@ -76,7 +76,7 @@
 
   .main { padding: 20px 24px; }
 
-  .filter-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; position: sticky; top: 0; z-index: 120; box-shadow: 0 4px 16px rgba(0,0,0,0.35); backdrop-filter: blur(8px); }
+  .filter-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; position: sticky; top: var(--header-h, 0px); z-index: 120; box-shadow: 0 4px 16px rgba(0,0,0,0.35); backdrop-filter: blur(8px); }
   .filter-group { display: flex; flex-direction: column; gap: 6px; }
   .filter-group label { font-size: 11px; color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
   .filter-group input, .filter-group select { background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 12px; font-size: 13px; min-width: 140px; }
@@ -6462,6 +6462,16 @@ function hideWinTip() {
   if (tip) tip.style.display = 'none';
 }
 document.addEventListener('mousemove', _moveWinTip);
+
+// ヘッダー高さをCSS変数に設定（filter-barのsticky top調整用）
+(function updateHeaderH() {
+  var hdr = document.querySelector('.header');
+  if (hdr) document.documentElement.style.setProperty('--header-h', hdr.offsetHeight + 'px');
+  window.addEventListener('resize', function() {
+    var hdr = document.querySelector('.header');
+    if (hdr) document.documentElement.style.setProperty('--header-h', hdr.offsetHeight + 'px');
+  });
+})();
 
 function toggleMainWinDetail(idx) {
   const el = document.getElementById('mainWinDetail_' + idx);
