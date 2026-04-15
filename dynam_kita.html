@@ -3695,6 +3695,7 @@ function renderRivalAnalysis() {
     const hasTaiban = all.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
 
     const zentaiEvents = [];
+    const zentaiEvents100 = [];  // 100%以上バージョン（if(hasTaiban)内で埋める）
 
     if (hasTaiban) {
       // 日付×機種×台番 ごとに集計
@@ -3736,11 +3737,8 @@ function renderRivalAnalysis() {
         });
       });
       zentaiEvents.sort((a, b) => b.date.localeCompare(a.date) || b.taiCount - a.taiCount);
-    }
 
-    // 100%以上バージョンも並行検出
-    const zentaiEvents100 = [];
-    if (hasTaiban) {
+      // 100%以上バージョンも並行検出（byDateModelと同一スコープ内）
       Object.values(byDateModel).forEach(({ date, model, tais }) => {
         if (tais.length < ZENTAI_MIN_MACHINES)           return;
         if (!tais.every(t => t.inAmt  >= ZENTAI_MIN_IN)) return;
