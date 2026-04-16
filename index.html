@@ -1852,7 +1852,7 @@ async function exportUserData() {
 
     // 6ヶ月カットオフ日を計算
     const cutoffDate = new Date();
-    cutoffDate.setMonth(cutoffDate.getMonth() - 6);
+    cutoffDate.setMonth(cutoffDate.getMonth() - 12);
     const cutoffStr = cutoffDate.toISOString().slice(0, 10);
 
     for (const storeName of userConf.stores) {
@@ -7570,12 +7570,28 @@ async function checkAuth() {
 window.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem(AUTH_KEY) === '1') {
     document.getElementById('authOverlay').style.display = 'none';
-    initDB().then(_buildBenchmarkFromCache).then(loadRemoteData).then(init).catch(e => { console.error('[initDB]', e); init(); });
+    initDB().then(_buildBenchmarkFromCache).then(loadRemoteData).then(init).then(_checkAdminDataEmpty).catch(e => { console.error('[initDB]', e); init(); });
   } else {
     // authOverlayを表示したままにする（init()は呼ばない）
     setTimeout(() => document.getElementById('authInput').focus(), 100);
   }
 });
+
+// 管理者：IndexedDBが空のときに復元を促す
+function _checkAdminDataEmpty() {
+  if (USER_ID !== 'admin') return;
+  const total = Object.entries(DB_CACHE)
+    .filter(([k]) => k !== '__benchmark__')
+    .reduce((sum, [, arr]) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
+  if (total === 0) {
+    showMsg('⚠️ データが空です。バックアップJSONから復元してください', 'warn');
+    setTimeout(() => {
+      if (confirm('⚠️ 管理者データが空です。\n\nバックアップJSONから復元しますか？')) {
+        document.getElementById('restoreJsonInput').click();
+      }
+    }, 500);
+  }
+}
 
 // ヘッダー高さをCSS変数に反映（filter-barのtop計算用）
 (function updateHeaderH() {
