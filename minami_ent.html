@@ -4187,6 +4187,185 @@ function renderRivalAnalysis() {
     </div>`;
   }
 
+  // ②-d 初登場（新台）検出
+  {
+    // addDays ヘルパー（このスコープ内で定義）
+    function _addDaysND(dateStr, n) {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + n);
+      return d.toISOString().slice(0, 10);
+    }
+
+    const allDataStart = all.reduce((mn, r) => r.date && r.date < mn ? r.date : mn, '9999-99-99');
+    const allDataEnd   = all.reduce((mx, r) => r.date && r.date > mx ? r.date : mx, '0000-00-00');
+    const NEW_BUFFER   = 14; // データ開始から14日以内に現れた機種は除外（データ不完全回避）
+    const bufferEnd    = _addDaysND(allDataStart, NEW_BUFFER);
+
+    // 機種ごとの初登場日
+    const modelFirstDate = {};
+    all.forEach(r => {
+      const m = r['機種名'];
+      if (!m || !r.date) return;
+      if (!modelFirstDate[m] || r.date < modelFirstDate[m]) modelFirstDate[m] = r.date;
+    });
+
+    // 初登場候補を構築
+    const newModels = Object.entries(modelFirstDate)
+      .filter(([, firstDate]) => firstDate > bufferEnd)
+      .map(([model, firstDate]) => {
+        const modelRecs = all.filter(r => r['機種名'] === model);
+
+        // 初日の台番数
+        const firstDayRecs   = modelRecs.filter(r => r.date === firstDate);
+        const firstDayTaiban = new Set(firstDayRecs.map(r => r['台番'] != null ? String(r['台番']).trim() : '').filter(Boolean));
+        const firstDayCount  = firstDayTaiban.size > 0 ? firstDayTaiban.size : firstDayRecs.length;
+
+        // 初週（初登場日〜+6日）平均
+        const firstWeekEnd  = _addDaysND(firstDate, 6);
+        const fwRecs = modelRecs.filter(r => r.date >= firstDate && r.date <= firstWeekEnd);
+        const firstWeekAvgIn     = fwRecs.length > 0 ? fwRecs.reduce((a,r) => a+(r['IN枚数']||0),0) / fwRecs.length : null;
+        const firstWeekAvgProfit = fwRecs.length > 0 ? fwRecs.reduce((a,r) => a+(r['台粗利']||0),0) / fwRecs.length : null;
+
+        // 直近7日平均
+        const recentStart = _addDaysND(allDataEnd, -6);
+        const rrRecs = modelRecs.filter(r => r.date >= recentStart && r.date <= allDataEnd);
+        const recentAvgIn     = rrRecs.length > 0 ? rrRecs.reduce((a,r) => a+(r['IN枚数']||0),0) / rrRecs.length : null;
+        const recentAvgProfit = rrRecs.length > 0 ? rrRecs.reduce((a,r) => a+(r['台粗利']||0),0) / rrRecs.length : null;
+
+        // チャートデータ（初登場日から28日間）
+        const chartEnd  = _addDaysND(firstDate, 27);
+        const crRecs    = modelRecs.filter(r => r.date >= firstDate && r.date <= chartEnd);
+        const byDay = {};
+        crRecs.forEach(r => {
+          if (!byDay[r.date]) byDay[r.date] = { inSum:0, prSum:0, cnt:0 };
+          byDay[r.date].inSum += r['IN枚数']||0;
+          byDay[r.date].prSum += r['台粗利']||0;
+          byDay[r.date].cnt++;
+        });
+        const chartLabels=[], chartInData=[], chartPrData=[];
+        for (let n = 0; n <= 27; n++) {
+          const dt = _addDaysND(firstDate, n);
+          chartLabels.push(dt.slice(5));
+          if (byDay[dt] && byDay[dt].cnt > 0) {
+            chartInData.push(Math.round(byDay[dt].inSum / byDay[dt].cnt));
+            chartPrData.push(Math.round(byDay[dt].prSum / byDay[dt].cnt));
+          } else {
+            chartInData.push(null);
+            chartPrData.push(null);
+          }
+        }
+
+        // 登場からの経過日数
+        const daysElapsed = Math.round((new Date(allDataEnd+'T00:00:00') - new Date(firstDate+'T00:00:00')) / 86400000);
+
+        return { model, firstDate, firstDayCount, firstWeekAvgIn, firstWeekAvgProfit,
+                 recentAvgIn, recentAvgProfit, daysElapsed, chartLabels, chartInData, chartPrData };
+      })
+      .sort((a, b) => b.firstDate.localeCompare(a.firstDate));
+
+    newModels.forEach((m, i) => { m.idx = i; });
+    window._newModelData = newModels;
+
+    // インサイト登録
+    if (newModels.length > 0) {
+      const top = newModels[0];
+      _pushInsight('rival', '🆕',
+        `新台登場 ${newModels.length}機種を検出`,
+        `直近: ${top.firstDate.slice(5)} ${top.model}（${top.firstDayCount}台）`, 3, null, 'rivalAnalysisCard');
+    }
+
+    // テーブル行ビルダー
+    function _nmRows(models) {
+      const thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
+      const rows = models.map(m => {
+        const fIn  = m.firstWeekAvgIn     != null ? Math.round(m.firstWeekAvgIn).toLocaleString()     : '—';
+        const rIn  = m.recentAvgIn        != null ? Math.round(m.recentAvgIn).toLocaleString()        : '—';
+        const fPr  = m.firstWeekAvgProfit != null ? Math.round(m.firstWeekAvgProfit).toLocaleString() : '—';
+        const rPr  = m.recentAvgProfit    != null ? Math.round(m.recentAvgProfit).toLocaleString()    : '—';
+        // IN: 直近 vs 初週の差
+        const inDiff = (m.firstWeekAvgIn != null && m.recentAvgIn != null)
+          ? (m.recentAvgIn - m.firstWeekAvgIn >= 0 ? '+' : '') + Math.round(m.recentAvgIn - m.firstWeekAvgIn).toLocaleString() : '';
+        const prDiff = (m.firstWeekAvgProfit != null && m.recentAvgProfit != null)
+          ? (m.recentAvgProfit - m.firstWeekAvgProfit >= 0 ? '+' : '') + Math.round(m.recentAvgProfit - m.firstWeekAvgProfit).toLocaleString() : '';
+        const inDiffCol = (m.recentAvgIn != null && m.firstWeekAvgIn != null)
+          ? (m.recentAvgIn >= m.firstWeekAvgIn ? '#34d399' : '#f87171') : 'var(--text3)';
+        const prDiffCol = (m.recentAvgProfit != null && m.firstWeekAvgProfit != null)
+          ? (m.recentAvgProfit >= m.firstWeekAvgProfit ? '#34d399' : '#f87171') : 'var(--text3)';
+        const elapsed = m.daysElapsed > 0 ? m.daysElapsed + '日前' : '本日';
+
+        return '<tr class="nm-data-row" '
+          + 'style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background .15s;" '
+          + 'onclick="showNewModelChart(' + m.idx + ')" '
+          + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.04)\'" '
+          + 'onmouseleave="this.style.background=\'\'">'
+          + '<td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">' + m.firstDate + '</td>'
+          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + m.model + ' <span style="font-size:9px;color:var(--text3);">📈</span></td>'
+          + '<td style="padding:7px 10px;font-size:13px;font-weight:700;color:#a78bfa;text-align:center;">' + m.firstDayCount + '台</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text3);text-align:center;">' + elapsed + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + fIn + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:' + inDiffCol + ';text-align:right;font-weight:700;">' + rIn + (inDiff ? '<span style="font-size:9px;margin-left:3px;">(' + inDiff + ')</span>' : '') + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + fPr + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:' + prDiffCol + ';text-align:right;font-weight:700;">' + rPr + (prDiff ? '<span style="font-size:9px;margin-left:3px;">(' + prDiff + ')</span>' : '') + '</td>'
+          + '</tr>'
+          + '<tr id="nmChartRow_' + m.idx + '" style="display:none;">'
+          + '<td colspan="8" style="padding:0 10px 16px;">'
+          + '<div style="padding:14px;background:rgba(0,0,0,0.25);border-radius:10px;margin-top:4px;">'
+          + '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:700;">' + m.model + ' 登場後28日間トレンド（登場日: ' + m.firstDate + '）</div>'
+          + '<div style="position:relative;height:180px;">'
+          + '<canvas id="nmCanvas_' + m.idx + '"></canvas>'
+          + '</div>'
+          + '</div>'
+          + '</td>'
+          + '</tr>';
+      }).join('');
+
+      const thRow = '<tr style="border-bottom:1px solid rgba(167,139,250,0.25);">'
+        + '<th style="' + thS + 'text-align:left;">初登場日</th>'
+        + '<th style="' + thS + 'text-align:left;">機種名</th>'
+        + '<th style="' + thS + 'text-align:center;">初日台数</th>'
+        + '<th style="' + thS + 'text-align:center;">経過</th>'
+        + '<th style="' + thS + 'text-align:right;">初週IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">直近IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">初週粗利/台</th>'
+        + '<th style="' + thS + 'text-align:right;">直近粗利/台</th>'
+        + '</tr>';
+
+      return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+        + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
+    html += `<div class="rival-section">
+      <div class="rival-section-title" style="color:#a78bfa;">🆕 新台登場 検出</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
+        期間内に初めて登場した機種（＝新台）を自動検出。初週と直近の1台あたりアウト・粗利を比較することで、新台が定着しているか・落ちているかを把握できます。行クリックで登場後28日グラフ展開。
+      </div>`;
+
+    if (newModels.length === 0) {
+      html += `<div style="font-size:11px;color:var(--text2);">期間内に新台登場は検出されませんでした（データ開始日から${NEW_BUFFER}日以内は除外）。</div>`;
+    } else {
+      html += `
+      <div id="newModelTile" data-open="false" onclick="toggleNewModelDetail()"
+        style="display:inline-flex;flex-direction:column;border:1px solid #a78bfa;border-radius:14px;padding:18px 24px 14px;cursor:pointer;background:rgba(167,139,250,0.07);user-select:none;margin-bottom:16px;min-width:160px;">
+        <div style="font-size:56px;font-weight:900;line-height:1;color:#a78bfa;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${newModels.length}</div>
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#a78bfa;margin-top:10px;">新台登場</div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">期間内に初登場した<br>競合機種</div>
+        <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+          <span class="action-badge badge-alert">要チェック</span>
+          <span style="font-size:10px;color:var(--text2);">▾</span>
+        </div>
+      </div>
+
+      <div id="newModelDetail" style="display:none;padding:16px 18px;border-radius:12px;border:1px solid rgba(167,139,250,0.35);background:rgba(0,0,0,0.18);">
+        ${_nmRows(newModels)}
+      </div>`;
+    }
+
+    html += `<div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6;">
+        ※ データ開始から${NEW_BUFFER}日以内に初登場した機種は「データが途中から始まった可能性」があるため除外しています。
+      </div>
+    </div>`;
+  }
+
   // ③ 運用努力機種分析 — 「◯曜日」「◯の付く日」稼働・利益の2軸パターン検出
   {
     // 機種×日付ごとに IN枚数・台粗利 を集計
@@ -6763,6 +6942,91 @@ function showMachineChangeChart(idx) {
       }
     }
   });
+}
+
+function showNewModelChart(idx) {
+  const ev = window._newModelData && window._newModelData[idx];
+  if (!ev) return;
+  const chartRow = document.getElementById('nmChartRow_' + idx);
+  if (!chartRow) return;
+  const isOpen = chartRow.style.display !== 'none';
+  if (isOpen) { chartRow.style.display = 'none'; return; }
+  chartRow.style.display = '';
+  if (chartRow.dataset.rendered === '1') return;
+  chartRow.dataset.rendered = '1';
+  const canvas = document.getElementById('nmCanvas_' + idx);
+  if (!canvas) return;
+  const old = Chart.getChart(canvas);
+  if (old) old.destroy();
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: ev.chartLabels,
+      datasets: [
+        {
+          label: 'IN枚数/台',
+          data: ev.chartInData,
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.10)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          spanGaps: true,
+          yAxisID: 'yIn',
+        },
+        {
+          label: '台粗利',
+          data: ev.chartPrData,
+          borderColor: '#fbbf24',
+          backgroundColor: 'rgba(251,191,36,0.08)',
+          fill: false,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          spanGaps: true,
+          yAxisID: 'yPr',
+          borderDash: [4, 3],
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 14 } },
+        tooltip: { callbacks: { title: items => items[0]?.dataIndex === 0 ? items[0].label + '  ← 初登場日' : items[0]?.label || '' } }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#6b7280', font: { size: 9.5 }, maxTicksLimit: 10 },
+          grid:  { color: 'rgba(255,255,255,0.05)' }
+        },
+        yIn: {
+          type: 'linear', position: 'left',
+          ticks: { color: '#60a5fa', font: { size: 9.5 }, callback: v => v != null ? v.toLocaleString() : '' },
+          grid:  { color: 'rgba(255,255,255,0.06)' },
+          title: { display: true, text: 'IN枚数/台', color: '#60a5fa', font: { size: 9 } }
+        },
+        yPr: {
+          type: 'linear', position: 'right',
+          ticks: { color: '#fbbf24', font: { size: 9.5 }, callback: v => v != null ? v.toLocaleString() : '' },
+          grid:  { drawOnChartArea: false },
+          title: { display: true, text: '台粗利', color: '#fbbf24', font: { size: 9 } }
+        }
+      }
+    }
+  });
+}
+
+function toggleNewModelDetail() {
+  const detail = document.getElementById('newModelDetail');
+  const tile   = document.getElementById('newModelTile');
+  if (!detail) return;
+  const isOpen = detail.style.display !== 'none';
+  detail.style.display = isOpen ? 'none' : 'block';
+  if (tile) tile.setAttribute('data-open', String(!isOpen));
 }
 
 function toggleMachineChangeDetail(type) {
