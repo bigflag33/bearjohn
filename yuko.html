@@ -4154,12 +4154,16 @@ function renderRivalAnalysis() {
     } else {
       const addEvents = changeEvents.filter(e => e.type === 'add');
       const remEvents = changeEvents.filter(e => e.type === 'remove');
+      // 増台・減台それぞれで「増台後/減台後にIN枚数が上がった機種数（ユニーク機種名）」
+      const addInUpCount = new Set(addEvents.filter(e => e.postAvgIn != null && e.preAvgIn != null && e.postAvgIn > e.preAvgIn).map(e => e.model)).size;
+      const remInUpCount = new Set(remEvents.filter(e => e.postAvgIn != null && e.preAvgIn != null && e.postAvgIn > e.preAvgIn).map(e => e.model)).size;
       html += `
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:400px;margin-bottom:16px;">
         <div id="machineAddTile" data-open="false" onclick="toggleMachineChangeDetail('add')"
           style="border:1px solid #34d399;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(52,211,153,0.07);user-select:none;">
           <div style="font-size:56px;font-weight:900;line-height:1;color:#34d399;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${addCount}</div>
-          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#34d399;margin-top:10px;">増台イベント</div>
+          <div style="font-size:12px;font-weight:700;color:#34d399;margin-top:4px;min-height:16px;">${addInUpCount > 0 ? '（内' + addInUpCount + '機種アウト増）' : ''}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#34d399;margin-top:6px;">増台イベント</div>
           <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">設置台数が増えた<br>機種・日付</div>
           <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
             <span class="action-badge ${addCount > 0 ? 'badge-warn' : 'badge-ok'}">${addCount > 0 ? '強化注意' : 'なし'}</span>
@@ -4169,7 +4173,8 @@ function renderRivalAnalysis() {
         <div id="machineRemoveTile" data-open="false" onclick="toggleMachineChangeDetail('remove')"
           style="border:1px solid #f87171;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(248,113,113,0.07);user-select:none;">
           <div style="font-size:56px;font-weight:900;line-height:1;color:#f87171;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${removeCount}</div>
-          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f87171;margin-top:10px;">減台イベント</div>
+          <div style="font-size:12px;font-weight:700;color:#f87171;margin-top:4px;min-height:16px;">${remInUpCount > 0 ? '（内' + remInUpCount + '機種アウト増）' : ''}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f87171;margin-top:6px;">減台イベント</div>
           <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">設置台数が減った<br>機種・日付</div>
           <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
             <span class="action-badge ${removeCount > 0 ? 'badge-ok' : 'badge-ok'}">${removeCount > 0 ? '好機あり' : 'なし'}</span>
@@ -5383,6 +5388,188 @@ function renderRivalAnalysis() {
           <div style="font-size:18px;font-weight:800;color:${color};">${value}<span style="font-size:11px;color:var(--text2);">${unit}</span></div>
         </div>`;
 
+      // ── メイン機種 台別運用パターン（据え置き + ドボン台）事前計算 ──
+      let mainPatternHtml = '';
+      {
+        const mainModelNames = new Set(mainModels.map(m => m.name));
+        const mainRawOp = all.filter(r => r['機種名'] && mainModelNames.has(r['機種名']));
+        const hasTaiMain = mainRawOp.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
+
+        if (!hasTaiMain) {
+          mainPatternHtml = '<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px;font-size:11px;color:var(--text2);">台番データがないため台別運用パターンを表示できません。</div>';
+        } else {
+          // ── 据え置き検出 ──
+          const byTaiMn = {};
+          mainRawOp.forEach(function(r) {
+            var model = r['機種名'] || '';
+            var tai   = String(r['台番'] || '').trim();
+            if (!tai) return;
+            var key = model + '\x00' + tai;
+            if (!byTaiMn[key]) byTaiMn[key] = { model: model, tai: tai, days: {} };
+            var d = byTaiMn[key].days;
+            if (!d[r.date]) d[r.date] = { inSum: 0, diffSum: 0 };
+            d[r.date].inSum   += r['IN枚数'] || 0;
+            d[r.date].diffSum += r['差枚']   || 0;
+          });
+          var mnOkiEvents = 0;
+          var mnOkiDetail = [];
+          Object.values(byTaiMn).forEach(function(entry) {
+            var eligDays = Object.entries(entry.days)
+              .filter(function(kv) { return kv[1].inSum >= storeAvgIn && kv[1].diffSum >= 0; })
+              .map(function(kv) { return kv[0]; }).sort();
+            if (eligDays.length < 3) return;
+            var run = [eligDays[0]];
+            for (var i = 1; i < eligDays.length; i++) {
+              var diff = (new Date(eligDays[i]) - new Date(eligDays[i-1])) / 86400000;
+              if (diff === 1) {
+                run.push(eligDays[i]);
+              } else {
+                if (run.length >= 3) { mnOkiEvents++; mnOkiDetail.push({ model: entry.model, tai: entry.tai, startDate: run[0], days: run.length }); }
+                run = [eligDays[i]];
+              }
+            }
+            if (run.length >= 3) { mnOkiEvents++; mnOkiDetail.push({ model: entry.model, tai: entry.tai, startDate: run[0], days: run.length }); }
+          });
+          var mnTaiCount = new Set(mainRawOp.map(function(r) { return String(r['台番'] || '').trim(); }).filter(function(t) { return t; })).size;
+          var mnDaysCount = new Set(mainRawOp.map(function(r) { return r.date; })).size;
+          var mnOkiPct = (mnTaiCount > 0 && mnDaysCount > 0) ? mnOkiEvents / (mnTaiCount * mnDaysCount) * 100 : 0;
+
+          // ── ドボン台設定上げ ──
+          var byDMTMn = {};
+          mainRawOp.forEach(function(r) {
+            var tai = String(r['台番'] || '').trim();
+            if (!r.date || !r['機種名'] || !tai) return;
+            var k = r.date + '\x00' + r['機種名'] + '\x00' + tai;
+            if (!byDMTMn[k]) byDMTMn[k] = { date: r.date, model: r['機種名'], tai: tai, inSum: 0, diffSum: 0 };
+            byDMTMn[k].inSum   += r['IN枚数'] || 0;
+            byDMTMn[k].diffSum += r['差枚']   || 0;
+          });
+          var byDMMn = {};
+          Object.values(byDMTMn).forEach(function(e) {
+            var k = e.date + '\x00' + e.model;
+            if (!byDMMn[k]) byDMMn[k] = { date: e.date, model: e.model, tais: [] };
+            var payout = e.inSum > 0 ? (e.inSum + e.diffSum) / e.inSum : 0;
+            byDMMn[k].tais.push({ tai: e.tai, inSum: e.inSum, payout: payout });
+          });
+          var mnDobTotal = 0, mnDobHits = 0;
+          var mnDobDetail = [];
+          Object.values(byDMMn).forEach(function(group) {
+            if (group.tais.length < 2) return;
+            var minIn = Math.min.apply(null, group.tais.map(function(t) { return t.inSum; }));
+            var activeTais = group.tais.filter(function(t) { return t.inSum > 0; });
+            var minPayout = activeTais.length > 0 ? Math.min.apply(null, activeTais.map(function(t) { return t.payout; })) : null;
+            var dobonTaiSet = new Set(
+              group.tais.filter(function(t) { return t.inSum === minIn; }).map(function(t) { return t.tai; }).concat(
+                minPayout !== null ? activeTais.filter(function(t) { return t.payout === minPayout; }).map(function(t) { return t.tai; }) : []
+              )
+            );
+            var dobons = group.tais.filter(function(t) { return dobonTaiSet.has(t.tai); });
+            var nd = new Date(group.date); nd.setDate(nd.getDate() + 1);
+            var nextDate = nd.toISOString().split('T')[0];
+            dobons.forEach(function(dobon) {
+              mnDobTotal++;
+              var nextDay = byDMTMn[nextDate + '\x00' + group.model + '\x00' + dobon.tai];
+              var nextPayout = nextDay && nextDay.inSum > 0 ? (nextDay.inSum + nextDay.diffSum) / nextDay.inSum : null;
+              var hit = nextPayout !== null && nextPayout >= 1.0 && nextDay.inSum >= storeAvgIn;
+              if (hit) mnDobHits++;
+              mnDobDetail.push({ date: group.date, model: group.model, tai: dobon.tai, payout: dobon.payout, nextPayout: nextPayout, hit: !!hit });
+            });
+          });
+          var mnDobRate = mnDobTotal > 0 ? mnDobHits / mnDobTotal * 100 : 0;
+
+          var mnOkiCol  = mnOkiEvents > 0 ? { border:'#f59e0b', bg:'rgba(245,158,11,0.08)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
+          var mnDobCol  = mnDobRate >= 30 ? { border:'#34d399', bg:'rgba(52,211,153,0.07)' } : mnDobRate >= 15 ? { border:'#fbbf24', bg:'rgba(251,191,36,0.06)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
+          var mnDobBadge = mnDobRate >= 30 ? 'badge-alert' : mnDobRate >= 15 ? 'badge-warn' : 'badge-ok';
+
+          // ── 据え置きリスト HTML ──
+          var thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
+          var mnOkiTable = mnOkiDetail.length === 0
+            ? '<div style="font-size:11px;color:var(--text2);">該当なし（期間内に3日連続の据え置きパターンは検出されませんでした）</div>'
+            : '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
+              + '<tr style="color:var(--text2);border-bottom:1px solid var(--border);">'
+              + '<th style="' + thS + 'text-align:left;">機種名</th>'
+              + '<th style="' + thS + 'text-align:center;">台番</th>'
+              + '<th style="' + thS + 'text-align:center;">開始日</th>'
+              + '<th style="' + thS + 'text-align:center;">連続日数</th>'
+              + '</tr>'
+              + mnOkiDetail.sort(function(a,b){return b.days-a.days;}).slice(0,25).map(function(e) {
+                  return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+                    + '<td style="padding:6px 8px;color:var(--text);">' + e.model + '</td>'
+                    + '<td style="padding:6px 8px;color:var(--text2);text-align:center;">' + e.tai + '</td>'
+                    + '<td style="padding:6px 8px;color:var(--text2);text-align:center;">' + e.startDate + '</td>'
+                    + '<td style="padding:6px 8px;color:#f59e0b;text-align:center;font-weight:800;">' + e.days + '日</td>'
+                    + '</tr>';
+                }).join('')
+              + (mnOkiDetail.length > 25 ? '<tr><td colspan="4" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ' + (mnOkiDetail.length-25) + ' 件</td></tr>' : '')
+              + '</table></div>';
+
+          // ── ドボン一覧 HTML ──
+          var mnDobTable = mnDobDetail.length === 0
+            ? '<div style="font-size:11px;color:var(--text2);">該当なし</div>'
+            : '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">'
+              + '<tr style="color:var(--text2);border-bottom:1px solid var(--border);">'
+              + '<th style="' + thS + 'text-align:left;">日付</th>'
+              + '<th style="' + thS + 'text-align:left;">機種名</th>'
+              + '<th style="' + thS + 'text-align:center;">台番</th>'
+              + '<th style="' + thS + 'text-align:center;">当日出玉率</th>'
+              + '<th style="' + thS + 'text-align:center;">翌日出玉率</th>'
+              + '<th style="' + thS + 'text-align:center;">改善</th>'
+              + '</tr>'
+              + mnDobDetail.slice(0,30).map(function(e) {
+                  var pc = e.payout != null ? (e.payout*100).toFixed(1)+'%' : '—';
+                  var nc = e.nextPayout != null ? (e.nextPayout*100).toFixed(1)+'%' : '—';
+                  var hc = e.hit ? '#34d399' : 'var(--text2)';
+                  return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+                    + '<td style="padding:6px 8px;color:var(--text2);">' + e.date + '</td>'
+                    + '<td style="padding:6px 8px;color:var(--text);">' + e.model + '</td>'
+                    + '<td style="padding:6px 8px;color:var(--text2);text-align:center;">' + e.tai + '</td>'
+                    + '<td style="padding:6px 8px;text-align:center;color:#f87171;">' + pc + '</td>'
+                    + '<td style="padding:6px 8px;text-align:center;color:' + hc + ';font-weight:700;">' + nc + '</td>'
+                    + '<td style="padding:6px 8px;text-align:center;">' + (e.hit ? '<span style="color:#34d399;font-weight:800;">✓</span>' : '<span style="color:var(--text3);">—</span>') + '</td>'
+                    + '</tr>';
+                }).join('')
+              + '</table></div>';
+
+          mainPatternHtml =
+            '<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">'
+            + '<div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">台別運用パターン（メイン機種上位' + mainModels.length + '機種）</div>'
+            + '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">'
+            + '<div id="mainOpTile_oki" data-open="false" onclick="toggleMainOpDetail(\'oki\')"'
+            + ' style="border:1px solid ' + mnOkiCol.border + ';border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:' + mnOkiCol.bg + ';user-select:none;">'
+            + '<div style="font-size:56px;font-weight:900;line-height:1;color:' + mnOkiCol.border + ';letter-spacing:-3px;font-variant-numeric:tabular-nums;">' + mnOkiEvents + '</div>'
+            + '<div style="font-size:24px;font-weight:900;color:' + mnOkiCol.border + ';margin-top:5px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">' + mnOkiPct.toFixed(2) + '%</div>'
+            + '<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:' + mnOkiCol.border + ';margin-top:8px;">据え置き検出</div>'
+            + '<div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3日以上連続<br>出玉率100%超の台</div>'
+            + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">'
+            + '<span class="action-badge ' + (mnOkiEvents > 0 ? 'badge-warn' : 'badge-ok') + '">' + (mnOkiEvents > 0 ? '設定据え置き疑い' : 'なし') + '</span>'
+            + '<span style="font-size:10px;color:var(--text2);">▾</span>'
+            + '</div></div>'
+            + '<div id="mainOpTile_dobon" data-open="false" onclick="toggleMainOpDetail(\'dobon\')"'
+            + ' style="border:1px solid ' + mnDobCol.border + ';border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:' + mnDobCol.bg + ';user-select:none;">'
+            + '<div style="font-size:48px;font-weight:900;line-height:1;color:' + mnDobCol.border + ';letter-spacing:-2px;font-variant-numeric:tabular-nums;">' + mnDobRate.toFixed(0) + '<span style="font-size:20px;font-weight:700;">%</span></div>'
+            + '<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:' + mnDobCol.border + ';margin-top:10px;">ドボン台 翌日回収率</div>'
+            + '<div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">最低IN台・最低出玉率台（各1台）が<br>翌日に改善した割合</div>'
+            + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">'
+            + '<span class="action-badge ' + mnDobBadge + '">' + (mnDobTotal > 0 ? mnDobHits + '/' + mnDobTotal + '回' : 'データ不足') + '</span>'
+            + '<span style="font-size:10px;color:var(--text2);">▾</span>'
+            + '</div></div>'
+            + '</div>'
+            + '<div id="mainOpDetail_oki" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">'
+            + '<div style="font-size:11.5px;font-weight:700;color:#f59e0b;margin-bottom:4px;">3日以上連続 出玉率100%超 — 据え置き台リスト（' + mnOkiDetail.length + '件）</div>'
+            + '<div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">条件: 店舗平均IN以上 かつ 差枚≥0 が3日以上カレンダー連続</div>'
+            + mnOkiTable
+            + '</div>'
+            + '<div id="mainOpDetail_dobon" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">'
+            + '<div style="font-size:11.5px;font-weight:700;color:#34d399;margin-bottom:4px;">ドボン台（最低IN台 + 最低出玉率台）→ 翌日改善の記録</div>'
+            + '<div style="font-size:10.5px;color:var(--text2);margin-bottom:8px;">出現率 ' + mnDobRate.toFixed(1) + '%（' + mnDobHits + '/' + mnDobTotal + '件）</div>'
+            + '<div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;padding:8px 10px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:8px;line-height:1.7;">'
+            + '⚡ <b style="color:#fbbf24;">ダブル判定</b>：「最低IN台」と「最低出玉率台」をそれぞれ独立して特定。同一台なら1台、別々の台なら最大2台がドボン台になります。</div>'
+            + mnDobTable
+            + '</div>'
+            + '</div>';
+        }
+      }
+
       html += `<div class="rival-section">
         <div class="rival-section-title" style="color:#60a5fa;">メイン機種分析 — 総アウト上位5機種</div>
         <div style="font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
@@ -5497,6 +5684,8 @@ function renderRivalAnalysis() {
               </div></div>`;
           }).join('')}
         </div>
+
+        ${mainPatternHtml}
 
       </div>`;
     }
@@ -7869,6 +8058,23 @@ function toggleManDetail(key) {
   if (!isOpen) {
     el.style.display = 'block';
     const tile = document.getElementById('manTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
+}
+
+function toggleMainOpDetail(key) {
+  const el = document.getElementById('mainOpDetail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  ['oki','dobon'].forEach(k => {
+    const p = document.getElementById('mainOpDetail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('mainOpTile_' + k);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('mainOpTile_' + key);
     if (tile) tile.setAttribute('data-open','true');
   }
 }
