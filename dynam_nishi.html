@@ -4316,8 +4316,37 @@ function renderRivalAnalysis() {
       : null;
     const noBreakCount = newModels.length - belowModels.length;
 
-    window._newModelData      = newModels;
-    window._newModelStoreAvgIn = Math.round(storeAvgIn);
+    // ── 回転率計算 ──
+    // 新台総台数（各機種の初日台番数合計）
+    const totalNewMachines = newModels.reduce((a, m) => a + m.firstDayCount, 0);
+    // データ期間（日数）
+    const dataPeriodDays = allDataStart < allDataEnd
+      ? Math.round((new Date(allDataEnd+'T00:00:00') - new Date(allDataStart+'T00:00:00')) / 86400000) + 1
+      : 1;
+    // 店舗設置台数（日別ユニーク台番数の平均 or 日別レコード数平均）
+    const hasTaibanND = all.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
+    const dailyMachMap = {};
+    all.forEach(r => {
+      if (!r.date) return;
+      if (!dailyMachMap[r.date]) dailyMachMap[r.date] = { taiSet: new Set(), cnt: 0 };
+      const tai = r['台番'] != null ? String(r['台番']).trim() : '';
+      if (tai) dailyMachMap[r.date].taiSet.add(tai);
+      dailyMachMap[r.date].cnt++;
+    });
+    const dmKeys = Object.keys(dailyMachMap);
+    const storeTotalMachines = dmKeys.length > 0
+      ? Math.round(dmKeys.reduce((a, dt) => {
+          const sz = dailyMachMap[dt].taiSet.size;
+          return a + (hasTaibanND && sz > 0 ? sz : dailyMachMap[dt].cnt);
+        }, 0) / dmKeys.length)
+      : 0;
+    // 年換算新台数・回転率
+    const annualNewMachines = dataPeriodDays > 0 ? Math.round(totalNewMachines / dataPeriodDays * 365) : 0;
+    const turnoverRate = storeTotalMachines > 0 ? annualNewMachines / storeTotalMachines : null;
+
+    window._newModelData        = newModels;
+    window._newModelStoreAvgIn  = Math.round(storeAvgIn);
+    window._newModelTurnover    = { totalNewMachines, dataPeriodDays, storeTotalMachines, annualNewMachines, turnoverRate };
 
     // インサイト登録
     if (newModels.length > 0) {
@@ -4446,27 +4475,51 @@ function renderRivalAnalysis() {
       const belowBadgeTxt = avgWeeksUntilBelow !== null && avgWeeksUntilBelow <= 1 ? '早期失速'
         : avgWeeksUntilBelow !== null && avgWeeksUntilBelow <= 2 ? '要観察' : '稼働維持';
 
+      // タイル③ 回転率
+      const trNum    = turnoverRate !== null ? turnoverRate.toFixed(2) : '—';
+      const trBadgeClass = turnoverRate === null ? 'badge-ok'
+        : turnoverRate >= 1.0 ? 'badge-alert'
+        : turnoverRate >= 0.5 ? 'badge-warn' : 'badge-ok';
+      const trBadgeTxt = turnoverRate === null ? 'データ不足'
+        : turnoverRate >= 1.0 ? '高速入替' : turnoverRate >= 0.5 ? '標準的' : '低頻度';
+      const trPeriodTxt = dataPeriodDays + '日間 → 年換算' + annualNewMachines + '台';
+
       html += `
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:500px;margin-bottom:16px;">
-        <!-- タイル①：新台登場数 -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:660px;margin-bottom:16px;">
+        <!-- タイル①：新台登場 機種数＋台数 -->
         <div id="newModelTile" data-open="false" onclick="toggleNewModelDetail()"
-          style="border:1px solid #a78bfa;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(167,139,250,0.07);user-select:none;">
-          <div style="font-size:56px;font-weight:900;line-height:1;color:#a78bfa;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${newModels.length}</div>
-          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#a78bfa;margin-top:10px;">新台登場</div>
-          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">期間内に初登場した<br>競合機種</div>
+          style="border:1px solid #a78bfa;border-radius:14px;padding:18px 14px 14px;cursor:pointer;background:rgba(167,139,250,0.07);user-select:none;">
+          <div style="font-size:50px;font-weight:900;line-height:1;color:#a78bfa;letter-spacing:-2px;font-variant-numeric:tabular-nums;">${newModels.length}</div>
+          <div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:#a78bfa;margin-top:2px;">機種</div>
+          <div style="font-size:20px;font-weight:800;color:#a78bfa;margin-top:6px;font-variant-numeric:tabular-nums;">${totalNewMachines}<span style="font-size:10px;font-weight:700;margin-left:2px;">台</span></div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.5px;color:#a78bfa;margin-top:6px;">新台登場</div>
+          <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-top:2px;line-height:1.35;">初登場した競合<br>機種・台数</div>
           <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
             <span class="action-badge badge-alert">要チェック</span>
             <span style="font-size:10px;color:var(--text2);">▾</span>
           </div>
         </div>
-        <!-- タイル②：稼働割れまでの日数 -->
+        <!-- タイル②：稼働割れまでの週数 -->
         <div id="nmBelowTile" data-open="false" onclick="toggleNmBelowDetail()"
-          style="border:1px solid #c084fc;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(192,132,252,0.06);user-select:none;">
-          <div style="font-size:56px;font-weight:900;line-height:1;color:#c084fc;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${belowTileNum}</div>
-          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#c084fc;margin-top:10px;">平均稼働割れ週数</div>
-          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">店舗平均を下回るまで<br>の週数（7日MA基準）</div>
+          style="border:1px solid #c084fc;border-radius:14px;padding:18px 14px 14px;cursor:pointer;background:rgba(192,132,252,0.06);user-select:none;">
+          <div style="font-size:50px;font-weight:900;line-height:1;color:#c084fc;letter-spacing:-2px;font-variant-numeric:tabular-nums;">${belowTileNum}</div>
+          <div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:#c084fc;margin-top:2px;">WEEK</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.5px;color:#c084fc;margin-top:8px;">平均稼働割れ週数</div>
+          <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-top:2px;line-height:1.35;">店舗平均を下回る<br>まで（7日MA）</div>
           <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
             <span class="action-badge ${belowBadgeClass}">${belowBadgeTxt}</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
+        </div>
+        <!-- タイル③：推定新台回転率 -->
+        <div id="nmTurnoverTile" data-open="false" onclick="toggleNmTurnoverDetail()"
+          style="border:1px solid #818cf8;border-radius:14px;padding:18px 14px 14px;cursor:pointer;background:rgba(129,140,248,0.06);user-select:none;">
+          <div style="font-size:50px;font-weight:900;line-height:1;color:#818cf8;letter-spacing:-2px;font-variant-numeric:tabular-nums;">${trNum}</div>
+          <div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:#818cf8;margin-top:2px;">回転</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.5px;color:#818cf8;margin-top:8px;">推定新台回転率</div>
+          <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-top:2px;line-height:1.35;">年換算での新台<br>入替率（推定）</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge ${trBadgeClass}">${trBadgeTxt}</span>
             <span style="font-size:10px;color:var(--text2);">▾</span>
           </div>
         </div>
@@ -4483,6 +4536,38 @@ function renderRivalAnalysis() {
           店舗平均IN/台: <b style="color:#c084fc;">${Math.round(storeAvgIn).toLocaleString()}枚</b>　${belowSubText}
         </div>
         ${_nmBelowRows(newModels, Math.round(storeAvgIn))}
+      </div>
+
+      <!-- 回転率詳細パネル -->
+      <div id="nmTurnoverDetail" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(129,140,248,0.3);background:rgba(0,0,0,0.18);">
+        <div style="font-size:12px;font-weight:700;color:#818cf8;margin-bottom:12px;">推定新台回転率 計算内訳</div>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;max-width:480px;">
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px 14px;">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">期間中の新台台数</div>
+            <div style="font-size:20px;font-weight:800;color:var(--text);">${totalNewMachines}<span style="font-size:11px;color:var(--text2);margin-left:2px;">台</span></div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">${newModels.length}機種の初日台数合計</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px 14px;">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">推定設置台数</div>
+            <div style="font-size:20px;font-weight:800;color:var(--text);">${storeTotalMachines}<span style="font-size:11px;color:var(--text2);margin-left:2px;">台</span></div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">日別台番数の平均</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px 14px;">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">計算期間</div>
+            <div style="font-size:20px;font-weight:800;color:var(--text);">${dataPeriodDays}<span style="font-size:11px;color:var(--text2);margin-left:2px;">日</span></div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">${allDataStart} 〜 ${allDataEnd}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:12px 14px;">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:4px;">年換算新台台数</div>
+            <div style="font-size:20px;font-weight:800;color:var(--text);">${annualNewMachines}<span style="font-size:11px;color:var(--text2);margin-left:2px;">台/年</span></div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px;">${totalNewMachines}台 ÷ ${dataPeriodDays}日 × 365</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding:10px 14px;background:rgba(129,140,248,0.08);border-radius:8px;border:1px solid rgba(129,140,248,0.2);">
+          <span style="font-size:11px;color:var(--text2);">回転率 ＝ 年換算新台 <b style="color:#818cf8;">${annualNewMachines}台</b> ÷ 設置台数 <b style="color:#818cf8;">${storeTotalMachines}台</b> ＝ </span>
+          <span style="font-size:15px;font-weight:900;color:#818cf8;">${trNum}回転</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin-top:8px;">設置台数と同数を年間で入れ替えると1.0回転。0.5回転なら半数入替ペース。</div>
       </div>`;
     }
 
@@ -7146,30 +7231,37 @@ function showNewModelChart(idx) {
   });
 }
 
+function _nmCloseAllPanels(exceptId) {
+  [['newModelDetail','newModelTile'],['nmBelowDetail','nmBelowTile'],['nmTurnoverDetail','nmTurnoverTile']].forEach(([did, tid]) => {
+    if (did === exceptId) return;
+    const d = document.getElementById(did); if (d) d.style.display = 'none';
+    const t = document.getElementById(tid); if (t) t.setAttribute('data-open','false');
+  });
+}
 function toggleNewModelDetail() {
-  const detail  = document.getElementById('newModelDetail');
-  const tile    = document.getElementById('newModelTile');
-  const detail2 = document.getElementById('nmBelowDetail');
-  const tile2   = document.getElementById('nmBelowTile');
+  const detail = document.getElementById('newModelDetail');
+  const tile   = document.getElementById('newModelTile');
   if (!detail) return;
   const isOpen = detail.style.display !== 'none';
-  // 他パネルを閉じる
-  if (detail2) detail2.style.display = 'none';
-  if (tile2)   tile2.setAttribute('data-open', 'false');
+  _nmCloseAllPanels('newModelDetail');
   detail.style.display = isOpen ? 'none' : 'block';
   if (tile) tile.setAttribute('data-open', String(!isOpen));
 }
-
 function toggleNmBelowDetail() {
-  const detail  = document.getElementById('nmBelowDetail');
-  const tile    = document.getElementById('nmBelowTile');
-  const detail2 = document.getElementById('newModelDetail');
-  const tile2   = document.getElementById('newModelTile');
+  const detail = document.getElementById('nmBelowDetail');
+  const tile   = document.getElementById('nmBelowTile');
   if (!detail) return;
   const isOpen = detail.style.display !== 'none';
-  // 他パネルを閉じる
-  if (detail2) detail2.style.display = 'none';
-  if (tile2)   tile2.setAttribute('data-open', 'false');
+  _nmCloseAllPanels('nmBelowDetail');
+  detail.style.display = isOpen ? 'none' : 'block';
+  if (tile) tile.setAttribute('data-open', String(!isOpen));
+}
+function toggleNmTurnoverDetail() {
+  const detail = document.getElementById('nmTurnoverDetail');
+  const tile   = document.getElementById('nmTurnoverTile');
+  if (!detail) return;
+  const isOpen = detail.style.display !== 'none';
+  _nmCloseAllPanels('nmTurnoverDetail');
   detail.style.display = isOpen ? 'none' : 'block';
   if (tile) tile.setAttribute('data-open', String(!isOpen));
 }
