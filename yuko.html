@@ -4271,31 +4271,48 @@ function renderRivalAnalysis() {
       : 0;
 
     newModels.forEach(m => {
-      // 機種の日別平均IN枚数を集計
-      const modelRecs  = all.filter(r => r['機種名'] === m.model && r.date >= m.firstDate);
-      const dayAvgMap  = {};
+      // 機種の日別平均IN枚数を集計（初登場日以降の全期間）
+      const modelRecs = all.filter(r => r['機種名'] === m.model);
+      const dayAvgMap = {};
       modelRecs.forEach(r => {
+        if (!r.date) return;
         if (!dayAvgMap[r.date]) dayAvgMap[r.date] = { sum: 0, cnt: 0 };
         dayAvgMap[r.date].sum += r['IN枚数'] || 0;
         dayAvgMap[r.date].cnt++;
       });
-      const sortedDates = Object.keys(dayAvgMap).sort();
-      m.daysUntilBelow = null;
-      m.belowDate      = null;
-      m.belowIn        = null;
-      for (const dt of sortedDates) {
-        const avgIn = dayAvgMap[dt].sum / dayAvgMap[dt].cnt;
-        if (avgIn < storeAvgIn) {
+      // 初登場日以降の日付を昇順で列挙
+      const sortedDates = Object.keys(dayAvgMap).filter(d => d >= m.firstDate).sort();
+
+      m.daysUntilBelow  = null;
+      m.belowDate       = null;
+      m.belowIn         = null;
+      m.belowWeekAvgIn  = null;
+
+      // 7日移動平均で稼働割れを判定（初登場日から7日分揃った時点から検査）
+      for (let i = 0; i < sortedDates.length; i++) {
+        const dt      = sortedDates[i];
+        // dt を末尾とする直近7日以内の日付を集める
+        const windowStart = _addDaysND(dt, -6);
+        const windowDates = sortedDates.filter(d => d >= windowStart && d <= dt);
+        if (windowDates.length < 7) continue; // 7日分揃うまでスキップ
+        // 7日ウィンドウ内の全レコード平均
+        const winSum = windowDates.reduce((a, d) => a + dayAvgMap[d].sum, 0);
+        const winCnt = windowDates.reduce((a, d) => a + dayAvgMap[d].cnt, 0);
+        const weekAvgIn = winCnt > 0 ? winSum / winCnt : 0;
+        if (weekAvgIn < storeAvgIn) {
           m.belowDate      = dt;
           m.daysUntilBelow = Math.round((new Date(dt + 'T00:00:00') - new Date(m.firstDate + 'T00:00:00')) / 86400000);
-          m.belowIn        = Math.round(avgIn);
+          m.belowWeekAvgIn = Math.round(weekAvgIn);
+          // 割れた週の最終日のIN値も保持
+          m.belowIn = Math.round(dayAvgMap[dt].sum / dayAvgMap[dt].cnt);
           break;
         }
       }
     });
     const belowModels = newModels.filter(m => m.daysUntilBelow !== null);
-    const avgDaysUntilBelow = belowModels.length > 0
-      ? Math.round(belowModels.reduce((a, m) => a + m.daysUntilBelow, 0) / belowModels.length)
+    // 日数→週数（小数第1位まで）
+    const avgWeeksUntilBelow = belowModels.length > 0
+      ? (belowModels.reduce((a, m) => a + m.daysUntilBelow, 0) / belowModels.length / 7)
       : null;
     const noBreakCount = newModels.length - belowModels.length;
 
@@ -4376,10 +4393,14 @@ function renderRivalAnalysis() {
       const rows = models.map(m => {
         const hasBelow   = m.daysUntilBelow !== null;
         const belowDateTxt = hasBelow ? m.belowDate : '未割れ';
-        const daysTxt    = hasBelow ? m.daysUntilBelow + '日' : '<span style="color:#34d399;font-weight:700;">未割れ</span>';
-        const belowInTxt = hasBelow ? m.belowIn.toLocaleString() : '—';
+        const weeksVal   = hasBelow ? (m.daysUntilBelow / 7).toFixed(1) : null;
+        const daysTxt    = hasBelow
+          ? weeksVal + '週 <span style="font-size:9px;color:#9ca3af;">(' + m.daysUntilBelow + '日)</span>'
+          : '<span style="color:#34d399;font-weight:700;">未割れ</span>';
+        const belowInTxt = hasBelow && m.belowWeekAvgIn != null ? m.belowWeekAvgIn.toLocaleString() : '—';
+        const weeksNum   = hasBelow ? m.daysUntilBelow / 7 : null;
         const daysColor  = hasBelow
-          ? (m.daysUntilBelow <= 7 ? '#f87171' : m.daysUntilBelow <= 14 ? '#fbbf24' : '#34d399')
+          ? (weeksNum <= 1 ? '#f87171' : weeksNum <= 2 ? '#fbbf24' : '#34d399')
           : '#34d399';
         return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
           + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + m.model + '</td>'
@@ -4397,9 +4418,9 @@ function renderRivalAnalysis() {
         + '<th style="' + thS + 'text-align:left;">機種名</th>'
         + '<th style="' + thS + 'text-align:left;">初登場日</th>'
         + '<th style="' + thS + 'text-align:left;">稼働割れ日</th>'
-        + '<th style="' + thS + 'text-align:center;">日数</th>'
+        + '<th style="' + thS + 'text-align:center;">週数</th>'
         + '<th style="' + thS + 'text-align:right;">初週IN/台</th>'
-        + '<th style="' + thS + 'text-align:right;">割れ時IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">割れ時7MA/台</th>'
         + '<th style="' + thS + 'text-align:right;">店舗平均IN/台</th>'
         + '</tr>';
 
@@ -4416,14 +4437,14 @@ function renderRivalAnalysis() {
     if (newModels.length === 0) {
       html += `<div style="font-size:11px;color:var(--text2);">期間内に新台登場は検出されませんでした（データ開始日から${NEW_BUFFER}日以内は除外）。</div>`;
     } else {
-      const belowTileNum  = avgDaysUntilBelow !== null ? String(avgDaysUntilBelow) : '—';
-      const belowSubText  = avgDaysUntilBelow !== null
+      const belowTileNum  = avgWeeksUntilBelow !== null ? avgWeeksUntilBelow.toFixed(1) : '—';
+      const belowSubText  = avgWeeksUntilBelow !== null
         ? `${belowModels.length}機種が稼働割れ${noBreakCount > 0 ? '・' + noBreakCount + '機種は未割れ' : ''}`
         : `全${newModels.length}機種とも未割れ`;
-      const belowBadgeClass = avgDaysUntilBelow !== null && avgDaysUntilBelow <= 7 ? 'badge-alert'
-        : avgDaysUntilBelow !== null && avgDaysUntilBelow <= 14 ? 'badge-warn' : 'badge-ok';
-      const belowBadgeTxt = avgDaysUntilBelow !== null && avgDaysUntilBelow <= 7 ? '早期失速'
-        : avgDaysUntilBelow !== null && avgDaysUntilBelow <= 14 ? '要観察' : '稼働維持';
+      const belowBadgeClass = avgWeeksUntilBelow !== null && avgWeeksUntilBelow <= 1 ? 'badge-alert'
+        : avgWeeksUntilBelow !== null && avgWeeksUntilBelow <= 2 ? 'badge-warn' : 'badge-ok';
+      const belowBadgeTxt = avgWeeksUntilBelow !== null && avgWeeksUntilBelow <= 1 ? '早期失速'
+        : avgWeeksUntilBelow !== null && avgWeeksUntilBelow <= 2 ? '要観察' : '稼働維持';
 
       html += `
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:500px;margin-bottom:16px;">
@@ -4442,8 +4463,8 @@ function renderRivalAnalysis() {
         <div id="nmBelowTile" data-open="false" onclick="toggleNmBelowDetail()"
           style="border:1px solid #c084fc;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(192,132,252,0.06);user-select:none;">
           <div style="font-size:56px;font-weight:900;line-height:1;color:#c084fc;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${belowTileNum}</div>
-          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#c084fc;margin-top:10px;">平均稼働割れ日数</div>
-          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">店舗平均を下回るまで<br>の日数（新台平均）</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#c084fc;margin-top:10px;">平均稼働割れ週数</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">店舗平均を下回るまで<br>の週数（7日MA基準）</div>
           <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
             <span class="action-badge ${belowBadgeClass}">${belowBadgeTxt}</span>
             <span style="font-size:10px;color:var(--text2);">▾</span>
@@ -4466,7 +4487,7 @@ function renderRivalAnalysis() {
     }
 
     html += `<div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6;">
-        ※ データ開始から${NEW_BUFFER}日以内に初登場した機種は除外。稼働割れ＝その日の機種平均IN枚数が店舗全体平均IN枚数を初めて下回った日。
+        ※ データ開始から${NEW_BUFFER}日以内に初登場した機種は除外。稼働割れ＝7日間移動平均IN枚数が店舗全体平均を初めて下回った週（7日分揃ってから判定開始）。
       </div>
     </div>`;
   }
