@@ -3946,6 +3946,171 @@ function renderRivalAnalysis() {
     }
   }
 
+  // ②-c 増台減台分析
+  {
+    const hasTaibanForChange = all.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
+
+    // 日付×機種 ごとにユニーク台番をカウント
+    const modelDateSet = {}; // key: 'model\x00date' → Set<台番>
+    if (hasTaibanForChange) {
+      all.forEach(r => {
+        const model = r['機種名'];
+        const tai   = r['台番'] != null ? String(r['台番']).trim() : '';
+        const date  = r.date;
+        if (!model || !tai || !date) return;
+        const k = model + '\x00' + date;
+        if (!modelDateSet[k]) modelDateSet[k] = new Set();
+        modelDateSet[k].add(tai);
+      });
+    }
+
+    // 変化イベント検出
+    const changeEvents = [];
+    if (hasTaibanForChange) {
+      const allModels = [...new Set(all.map(r => r['機種名']).filter(Boolean))];
+      allModels.forEach(model => {
+        const dateCounts = Object.entries(modelDateSet)
+          .filter(([k]) => k.startsWith(model + '\x00'))
+          .map(([k, s]) => ({ date: k.split('\x00')[1], count: s.size }))
+          .sort((a, b) => a.date.localeCompare(b.date));
+        if (dateCounts.length < 2) return;
+        for (let i = 1; i < dateCounts.length; i++) {
+          const prev = dateCounts[i - 1];
+          const curr = dateCounts[i];
+          if (prev.count === curr.count) continue;
+          // 日付ギャップが大きい場合は近似マーク
+          const dayGap = Math.round((new Date(curr.date) - new Date(prev.date)) / 86400000);
+          changeEvents.push({
+            date:     curr.date,
+            prevDate: prev.date,
+            model,
+            before:   prev.count,
+            after:    curr.count,
+            delta:    curr.count - prev.count,
+            type:     curr.count > prev.count ? 'add' : 'remove',
+            approx:   dayGap > 3  // 3日以上ギャップがある場合は「前後不明」
+          });
+        }
+      });
+      changeEvents.sort((a, b) => b.date.localeCompare(a.date) || a.model.localeCompare(b.model));
+    }
+
+    // インサイト登録
+    const addCount    = changeEvents.filter(e => e.type === 'add').length;
+    const removeCount = changeEvents.filter(e => e.type === 'remove').length;
+    if (changeEvents.length > 0) {
+      const recentAdd = changeEvents.find(e => e.type === 'add');
+      const recentRem = changeEvents.find(e => e.type === 'remove');
+      const topEvent  = changeEvents[0];
+      _pushInsight('rival', '📊',
+        `増台・減台 計${changeEvents.length}件を検出`,
+        `直近: ${topEvent.date.slice(5)} ${topEvent.model} ${topEvent.before}台→${topEvent.after}台（${topEvent.delta > 0 ? '+' : ''}${topEvent.delta}台）`, 3, null, 'rivalAnalysisCard');
+    }
+
+    const thStyleC = 'padding:8px 10px;font-size:10.5px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap;user-select:none;';
+
+    html += `<div class="rival-section">
+      <div class="rival-section-title" style="color:#34d399;">増台・減台 分析</div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
+        台番データをもとに、機種ごとの設置台数が変化した日を自動検出。増台（競合の強化）・減台（弱体化）を素早く把握できます。
+      </div>`;
+
+    if (!hasTaibanForChange) {
+      html += `<div style="font-size:11px;color:var(--text2);">台番データが含まれていないため検出できません。</div>`;
+    } else if (changeEvents.length === 0) {
+      html += `<div style="font-size:11px;color:var(--text2);">期間内に台数変化は検出されませんでした。</div>`;
+    } else {
+      html += `
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:400px;margin-bottom:16px;">
+        <div id="machineAddTile" data-open="false" onclick="toggleMachineChangeDetail('add')"
+          style="border:1px solid #34d399;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(52,211,153,0.07);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#34d399;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${addCount}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#34d399;margin-top:10px;">増台イベント</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">設置台数が増えた<br>機種・日付</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge ${addCount > 0 ? 'badge-warn' : 'badge-ok'}">${addCount > 0 ? '強化注意' : 'なし'}</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
+        </div>
+        <div id="machineRemoveTile" data-open="false" onclick="toggleMachineChangeDetail('remove')"
+          style="border:1px solid #f87171;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(248,113,113,0.07);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#f87171;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${removeCount}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f87171;margin-top:10px;">減台イベント</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">設置台数が減った<br>機種・日付</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge ${removeCount > 0 ? 'badge-ok' : 'badge-ok'}">${removeCount > 0 ? '好機あり' : 'なし'}</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 増台詳細パネル -->
+      <div id="machineAddDetail" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(52,211,153,0.35);background:rgba(0,0,0,0.18);">
+        ${addCount === 0
+          ? `<div style="font-size:11px;color:var(--text2);">増台イベントは検出されませんでした。</div>`
+          : `<div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr style="border-bottom:1px solid rgba(52,211,153,0.25);">
+                    <th style="${thStyleC}text-align:left;">日付</th>
+                    <th style="${thStyleC}text-align:left;">機種名</th>
+                    <th style="${thStyleC}text-align:center;">変更前</th>
+                    <th style="${thStyleC}text-align:center;">変更後</th>
+                    <th style="${thStyleC}text-align:center;">増台数</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${changeEvents.filter(e => e.type === 'add').map(e => `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                      <td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">${e.date}${e.approx ? '<span style="font-size:9px;color:var(--text3);margin-left:3px;" title="データ空白期間があるため前後の日付は近似値">※</span>' : ''}</td>
+                      <td style="padding:7px 10px;font-size:12px;font-weight:600;color:var(--text);">${e.model}</td>
+                      <td style="padding:7px 10px;font-size:13px;font-weight:700;color:var(--text2);text-align:center;">${e.before}台</td>
+                      <td style="padding:7px 10px;font-size:13px;font-weight:700;color:#34d399;text-align:center;">${e.after}台</td>
+                      <td style="padding:7px 10px;font-size:14px;font-weight:900;color:#34d399;text-align:center;">+${e.delta}</td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>`
+        }
+      </div>
+
+      <!-- 減台詳細パネル -->
+      <div id="machineRemoveDetail" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(248,113,113,0.3);background:rgba(0,0,0,0.18);">
+        ${removeCount === 0
+          ? `<div style="font-size:11px;color:var(--text2);">減台イベントは検出されませんでした。</div>`
+          : `<div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr style="border-bottom:1px solid rgba(248,113,113,0.25);">
+                    <th style="${thStyleC}text-align:left;">日付</th>
+                    <th style="${thStyleC}text-align:left;">機種名</th>
+                    <th style="${thStyleC}text-align:center;">変更前</th>
+                    <th style="${thStyleC}text-align:center;">変更後</th>
+                    <th style="${thStyleC}text-align:center;">減台数</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${changeEvents.filter(e => e.type === 'remove').map(e => `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                      <td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">${e.date}${e.approx ? '<span style="font-size:9px;color:var(--text3);margin-left:3px;" title="データ空白期間があるため前後の日付は近似値">※</span>' : ''}</td>
+                      <td style="padding:7px 10px;font-size:12px;font-weight:600;color:var(--text);">${e.model}</td>
+                      <td style="padding:7px 10px;font-size:13px;font-weight:700;color:var(--text2);text-align:center;">${e.before}台</td>
+                      <td style="padding:7px 10px;font-size:13px;font-weight:700;color:#f87171;text-align:center;">${e.after}台</td>
+                      <td style="padding:7px 10px;font-size:14px;font-weight:900;color:#f87171;text-align:center;">${e.delta}</td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>`
+        }
+      </div>`;
+    }
+
+    html += `<div style="font-size:10.5px;color:var(--text2);margin-top:4px;line-height:1.6;">
+        ※ データ取得日が連続していない場合、変化日は「その機種の直前データ日〜検出日」の間に発生した近似値です。
+      </div>
+    </div>`;
+  }
+
   // ③ 運用努力機種分析 — 「◯曜日」「◯の付く日」稼働・利益の2軸パターン検出
   {
     // 機種×日付ごとに IN枚数・台粗利 を集計
@@ -6394,6 +6559,29 @@ function sortZentai100Table(key) {
   if (_zentai100SortKey === key) { _zentai100SortDir = _zentai100SortDir==='asc'?'desc':'asc'; }
   else { _zentai100SortKey = key; _zentai100SortDir = 'desc'; }
   renderZentai100Table();
+}
+
+function toggleMachineChangeDetail(type) {
+  // type: 'add' or 'remove'
+  const addDetail = document.getElementById('machineAddDetail');
+  const remDetail = document.getElementById('machineRemoveDetail');
+  const addTile   = document.getElementById('machineAddTile');
+  const remTile   = document.getElementById('machineRemoveTile');
+  if (!addDetail || !remDetail) return;
+  if (type === 'add') {
+    const isOpen = addDetail.style.display !== 'none';
+    // 反対側を閉じる
+    remDetail.style.display = 'none';
+    if (remTile) remTile.setAttribute('data-open', 'false');
+    addDetail.style.display = isOpen ? 'none' : 'block';
+    if (addTile) addTile.setAttribute('data-open', String(!isOpen));
+  } else {
+    const isOpen = remDetail.style.display !== 'none';
+    addDetail.style.display = 'none';
+    if (addTile) addTile.setAttribute('data-open', 'false');
+    remDetail.style.display = isOpen ? 'none' : 'block';
+    if (remTile) remTile.setAttribute('data-open', String(!isOpen));
+  }
 }
 
 function toggleZentaiDetail() {
