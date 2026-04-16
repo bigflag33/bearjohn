@@ -4204,6 +4204,171 @@ function renderRivalAnalysis() {
         ※ データ取得日が連続していない場合、変化日は近似値です。前後1週間の数値はIN枚数・台粗利の1台あたり平均です。
       </div>
     </div>`;
+
+    // ── 台移動検出（台数同・台番変化） ──
+    const moveEvents = [];
+    if (hasTaibanForChange) {
+      const allModelsM = [...new Set(all.map(r => r['機種名']).filter(Boolean))];
+      allModelsM.forEach(function(model) {
+        const dateEntriesM = Object.entries(modelDateSet)
+          .filter(function(kv) { return kv[0].startsWith(model + '\x00'); })
+          .map(function(kv) { return { date: kv[0].split('\x00')[1], taiSet: kv[1] }; })
+          .sort(function(a, b) { return a.date.localeCompare(b.date); });
+        if (dateEntriesM.length < 2) return;
+        for (let mi = 1; mi < dateEntriesM.length; mi++) {
+          const mprev = dateEntriesM[mi - 1];
+          const mcurr = dateEntriesM[mi];
+          if (mprev.taiSet.size !== mcurr.taiSet.size) continue; // 台数変化→増台減台で処理
+          const removedTai = [...mprev.taiSet].filter(t => !mcurr.taiSet.has(t));
+          if (removedTai.length === 0) continue; // 台番も変化なし
+          const addedTai   = [...mcurr.taiSet].filter(t => !mprev.taiSet.has(t));
+          const dayGapM = Math.round((new Date(mcurr.date) - new Date(mprev.date)) / 86400000);
+          moveEvents.push({
+            date: mcurr.date, prevDate: mprev.date, model,
+            count: mcurr.taiSet.size, movedCount: removedTai.length,
+            removedTai, addedTai, approx: dayGapM > 3
+          });
+        }
+      });
+      moveEvents.sort((a, b) => b.date.localeCompare(a.date) || a.model.localeCompare(b.model));
+
+      function _mvAddDays(dateStr, n) {
+        const d = new Date(dateStr + 'T00:00:00'); d.setDate(d.getDate() + n);
+        return d.toISOString().slice(0, 10);
+      }
+      moveEvents.forEach((ev, idx) => {
+        ev.idx = idx;
+        const mrecs = all.filter(r => r['機種名'] === ev.model);
+        const preStart = _mvAddDays(ev.date, -7), preEnd = _mvAddDays(ev.date, -1);
+        const postStart = ev.date,                postEnd = _mvAddDays(ev.date, 6);
+        const preR  = mrecs.filter(r => r.date >= preStart  && r.date <= preEnd);
+        const postR = mrecs.filter(r => r.date >= postStart && r.date <= postEnd);
+        ev.preAvgIn      = preR.length  > 0 ? preR.reduce( (a,r) => a+(r['IN枚数']||0), 0) / preR.length  : null;
+        ev.postAvgIn     = postR.length > 0 ? postR.reduce((a,r) => a+(r['IN枚数']||0), 0) / postR.length : null;
+        ev.preAvgProfit  = preR.length  > 0 ? preR.reduce( (a,r) => a+(r['台粗利']||0), 0) / preR.length  : null;
+        ev.postAvgProfit = postR.length > 0 ? postR.reduce((a,r) => a+(r['台粗利']||0), 0) / postR.length : null;
+        const cStart = _mvAddDays(ev.date, -14), cEnd = _mvAddDays(ev.date, 14);
+        const cRecs  = mrecs.filter(r => r.date >= cStart && r.date <= cEnd);
+        const byDayM = {};
+        cRecs.forEach(r => {
+          if (!byDayM[r.date]) byDayM[r.date] = { inSum:0, prSum:0, cnt:0 };
+          byDayM[r.date].inSum += r['IN枚数']||0;
+          byDayM[r.date].prSum += r['台粗利']||0;
+          byDayM[r.date].cnt++;
+        });
+        const labels = [], inData = [], prData = [];
+        for (let n = -14; n <= 14; n++) {
+          const dt = _mvAddDays(ev.date, n);
+          labels.push(dt.slice(5));
+          if (byDayM[dt] && byDayM[dt].cnt > 0) {
+            inData.push(Math.round(byDayM[dt].inSum / byDayM[dt].cnt));
+            prData.push(Math.round(byDayM[dt].prSum / byDayM[dt].cnt));
+          } else { inData.push(null); prData.push(null); }
+        }
+        ev.chartLabels = labels; ev.chartInData = inData;
+        ev.chartPrData = prData; ev.chartChangeIdx = 14;
+      });
+    }
+
+    window._moveData = moveEvents;
+
+    // 台移動テーブル行ビルダー
+    function _mvRows(events) {
+      const thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
+      const rows = events.map(e => {
+        const pIn  = e.preAvgIn     != null ? Math.round(e.preAvgIn).toLocaleString()     : '—';
+        const aIn  = e.postAvgIn    != null ? Math.round(e.postAvgIn).toLocaleString()    : '—';
+        const pPr  = e.preAvgProfit != null ? Math.round(e.preAvgProfit).toLocaleString() : '—';
+        const aPr  = e.postAvgProfit!= null ? Math.round(e.postAvgProfit).toLocaleString(): '—';
+        const inDiff = (e.preAvgIn != null && e.postAvgIn != null)
+          ? (e.postAvgIn - e.preAvgIn >= 0 ? '+' : '') + Math.round(e.postAvgIn - e.preAvgIn).toLocaleString() : '';
+        const prDiff = (e.preAvgProfit != null && e.postAvgProfit != null)
+          ? (e.postAvgProfit - e.preAvgProfit >= 0 ? '+' : '') + Math.round(e.postAvgProfit - e.preAvgProfit).toLocaleString() : '';
+        const inDC = (e.postAvgIn != null && e.preAvgIn != null)
+          ? (e.postAvgIn  >= e.preAvgIn  ? '#34d399' : '#f87171') : 'var(--text3)';
+        const prDC = (e.postAvgProfit != null && e.preAvgProfit != null)
+          ? (e.postAvgProfit >= e.preAvgProfit ? '#34d399' : '#f87171') : 'var(--text3)';
+        const appx = e.approx ? '<span style="font-size:9px;color:#9ca3af;margin-left:3px;" title="データ空白期間あり">※</span>' : '';
+        const remStr = e.removedTai.slice(0,5).join(', ') + (e.removedTai.length > 5 ? '…' : '');
+        const addStr = e.addedTai.slice(0,5).join(', ')   + (e.addedTai.length   > 5 ? '…' : '');
+        return '<tr class="mv-data-row" data-idx="' + e.idx + '" '
+          + 'style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background .15s;" '
+          + 'onclick="showMoveChart(' + e.idx + ')" '
+          + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.04)\'" '
+          + 'onmouseleave="this.style.background=\'\'">'
+          + '<td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">' + e.date + appx + '</td>'
+          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + e.model + '</td>'
+          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:#a78bfa;text-align:center;">' + e.count + '台</td>'
+          + '<td style="padding:7px 10px;font-size:14px;font-weight:900;color:#c084fc;text-align:center;">' + e.movedCount + '</td>'
+          + '<td style="padding:7px 10px;font-size:10px;color:#f87171;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + remStr + '</td>'
+          + '<td style="padding:7px 10px;font-size:10px;color:#34d399;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + addStr + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + pIn + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:' + inDC + ';text-align:right;font-weight:700;">' + aIn + (inDiff ? '<span style="font-size:9px;margin-left:3px;">(' + inDiff + ')</span>' : '') + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + pPr + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:' + prDC + ';text-align:right;font-weight:700;">' + aPr + (prDiff ? '<span style="font-size:9px;margin-left:3px;">(' + prDiff + ')</span>' : '') + '</td>'
+          + '</tr>'
+          + '<tr id="mvChartRow_' + e.idx + '" style="display:none;">'
+          + '<td colspan="10" style="padding:0 10px 16px;">'
+          + '<div style="padding:14px;background:rgba(0,0,0,0.25);border-radius:10px;margin-top:4px;">'
+          + '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:700;">' + e.model + ' 前後2週間トレンド（移動日: ' + e.date + '）</div>'
+          + '<div style="position:relative;height:180px;">'
+          + '<canvas id="mvCanvas_' + e.idx + '"></canvas>'
+          + '</div></div></td></tr>';
+      }).join('');
+
+      const thRow = '<tr style="border-bottom:1px solid rgba(167,139,250,0.25);">'
+        + '<th style="' + thS + 'text-align:left;">日付</th>'
+        + '<th style="' + thS + 'text-align:left;">機種名</th>'
+        + '<th style="' + thS + 'text-align:center;">総台数</th>'
+        + '<th style="' + thS + 'text-align:center;">移動台数</th>'
+        + '<th style="' + thS + 'text-align:left;">旧台番</th>'
+        + '<th style="' + thS + 'text-align:left;">新台番</th>'
+        + '<th style="' + thS + 'text-align:right;">前1週IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">後1週IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">前1週粗利/台</th>'
+        + '<th style="' + thS + 'text-align:right;">後1週粗利/台</th>'
+        + '</tr>';
+      return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+        + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
+    // 台移動 HTML セクション
+    {
+      const mvCnt = moveEvents.length;
+      const mvInUpCnt = new Set(moveEvents.filter(e => e.postAvgIn != null && e.preAvgIn != null && e.postAvgIn > e.preAvgIn).map(e => e.model)).size;
+      const mvCol = mvCnt > 0 ? '#a78bfa' : '#6b7280';
+      const mvBg  = mvCnt > 0 ? 'rgba(167,139,250,0.07)' : 'rgba(107,114,128,0.05)';
+
+      html += '<div class="rival-section">';
+      html += '<div class="rival-section-title" style="color:#a78bfa;">🔄 台移動分析</div>';
+      html += '<div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">'
+        + '台番データをもとに「台数は変わらないが台番が入れ替わった日」を自動検出。台の物理的な移動（席移動・コーナー変更など）を推定します。行クリックで前後2週間グラフ展開。</div>';
+
+      if (!hasTaibanForChange) {
+        html += '<div style="font-size:11px;color:var(--text2);">台番データが含まれていないため検出できません。</div>';
+      } else {
+        html += '<div style="display:grid;grid-template-columns:1fr;gap:14px;max-width:280px;margin-bottom:16px;">'
+          + '<div id="moveTile" data-open="false" onclick="toggleMoveDetail()"'
+          + ' style="border:1px solid ' + mvCol + ';border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:' + mvBg + ';user-select:none;">'
+          + '<div style="font-size:56px;font-weight:900;line-height:1;color:' + mvCol + ';letter-spacing:-3px;font-variant-numeric:tabular-nums;">' + mvCnt + '</div>'
+          + '<div style="font-size:12px;font-weight:700;color:' + mvCol + ';margin-top:4px;min-height:16px;">' + (mvInUpCnt > 0 ? '（内' + mvInUpCnt + '機種アウト増）' : '') + '</div>'
+          + '<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:' + mvCol + ';margin-top:6px;">台移動イベント</div>'
+          + '<div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">台数同・台番変化<br>席移動・コーナー変更</div>'
+          + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">'
+          + '<span class="action-badge ' + (mvCnt > 0 ? 'badge-warn' : 'badge-ok') + '">' + (mvCnt > 0 ? '配置変更あり' : 'なし') + '</span>'
+          + '<span style="font-size:10px;color:var(--text2);">▾</span>'
+          + '</div></div></div>';
+
+        html += '<div id="moveDetail" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(167,139,250,0.35);background:rgba(0,0,0,0.18);">'
+          + (mvCnt === 0
+            ? '<div style="font-size:11px;color:var(--text2);">台移動イベントは検出されませんでした。</div>'
+            : _mvRows(moveEvents))
+          + '</div>';
+      }
+
+      html += '<div style="font-size:10.5px;color:var(--text2);margin-top:4px;line-height:1.6;">※ 「旧台番」＝消えた台番、「新台番」＝追加された台番。台数同・台番変化のみ抽出（増台・減台は別セクション）。</div>';
+      html += '</div>';
+    }
   }
 
   // ②-d 初登場（新台）検出
@@ -7474,6 +7639,107 @@ function showMachineChangeChart(idx) {
           position: 'right',
           ticks: { color: '#fbbf24', font: { size: 9.5 }, callback: v => v != null ? v.toLocaleString() : '' },
           grid:  { drawOnChartArea: false },
+          title: { display: true, text: '台粗利', color: '#fbbf24', font: { size: 9 } }
+        }
+      }
+    }
+  });
+}
+
+function toggleMoveDetail() {
+  const el   = document.getElementById('moveDetail');
+  const tile = document.getElementById('moveTile');
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  if (tile) tile.setAttribute('data-open', String(!isOpen));
+}
+
+function showMoveChart(idx) {
+  const ev = window._moveData && window._moveData[idx];
+  if (!ev) return;
+  const chartRow = document.getElementById('mvChartRow_' + idx);
+  if (!chartRow) return;
+  const isOpen = chartRow.style.display !== 'none';
+  if (isOpen) { chartRow.style.display = 'none'; return; }
+  chartRow.style.display = '';
+  if (chartRow.dataset.rendered === '1') return;
+  chartRow.dataset.rendered = '1';
+  const canvas = document.getElementById('mvCanvas_' + idx);
+  if (!canvas) return;
+
+  const vLinePlugin = {
+    id: 'mvVLine_' + idx,
+    afterDraw(chart) {
+      const ctx = chart.ctx, xScale = chart.scales.x, yScale = chart.scales.y;
+      if (!xScale || !yScale) return;
+      const x = xScale.getPixelForValue(ev.chartChangeIdx);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, chart.chartArea.top);
+      ctx.lineTo(x, chart.chartArea.bottom);
+      ctx.strokeStyle = '#a78bfa';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.globalAlpha = 0.75;
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  const old = Chart.getChart(canvas);
+  if (old) old.destroy();
+
+  new Chart(canvas, {
+    type: 'line',
+    plugins: [vLinePlugin],
+    data: {
+      labels: ev.chartLabels,
+      datasets: [
+        {
+          label: 'IN枚数/台',
+          data: ev.chartInData,
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.10)',
+          fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5,
+          spanGaps: true, yAxisID: 'yIn',
+        },
+        {
+          label: '台粗利',
+          data: ev.chartPrData,
+          borderColor: '#fbbf24',
+          backgroundColor: 'rgba(251,191,36,0.08)',
+          fill: false, tension: 0.35, pointRadius: 3, pointHoverRadius: 5,
+          spanGaps: true, yAxisID: 'yPr', borderDash: [4, 3],
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: true, labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 14 } },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const lbl = items[0]?.label || '';
+              return lbl + (items[0]?.dataIndex === ev.chartChangeIdx ? '  ← 台移動日' : '');
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 9.5 }, maxTicksLimit: 10 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        yIn: {
+          type: 'linear', position: 'left',
+          ticks: { color: '#60a5fa', font: { size: 9.5 }, callback: v => v != null ? v.toLocaleString() : '' },
+          grid: { color: 'rgba(255,255,255,0.06)' },
+          title: { display: true, text: 'IN枚数/台', color: '#60a5fa', font: { size: 9 } }
+        },
+        yPr: {
+          type: 'linear', position: 'right',
+          ticks: { color: '#fbbf24', font: { size: 9.5 }, callback: v => v != null ? v.toLocaleString() : '' },
+          grid: { drawOnChartArea: false },
           title: { display: true, text: '台粗利', color: '#fbbf24', font: { size: 9 } }
         }
       }
