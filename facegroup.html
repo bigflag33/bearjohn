@@ -800,6 +800,7 @@
 </style>
 </head>
 <body>
+<div id="winRateTooltip" style="display:none;position:fixed;background:rgba(0,0,0,0.85);color:#fff;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;pointer-events:none;z-index:9999;white-space:nowrap;border:1px solid rgba(255,255,255,0.15);"></div>
 <div id="authOverlay">
   <div class="auth-box">
     <div class="auth-logo" id="authLogoArea"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjIwIiBmaWxsPSJub25lIj4KICA8IS0tIOW3puOCouODvOODoO+8iOe/vOWei++8iSAtLT4KICA8cGF0aCBkPSJNIDU4LDEwOCBDIDQ4LDkwIDIyLDcyIDIsODAgQyAtNiw5NSAxOCwxMTYgNTgsMTE4IFoiIGZpbGw9IiMwMEFFRUYiLz4KICA8IS0tIOWPs+OCouODvOODoO+8iOe/vOWei++8iSAtLT4KICA8cGF0aCBkPSJNIDE0MiwxMDggQyAxNTIsOTAgMTc4LDcyIDE5OCw4MCBDIDIwNiw5NSAxODIsMTE2IDE0MiwxMTggWiIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g6aaWL+iCqeOBpOOBquOBjiAtLT4KICA8ZWxsaXBzZSBjeD0iMTAwIiBjeT0iMTEyIiByeD0iMjYiIHJ5PSIxMiIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g6aCtIC0tPgogIDxjaXJjbGUgY3g9IjEwMCIgY3k9IjgyIiByPSIzNyIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g5bem6ICzIC0tPgogIDxjaXJjbGUgY3g9IjcxIiBjeT0iNTEiIHI9IjE1IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDlj7PogLMgLS0+CiAgPGNpcmNsZSBjeD0iMTI5IiBjeT0iNTEiIHI9IjE1IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDpvLsgKOm7kuOBhOWwj+WGhikgLS0+CiAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iNjUiIHI9IjkiIGZpbGw9IiMxMTEiLz4KICA8IS0tIOiDtOS9kyAtLT4KICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSIxNTAiIHI9IjQ3IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDog7TkvZPjga7jgY/jgormipzjgY0gKOWkp+OBjeOBquWGhikgLS0+CiAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iMTUyIiByPSIzMCIgZmlsbD0iIzExMSIvPgogIDwhLS0g5bem6ISaIC0tPgogIDxlbGxpcHNlIGN4PSI4NyIgY3k9IjE5NSIgcng9IjEzIiByeT0iOSIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g5Y+z6ISaIC0tPgogIDxlbGxpcHNlIGN4PSIxMTMiIGN5PSIxOTUiIHJ4PSIxMyIgcnk9IjkiIGZpbGw9IiMwMEFFRUYiLz4KPC9zdmc+" alt="ベアジョン"></div>
@@ -3828,9 +3829,12 @@ function renderRivalAnalysis() {
       zentaiEvents100.sort((a, b) => b.date.localeCompare(a.date) || b.taiCount - a.taiCount);
     }
 
-    window._zentaiEvents = zentaiEvents;
-    _zentaiSortKey = 'date';
-    _zentaiSortDir = 'desc';
+    window._zentaiEvents    = zentaiEvents;
+    window._zentaiEvents100 = zentaiEvents100;
+    _zentaiSortKey    = 'date';
+    _zentaiSortDir    = 'desc';
+    _zentai100SortKey = 'date';
+    _zentai100SortDir = 'desc';
 
     // インサイト登録
     if (zentaiEvents.length > 0) {
@@ -3862,16 +3866,32 @@ function renderRivalAnalysis() {
       html += `<div style="font-size:11px;color:var(--text2);">台番データが含まれていないため検出できません。</div>`;
     } else {
       html += `
-      <div id="zentaiTile" data-open="false" onclick="toggleZentaiDetail()"
-        style="border:1px solid #f59e0b;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(245,158,11,0.07);user-select:none;display:inline-block;min-width:220px;">
-        <div style="font-size:56px;font-weight:900;line-height:1;color:#f59e0b;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${zentaiEvents.length}</div>
-        <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f59e0b;margin-top:10px;">全台系イベント</div>
-        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3台以上・全台IN2万枚超・出玉率105%超</div>
-        <div style="margin-top:10px;display:flex;justify-content:flex-end;">
-          <span style="font-size:10px;color:var(--text2);">▾</span>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:560px;">
+        <!-- 105%以上タイル -->
+        <div id="zentaiTile" data-open="false" onclick="toggleZentaiDetail()"
+          style="border:1px solid #f59e0b;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(245,158,11,0.07);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#f59e0b;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${zentaiEvents.length}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f59e0b;margin-top:10px;">全台系 105%以上</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3台以上・全台IN2万枚超<br>出玉率105%超</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge ${zentaiEvents.length > 0 ? 'badge-alert' : 'badge-ok'}">${zentaiEvents.length > 0 ? '高確度イベント' : 'なし'}</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
+        </div>
+        <!-- 100%以上タイル -->
+        <div id="zentaiTile100" data-open="false" onclick="toggleZentai100Detail()"
+          style="border:1px solid #fbbf24;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(251,191,36,0.06);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#fbbf24;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${zentaiEvents100.length}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#fbbf24;margin-top:10px;">全台系 100%以上</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3台以上・全台IN2万枚超<br>出玉率100%以上</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge ${zentaiEvents100.length > 0 ? 'badge-warn' : 'badge-ok'}">${zentaiEvents100.length > 0 ? 'イベント候補' : 'なし'}</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
         </div>
       </div>
 
+      <!-- 105%詳細パネル -->
       <div id="zentaiDetail" style="display:none;margin-top:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(245,158,11,0.35);background:rgba(0,0,0,0.18);">
         ${zentaiEvents.length === 0
           ? `<div style="font-size:11px;color:var(--text2);">該当するイベントが見つかりませんでした。期間を広げると検出精度が上がります。</div>`
@@ -3888,6 +3908,28 @@ function renderRivalAnalysis() {
                   </tr>
                 </thead>
                 <tbody id="zentaiTableBody"></tbody>
+              </table>
+            </div>`
+        }
+      </div>
+
+      <!-- 100%詳細パネル -->
+      <div id="zentaiDetail100" style="display:none;margin-top:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(251,191,36,0.3);background:rgba(0,0,0,0.18);">
+        ${zentaiEvents100.length === 0
+          ? `<div style="font-size:11px;color:var(--text2);">該当するイベントが見つかりませんでした。期間を広げると検出精度が上がります。</div>`
+          : `<div style="overflow-x:auto;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr style="border-bottom:1px solid rgba(251,191,36,0.25);">
+                    ${headers.map(([key, label, align]) =>
+                      `<th id="zentaiTh100_${key}" onclick="sortZentai100Table('${key}')"
+                        style="${thStyle}text-align:${align};">
+                        ${label} <span class="zi100" style="font-size:9px;opacity:.6;">${key==='date'?'▼':'⇅'}</span>
+                      </th>`
+                    ).join('')}
+                  </tr>
+                </thead>
+                <tbody id="zentaiTableBody100"></tbody>
               </table>
             </div>`
         }
@@ -4299,8 +4341,203 @@ function renderRivalAnalysis() {
           </span>`;
         }).join('')}
       </div>
+      ${(() => {
+        // ── ジャグラー台別運用パターン (据え置き率 & ドボン台設定上げ) ──
+        const jagRaw = all.filter(r => r['機種名'] && r['機種名'].includes('ジャグラー'));
+        if (!jagRaw.length) return '';
+
+        // 店舗全体の平均IN枚数（ジャグラー含む全台）
+        const storeAvgInAll = all.length > 0
+          ? all.reduce((s, r) => s + (r['IN枚数'] || 0), 0) / all.length : 0;
+
+        // ── 据え置き率: date×model×tai 集計 ──
+        const byTai = {};
+        jagRaw.forEach(r => {
+          const model = r['機種名'] || '';
+          const tai   = String(r['台番'] || '').trim();
+          if (!tai) return;
+          const key = model + '\x00' + tai;
+          if (!byTai[key]) byTai[key] = { model, tai, days: {} };
+          const d = byTai[key].days;
+          if (!d[r.date]) d[r.date] = { inSum: 0, diffSum: 0 };
+          d[r.date].inSum   += r['IN枚数'] || 0;
+          d[r.date].diffSum += r['差枚']   || 0;
+        });
+
+        let okiEvents = 0;
+        const okiDetail = [];
+
+        Object.values(byTai).forEach(entry => {
+          // 対象日: IN >= storeAvgIn AND 差枚 >= 0（出玉率100%以上）
+          const eligDays = Object.entries(entry.days)
+            .filter(([, v]) => v.inSum >= storeAvgInAll && v.diffSum >= 0)
+            .map(([dt]) => dt)
+            .sort();
+          if (eligDays.length < 3) return;
+
+          let run = [eligDays[0]];
+          for (let i = 1; i < eligDays.length; i++) {
+            const diff = (new Date(eligDays[i]) - new Date(eligDays[i-1])) / 86400000;
+            if (diff === 1) {
+              run.push(eligDays[i]);
+            } else {
+              if (run.length >= 3) {
+                okiEvents++;
+                okiDetail.push({ model: entry.model, tai: entry.tai, startDate: run[0], days: run.length });
+              }
+              run = [eligDays[i]];
+            }
+          }
+          if (run.length >= 3) {
+            okiEvents++;
+            okiDetail.push({ model: entry.model, tai: entry.tai, startDate: run[0], days: run.length });
+          }
+        });
+
+        // ── ドボン台設定上げ: date×model×tai 集計 ──
+        const byDMT = {};
+        jagRaw.forEach(r => {
+          const tai = String(r['台番'] || '').trim();
+          if (!r.date || !r['機種名'] || !tai) return;
+          const k = r.date + '\x00' + r['機種名'] + '\x00' + tai;
+          if (!byDMT[k]) byDMT[k] = { date: r.date, model: r['機種名'], tai, inSum: 0, diffSum: 0 };
+          byDMT[k].inSum   += r['IN枚数'] || 0;
+          byDMT[k].diffSum += r['差枚']   || 0;
+        });
+
+        // date × model でグループ化
+        const byDM = {};
+        Object.values(byDMT).forEach(e => {
+          const k = e.date + '\x00' + e.model;
+          if (!byDM[k]) byDM[k] = { date: e.date, model: e.model, tais: [] };
+          const payout = e.inSum > 0 ? (e.inSum + e.diffSum) / e.inSum : 0;
+          byDM[k].tais.push({ tai: e.tai, inSum: e.inSum, payout });
+        });
+
+        let dobonTotal = 0, dobonHits = 0;
+        const dobonDetail = [];
+
+        Object.values(byDM).forEach(group => {
+          if (group.tais.length < 2) return;
+          // 最低IN台：IN=0も含めて全台対象
+          const minIn = Math.min(...group.tais.map(t => t.inSum));
+          // 最低出玉率台：IN=0（出玉率0%）は除外し、稼働ある台の中で最低を探す
+          const activeTais = group.tais.filter(t => t.inSum > 0);
+          const minPayout  = activeTais.length > 0
+            ? Math.min(...activeTais.map(t => t.payout))
+            : null;
+          // ドボン台: 最低IN台 と 最低出玉率台 をそれぞれ独立して特定（ダブル判定）
+          // 同一台なら1台、別々の台なら最大2台がドボン台になる
+          const dobonTaiSet = new Set([
+            ...group.tais.filter(t => t.inSum === minIn).map(t => t.tai),
+            ...(minPayout !== null ? activeTais.filter(t => t.payout === minPayout).map(t => t.tai) : []),
+          ]);
+          const dobons = group.tais.filter(t => dobonTaiSet.has(t.tai));
+          const d = new Date(group.date);
+          d.setDate(d.getDate() + 1);
+          const nextDate = d.toISOString().split('T')[0];
+          dobons.forEach(dobon => {
+            dobonTotal++;
+            const nextDay = byDMT[nextDate + '\x00' + group.model + '\x00' + dobon.tai];
+            const nextPayout = nextDay && nextDay.inSum > 0 ? (nextDay.inSum + nextDay.diffSum) / nextDay.inSum : null;
+            const hit = nextPayout !== null && nextPayout >= 1.0 && nextDay.inSum >= storeAvgInAll;
+            if (hit) dobonHits++;
+            dobonDetail.push({ date: group.date, model: group.model, tai: dobon.tai, payout: dobon.payout, nextPayout, hit: !!hit });
+          });
+        });
+
+        const dobonRate = dobonTotal > 0 ? dobonHits / dobonTotal * 100 : 0;
+
+        // ── Jersey Tiles ──
+        const okiCol  = okiEvents > 0  ? { border:'#f59e0b', bg:'rgba(245,158,11,0.08)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
+        const dobCol  = dobonRate >= 30 ? { border:'#34d399', bg:'rgba(52,211,153,0.07)' } : dobonRate >= 15 ? { border:'#fbbf24', bg:'rgba(251,191,36,0.06)' } : { border:'#6b7280', bg:'rgba(107,114,128,0.05)' };
+        const dobBadge = dobonRate >= 30 ? 'badge-alert' : dobonRate >= 15 ? 'badge-warn' : 'badge-ok';
+
+        const hasTaiData = Object.keys(byTai).length > 0;
+
+        return `
+        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">台別運用パターン${!hasTaiData ? '<span style="font-size:10px;color:#f87171;margin-left:8px;">※台番データなし</span>' : ''}</div>
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+            <div id="jagTile_oki" data-open="false" onclick="toggleJagDetail('oki')"
+              style="border:1px solid ${okiCol.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${okiCol.bg};user-select:none;">
+              <div style="font-size:56px;font-weight:900;line-height:1;color:${okiCol.border};letter-spacing:-3px;font-variant-numeric:tabular-nums;">${okiEvents}</div>
+              <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${okiCol.border};margin-top:10px;">据え置き検出</div>
+              <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3日以上連続<br>出玉率100%超の台</div>
+              <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+                <span class="action-badge ${okiEvents > 0 ? 'badge-warn' : 'badge-ok'}">${okiEvents > 0 ? '設定据え置き疑い' : 'なし'}</span>
+                <span style="font-size:10px;color:var(--text2);">▾</span>
+              </div>
+            </div>
+            <div id="jagTile_dobon" data-open="false" onclick="toggleJagDetail('dobon')"
+              style="border:1px solid ${dobCol.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${dobCol.bg};user-select:none;">
+              <div style="font-size:48px;font-weight:900;line-height:1;color:${dobCol.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${dobonRate.toFixed(0)}<span style="font-size:20px;font-weight:700;">%</span></div>
+              <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${dobCol.border};margin-top:10px;">ドボン台 翌日回収率</div>
+              <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">最低IN台・最低出玉率台（各1台）が<br>翌日に改善した割合</div>
+              <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+                <span class="action-badge ${dobBadge}">${dobonTotal > 0 ? dobonHits + '/' + dobonTotal + '回' : 'データ不足'}</span>
+                <span style="font-size:10px;color:var(--text2);">▾</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="jagDetail_oki" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div style="font-size:11.5px;font-weight:700;color:#f59e0b;margin-bottom:4px;">3日以上連続 出玉率100%超 — 据え置き台リスト（${okiDetail.length}件）</div>
+            <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">条件: 店舗平均IN以上 かつ 差枚≥0 が3日以上カレンダー連続</div>
+            ${okiDetail.length === 0
+              ? '<div style="font-size:11px;color:var(--text2);">該当なし（期間内に3日連続の据え置きパターンは検出されませんでした）</div>'
+              : `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+                <tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+                  <th style="text-align:left;padding:7px 8px;font-weight:700;">機種名</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">台番</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">開始日</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">連続日数</th>
+                </tr>
+                ${okiDetail.sort((a,b)=>b.days-a.days).slice(0,25).map(e=>`
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                  <td style="padding:6px 8px;color:var(--text);">${e.model}</td>
+                  <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.tai}</td>
+                  <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.startDate}</td>
+                  <td style="padding:6px 8px;color:#f59e0b;text-align:center;font-weight:800;">${e.days}日</td>
+                </tr>`).join('')}
+                ${okiDetail.length>25?`<tr><td colspan="4" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${okiDetail.length-25} 件</td></tr>`:''}
+              </table></div>`}
+          </div>
+
+          <div id="jagDetail_dobon" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div style="font-size:11.5px;font-weight:700;color:#34d399;margin-bottom:4px;">ドボン台（最低IN台 + 最低出玉率台）→ 翌日改善の記録</div>
+            <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">出現率 ${dobonRate.toFixed(1)}%（${dobonHits}/${dobonTotal}件）— 翌日の出玉率100%超 かつ 店舗平均IN以上に改善した台を「ヒット」とカウント</div>
+            <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;padding:8px 10px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:8px;line-height:1.7;">
+              ⚡ <b style="color:#fbbf24;">ダブル判定</b>：「最低IN台」と「最低出玉率台」をそれぞれ独立して特定。同一台なら1台、別々の台なら最大2台がドボン台になります。
+            </div>
+            ${dobonDetail.length === 0
+              ? '<div style="font-size:11px;color:var(--text2);">該当なし（台番データがあり複数台の記録が必要です）</div>'
+              : `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+                <tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+                  <th style="text-align:left;padding:7px 8px;font-weight:700;">日付</th>
+                  <th style="text-align:left;padding:7px 8px;font-weight:700;">機種名</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">台番</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">当日出玉率</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">翌日出玉率</th>
+                  <th style="text-align:center;padding:7px 8px;font-weight:700;">改善</th>
+                </tr>
+                ${dobonDetail.filter(e=>e.nextPayout!==null).sort((a,b)=>b.hit-a.hit||b.date.localeCompare(a.date)).slice(0,25).map(e=>`
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.05);${e.hit?'background:rgba(52,211,153,0.05);':''}">
+                  <td style="padding:6px 8px;color:var(--text2);">${e.date}</td>
+                  <td style="padding:6px 8px;color:var(--text);">${e.model}</td>
+                  <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.tai}</td>
+                  <td style="padding:6px 8px;color:#f87171;text-align:center;">${(e.payout*100).toFixed(1)}%</td>
+                  <td style="padding:6px 8px;color:${e.nextPayout>=1.0?'#34d399':'#f87171'};text-align:center;font-weight:700;">${(e.nextPayout*100).toFixed(1)}%</td>
+                  <td style="padding:6px 8px;text-align:center;">${e.hit?'<span style="color:#34d399;font-weight:800;">◎</span>':'<span style="color:var(--text2);">—</span>'}</td>
+                </tr>`).join('')}
+                ${dobonDetail.filter(e=>e.nextPayout!==null).length>25?`<tr><td colspan="6" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${dobonDetail.filter(e=>e.nextPayout!==null).length-25} 件</td></tr>`:''}
+              </table></div>`}
+          </div>
+        </div>`;
+      })()}
     </div>`;
   }
+
 
   // ⑤ メイン機種分析 — 総アウト上位5機種（ジャグラーシリーズ除外）
   {
@@ -4339,6 +4576,38 @@ function renderRivalAnalysis() {
         `メイン機種 ${mainTotalMachines}台（${mainInstallRate.toFixed(0)}%）— ${mainProfitComment.split('—')[0].trim()}`,
         `ジャグラーシリーズを除く総アウト上位5機種。設置比率${mainInstallRate.toFixed(1)}%に対し利益比率${mainProfitRate.toFixed(1)}%・アウト比率${mainInRate.toFixed(1)}%。${mainInComment}`,
         2, mainVis, 'rivalAnalysisCard');
+
+      // ── 勝率計算: 日別「出玉率100%以上台数 / 総台数」の平均 ──
+      const mainWinRates = {};
+      const mainWinDaily = {}; // 日別データ保存（グラフ用）
+      mainModels.forEach(m => {
+        const modelRecs = all.filter(r => r['機種名'] === m.name);
+        if (!modelRecs.length) { mainWinRates[m.name] = null; mainWinDaily[m.name] = []; return; }
+        // date × 台番 で集計
+        const byDT = {};
+        modelRecs.forEach(r => {
+          const tai = String(r['台番'] || '').trim();
+          if (!tai || !r.date) return;
+          const k = r.date + '\x00' + tai;
+          if (!byDT[k]) byDT[k] = { date: r.date, inSum: 0, diffSum: 0 };
+          byDT[k].inSum   += r['IN枚数'] || 0;
+          byDT[k].diffSum += r['差枚']   || 0;
+        });
+        // 日別勝率
+        const byDate2 = {};
+        Object.values(byDT).forEach(e => {
+          if (!byDate2[e.date]) byDate2[e.date] = { win: 0, total: 0 };
+          byDate2[e.date].total++;
+          if (e.diffSum >= 0) byDate2[e.date].win++;
+        });
+        const days = Object.entries(byDate2)
+          .filter(([,d]) => d.total > 0)
+          .sort(([a],[b]) => a.localeCompare(b))
+          .map(([date, d]) => ({ date, win: d.win, total: d.total, rate: d.win / d.total }));
+        mainWinDaily[m.name] = days;
+        if (!days.length) { mainWinRates[m.name] = null; return; }
+        mainWinRates[m.name] = days.reduce((s, d) => s + d.rate, 0) / days.length * 100;
+      });
 
       const _kpiBox = (label, value, unit, color) => `
         <div style="background:rgba(96,165,250,0.08);border:1px solid rgba(96,165,250,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
@@ -4380,11 +4649,88 @@ function renderRivalAnalysis() {
               <span style="font-size:10.5px;background:rgba(96,165,250,0.12);border-radius:6px;padding:2px 7px;color:#93c5fd;">設置 ${instR}%</span>
               <span style="font-size:10.5px;background:rgba(${m.totalProfit>=0?'52,211,153':'248,113,113'},0.12);border-radius:6px;padding:2px 7px;color:${m.totalProfit>=0?'#34d399':'#f87171'};">利益 ${profR}%</span>
               <span style="font-size:10.5px;background:rgba(129,140,248,0.12);border-radius:6px;padding:2px 7px;color:#818cf8;">アウト ${mInR}%</span>
+              ${(() => { const wr = mainWinRates[m.name]; const wrN = wr !== null && wr !== undefined ? Math.round(wr) : null; const wrCol = wrN === null ? 'var(--text2)' : wrN >= 60 ? '#34d399' : wrN >= 40 ? '#93c5fd' : '#f87171'; const wrBg = wrN === null ? 'rgba(107,114,128,0.1)' : wrN >= 60 ? 'rgba(52,211,153,0.12)' : wrN >= 40 ? 'rgba(147,197,253,0.12)' : 'rgba(248,113,113,0.12)'; return `<span style="font-size:10.5px;background:${wrBg};border-radius:6px;padding:2px 7px;color:${wrCol};font-weight:700;">勝率 ${wrN !== null ? wrN + '%' : '—'}</span>`; })()}
               <span style="font-size:10.5px;color:${profCol};font-weight:600;">${profitStr}/台</span>
             </div>`;
           }).join('')}
         </div>
       </div>`;
+        <!-- 勝率 背番号タイル + 日別グラフ -->
+        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">機種別 勝率トレンド — 日別平均勝率</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">
+            ${mainModels.map((m, idx) => {
+              const wr  = mainWinRates[m.name];
+              const wrN = wr !== null && wr !== undefined ? Math.round(wr) : null;
+              const tc  = wrN === null ? { border:'#6b7280', bg:'rgba(107,114,128,0.05)' }
+                        : wrN >= 60   ? { border:'#34d399', bg:'rgba(52,211,153,0.07)' }
+                        : wrN >= 40   ? { border:'#93c5fd', bg:'rgba(147,197,253,0.07)' }
+                        :               { border:'#f87171', bg:'rgba(248,113,113,0.07)' };
+              const badge = wrN === null ? 'badge-ok' : wrN >= 60 ? 'badge-alert' : wrN >= 40 ? 'badge-warn' : 'badge-ok';
+              const shortName = m.name.length > 10 ? m.name.slice(0,10) + '\u2026' : m.name;
+              return `<div id="mainWinTile_${idx}" data-open="false" onclick="toggleMainWinDetail(${idx})"
+                style="border:1px solid ${tc.border};border-radius:14px;padding:16px 12px 12px;cursor:pointer;background:${tc.bg};user-select:none;">
+                <div style="font-size:48px;font-weight:900;line-height:1;color:${tc.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${wrN !== null ? wrN : '\u2014'}<span style="font-size:18px;font-weight:700;">${wrN !== null ? '%' : ''}</span></div>
+                <div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:${tc.border};margin-top:8px;">平均勝率</div>
+                <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">${shortName}</div>
+                <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
+                  <span class="action-badge ${badge}">${m.estimatedMachines}台設置</span>
+                  <span style="font-size:10px;color:var(--text2);">\u25be</span>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+
+          ${mainModels.map((m, idx) => {
+            const days = mainWinDaily[m.name] || [];
+            const n = days.length;
+            if (n === 0) return `<div id="mainWinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;"><div style="font-size:11px;color:var(--text2);">台番データなし</div></div>`;
+
+            const W=600, H=150, padL=36, padR=12, padT=12, padB=28;
+            const cW=W-padL-padR, cH=H-padT-padB;
+            const barW = Math.max(4, Math.min(22, cW/n*0.72));
+
+            const grids = [0,25,50,75,100].map(pct => {
+              const gy = (padT + cH*(1-pct/100)).toFixed(1);
+              const col = pct===50 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
+              const lw  = pct===50 ? '1' : '0.5';
+              return `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="${col}" stroke-width="${lw}"/><text x="${padL-4}" y="${gy}" text-anchor="end" font-size="8" fill="var(--text2)" dominant-baseline="middle">${pct}%</text>`;
+            }).join('');
+
+            const bars = days.map((d, i) => {
+              const cx = padL + (n > 1 ? i/(n-1)*cW : cW/2);
+              const x  = cx - barW/2;
+              const bH = Math.max(2, d.rate * cH);
+              const y  = padT + cH - bH;
+              const col = d.rate >= 0.6 ? '#34d399' : d.rate >= 0.4 ? '#93c5fd' : '#f87171';
+              const tip = `${d.date}\u3000勝率${Math.round(d.rate*100)}%\uff08${d.win}/${d.total}台\uff09`;
+              return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${col}" opacity="0.85" rx="2" onmouseenter="showWinTip(event,'${tip}')" onmouseleave="hideWinTip()"/>`;
+            }).join('');
+
+            const wr = mainWinRates[m.name];
+            const avgLine = wr !== null ? (() => {
+              const ay = (padT + cH*(1-wr/100)).toFixed(1);
+              return `<line x1="${padL}" y1="${ay}" x2="${W-padR}" y2="${ay}" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/><text x="${W-padR+2}" y="${ay}" font-size="8" fill="#fbbf24" dominant-baseline="middle">${Math.round(wr)}%</text>`;
+            })() : '';
+
+            const lblStep = Math.max(1, Math.ceil(n/8));
+            const lbls = days.map((d,i) => ({d,i})).filter(({i}) => i%lblStep===0 || i===n-1)
+              .map(({d,i}) => { const cx = (padL + (n>1 ? i/(n-1)*cW : cW/2)).toFixed(1); return `<text x="${cx}" y="${H-4}" text-anchor="middle" font-size="8" fill="var(--text2)">${d.date.slice(5,7)}/${d.date.slice(8,10)}</text>`; }).join('');
+
+            return `<div id="mainWinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+              <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:10px;">${m.name} \u2014 日別勝率（${n}日分）</div>
+              <div style="overflow-x:auto;"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:320px;height:auto;display:block;">
+                <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+                ${grids}<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+cH}" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+                ${bars}${avgLine}${lbls}
+              </svg></div>
+              <div style="font-size:10px;color:var(--text2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
+                <span>\ud83d\udfe2 60%以上（放出寄り）</span><span>\ud83d\udd35 40\uff5e60%（均衡）</span>
+                <span>\ud83d\udd34 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
+              </div></div>`;
+          }).join('')}
+        </div>
+
     }
   }
 
@@ -5997,15 +6343,69 @@ function navigateToPinpoint(dateStr) {
 }
 
 // ── 全台系ソート ──
-let _zentaiSortKey = 'date';
-let _zentaiSortDir = 'desc';
+let _zentaiSortKey    = 'date';
+let _zentaiSortDir    = 'desc';
+let _zentai100SortKey = 'date';
+let _zentai100SortDir = 'desc';
 
-function toggleZentaiDetail() {
-  const el = document.getElementById('zentaiDetail');
+function toggleZentai100Detail() {
+  const el   = document.getElementById('zentaiDetail100');
+  const tile = document.getElementById('zentaiTile100');
   if (!el) return;
   const isOpen = el.style.display !== 'none';
-  el.style.display = isOpen ? 'none' : 'block';
+  const d1 = document.getElementById('zentaiDetail');
+  const t1 = document.getElementById('zentaiTile');
+  if (d1) d1.style.display = 'none';
+  if (t1) t1.setAttribute('data-open','false');
+  el.style.display = 'none';
+  if (tile) tile.setAttribute('data-open','false');
+  if (!isOpen) {
+    el.style.display = 'block';
+    if (tile) tile.setAttribute('data-open','true');
+    renderZentai100Table();
+  }
+}
+
+function renderZentai100Table() {
+  const body = document.getElementById('zentaiTableBody100');
+  if (!body) return;
+  const events = window._zentaiEvents100 || [];
+  const sorted = [...events].sort((a,b) => {
+    let va = a[_zentai100SortKey], vb = b[_zentai100SortKey];
+    if (typeof va === 'string') return _zentai100SortDir==='asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+    return _zentai100SortDir==='asc' ? va-vb : vb-va;
+  });
+  body.innerHTML = sorted.map(e => `
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
+      <td style="padding:8px 10px;font-size:11px;color:var(--text2);">${e.date}</td>
+      <td style="padding:8px 10px;font-size:11px;color:var(--text);font-weight:600;">${e.model}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:center;font-weight:700;">${e.taiCount}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;">${Math.round(e.minIn).toLocaleString()}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;font-weight:700;">${(e.minPayout*100).toFixed(1)}%</td>
+      <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;opacity:.7;">${Math.round(e.avgIn).toLocaleString()}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;opacity:.7;">${(e.avgPayout*100).toFixed(1)}%</td>
+    </tr>`).join('');
+  document.querySelectorAll('.zi100').forEach(el => el.textContent = '⇅');
+  const th = document.getElementById('zentaiTh100_' + _zentai100SortKey);
+  if (th) { const zi = th.querySelector('.zi100'); if (zi) zi.textContent = _zentai100SortDir==='asc'?'▲':'▼'; }
+}
+
+function sortZentai100Table(key) {
+  if (_zentai100SortKey === key) { _zentai100SortDir = _zentai100SortDir==='asc'?'desc':'asc'; }
+  else { _zentai100SortKey = key; _zentai100SortDir = 'desc'; }
+  renderZentai100Table();
+}
+
+function toggleZentaiDetail() {
+  const el   = document.getElementById('zentaiDetail');
   const tile = document.getElementById('zentaiTile');
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  const d2 = document.getElementById('zentaiDetail100');
+  const t2 = document.getElementById('zentaiTile100');
+  if (d2) d2.style.display = 'none';
+  if (t2) t2.setAttribute('data-open','false');
+  el.style.display = isOpen ? 'none' : 'block';
   if (tile) tile.setAttribute('data-open', String(!isOpen));
 }
 
@@ -6041,6 +6441,61 @@ function _renderZentaiRows() {
       <td style="padding:8px 10px;font-size:11px;color:#34d399;text-align:right;opacity:.7;">${Math.round(e.avgIn).toLocaleString()}</td>
       <td style="padding:8px 10px;font-size:11px;color:#fbbf24;text-align:right;opacity:.7;">${(e.avgPayout*100).toFixed(1)}%</td>
     </tr>`).join('');
+}
+
+function showWinTip(e, text) {
+  const tip = document.getElementById('winRateTooltip');
+  if (!tip) return;
+  tip.textContent = text;
+  tip.style.display = 'block';
+  _moveWinTip(e);
+}
+function _moveWinTip(e) {
+  const tip = document.getElementById('winRateTooltip');
+  if (!tip || tip.style.display === 'none') return;
+  const x = e.clientX + 14;
+  const y = e.clientY - 36;
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  tip.style.left = (x + tw > window.innerWidth  ? e.clientX - tw - 10 : x) + 'px';
+  tip.style.top  = (y < 0 ? e.clientY + 14 : y) + 'px';
+}
+function hideWinTip() {
+  const tip = document.getElementById('winRateTooltip');
+  if (tip) tip.style.display = 'none';
+}
+
+function toggleMainWinDetail(idx) {
+  const el = document.getElementById('mainWinDetail_' + idx);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  [0,1,2,3,4].forEach(i => {
+    const p = document.getElementById('mainWinDetail_' + i);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('mainWinTile_' + i);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('mainWinTile_' + idx);
+    if (tile) tile.setAttribute('data-open','true');
+  }
+}
+
+function toggleJagDetail(key) {
+  const el = document.getElementById('jagDetail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  ['oki','dobon'].forEach(k => {
+    const p = document.getElementById('jagDetail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('jagTile_' + k);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('jagTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
 }
 
 function toggleEffortDetail(key) {
