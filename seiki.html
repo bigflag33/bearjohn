@@ -4591,6 +4591,123 @@ function renderRivalAnalysis() {
     </div>`;
   }
 
+  // ②-e 万枚突破分析
+  {
+    // 台番×日付 集計
+    const hasTaibanForMan = all.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
+
+    const manTaiDayMap = {};
+    if (hasTaibanForMan) {
+      all.forEach(r => {
+        const tai   = r['台番'] != null ? String(r['台番']).trim() : '';
+        const model = r['機種名'] || '不明';
+        const date  = r.date;
+        if (!tai || !date) return;
+        const k = date + '\x00' + tai;
+        if (!manTaiDayMap[k]) manTaiDayMap[k] = { date, tai, model, diff: 0, inmai: 0 };
+        manTaiDayMap[k].diff  += r['差枚']  || 0;
+        manTaiDayMap[k].inmai += r['IN枚数'] || 0;
+      });
+    }
+
+    const allManEvents = Object.values(manTaiDayMap).sort((a, b) => b.diff - a.diff);
+    const manEvt10k = allManEvents.filter(t => t.diff >= 10000);
+    const manEvt9k  = allManEvents.filter(t => t.diff >= 9000);
+    const manEvt8k  = allManEvents.filter(t => t.diff >= 8000);
+
+    // 出現率の分母: ユニーク台番数 × 営業日数
+    const manTotalDays = new Set(all.map(r => r.date).filter(Boolean)).size;
+    const manUniqueTai = new Set(all.map(r => r['台番'] != null ? String(r['台番']).trim() : '').filter(t => t)).size;
+    const manDenom = (manTotalDays > 0 && manUniqueTai > 0) ? manTotalDays * manUniqueTai : 0;
+    const manPct = (cnt) => manDenom > 0 ? (cnt / manDenom * 100).toFixed(2) + '%' : '—';
+
+    // インサイト登録
+    if (manEvt10k.length > 0) {
+      _pushInsight('rival', '🎰',
+        '万枚突破 ' + manEvt10k.length + '件を検出',
+        '最大: ' + manEvt10k[0].date + ' 台' + manEvt10k[0].tai + '（' + manEvt10k[0].model + '）差枚' + manEvt10k[0].diff.toLocaleString() + '枚',
+        2, null, 'rivalAnalysisCard');
+    }
+
+    window._manTachiData = { man10k: manEvt10k, man9k: manEvt9k, man8k: manEvt8k };
+
+    // テーブルビルダー
+    function _manRows(events, accentColor) {
+      if (!events || events.length === 0)
+        return '<div style="font-size:11px;color:var(--text2);padding:10px 0;">該当なし</div>';
+      const thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
+      const rows = events.slice(0, 30).map(e =>
+        '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+        + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);white-space:nowrap;">' + e.date + '</td>'
+        + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:center;">' + e.tai + '</td>'
+        + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + e.model + '</td>'
+        + '<td style="padding:7px 10px;font-size:14px;font-weight:900;color:' + accentColor + ';text-align:right;">' + e.diff.toLocaleString() + '枚</td>'
+        + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + (e.inmai || 0).toLocaleString() + '枚</td>'
+        + '</tr>'
+      ).join('');
+      const thRow = '<tr style="border-bottom:1px solid ' + accentColor + '44;">'
+        + '<th style="' + thS + 'text-align:left;">日付</th>'
+        + '<th style="' + thS + 'text-align:center;">台番</th>'
+        + '<th style="' + thS + 'text-align:left;">機種名</th>'
+        + '<th style="' + thS + 'text-align:right;">差枚</th>'
+        + '<th style="' + thS + 'text-align:right;">IN枚数</th>'
+        + '</tr>';
+      return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+        + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>'
+        + (events.length > 30 ? '<div style="font-size:10px;color:var(--text3);padding:4px 2px;">… 他 ' + (events.length - 30) + ' 件</div>' : '');
+    }
+
+    // タイルビルダー（攻略分析用）
+    function _manTile(id, cnt, label, sublabel, color, pctStr) {
+      const col    = cnt > 0 ? color : '#6b7280';
+      const bg     = cnt > 0 ? color + '12' : 'rgba(107,114,128,0.05)';
+      const badge  = cnt > 0 ? 'badge-warn' : 'badge-ok';
+      const badgeTxt = cnt > 0 ? cnt + '件' : 'なし';
+      return '<div id="manTile_' + id + '" data-open="false" onclick="toggleManDetail(\'' + id + '\')"'
+        + ' style="border:1px solid ' + col + ';border-radius:14px;padding:18px 14px 14px;cursor:pointer;background:' + bg + ';user-select:none;">'
+        + '<div style="font-size:56px;font-weight:900;line-height:1;color:' + col + ';letter-spacing:-3px;font-variant-numeric:tabular-nums;">' + cnt + '</div>'
+        + '<div style="font-size:22px;font-weight:900;color:' + col + ';margin-top:4px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">' + pctStr + '</div>'
+        + '<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:' + col + ';margin-top:8px;">' + label + '</div>'
+        + '<div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">' + sublabel + '</div>'
+        + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">'
+        + '<span class="action-badge ' + badge + '">' + badgeTxt + '</span>'
+        + '<span style="font-size:10px;color:var(--text2);">▾</span>'
+        + '</div></div>';
+    }
+
+    html += '<div class="rival-section">';
+    html += '<div class="rival-section-title" style="color:#f59e0b;">🎰 万枚突破分析</div>';
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">'
+      + '台番レベルで差枚を日次集計し、10,000枚・9,000枚・8,000枚を突破したイベントを全期間から検出します。'
+      + '出現率＝件数÷（ユニーク台番数×営業日数）。タイルクリックで一覧展開。</div>';
+
+    if (!hasTaibanForMan) {
+      html += '<div style="font-size:11px;color:var(--text2);">台番データがないため万枚突破分析を実行できません。</div>';
+    } else {
+      html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:660px;margin-bottom:16px;">';
+      html += _manTile('man10k', manEvt10k.length, '万枚突破',    '差枚10,000枚以上', '#f59e0b', manPct(manEvt10k.length));
+      html += _manTile('man9k',  manEvt9k.length,  '9,000枚突破', '差枚9,000枚以上',  '#fbbf24', manPct(manEvt9k.length));
+      html += _manTile('man8k',  manEvt8k.length,  '8,000枚突破', '差枚8,000枚以上',  '#fb923c', manPct(manEvt8k.length));
+      html += '</div>';
+
+      html += '<div id="manDetail_man10k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(245,158,11,0.3);background:rgba(0,0,0,0.18);">'
+        + '<div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:12px;">万枚突破 一覧（差枚10,000枚以上 全' + manEvt10k.length + '件）</div>'
+        + _manRows(manEvt10k, '#f59e0b') + '</div>';
+
+      html += '<div id="manDetail_man9k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(251,191,36,0.3);background:rgba(0,0,0,0.18);">'
+        + '<div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:12px;">9,000枚突破 一覧（差枚9,000枚以上 全' + manEvt9k.length + '件）</div>'
+        + _manRows(manEvt9k, '#fbbf24') + '</div>';
+
+      html += '<div id="manDetail_man8k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(251,146,60,0.3);background:rgba(0,0,0,0.18);">'
+        + '<div style="font-size:12px;font-weight:700;color:#fb923c;margin-bottom:12px;">8,000枚突破 一覧（差枚8,000枚以上 全' + manEvt8k.length + '件）</div>'
+        + _manRows(manEvt8k, '#fb923c') + '</div>';
+    }
+
+    html += '<div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6;">'
+      + '※ 出現率＝件数÷（ユニーク台番数' + manUniqueTai + '台×営業日数' + manTotalDays + '日）。1台が連日万枚なら複数カウント。台番データ必須。</div>';
+    html += '</div>';
+  }
+
   // ③ 運用努力機種分析 — 「◯曜日」「◯の付く日」稼働・利益の2軸パターン検出
   {
     // 機種×日付ごとに IN枚数・台粗利 を集計
@@ -5112,7 +5229,7 @@ function renderRivalAnalysis() {
             <div id="jagTile_oki" data-open="false" onclick="toggleJagDetail('oki')"
               style="border:1px solid ${okiCol.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${okiCol.bg};user-select:none;">
               <div style="font-size:56px;font-weight:900;line-height:1;color:${okiCol.border};letter-spacing:-3px;font-variant-numeric:tabular-nums;">${okiEvents}</div>
-              <div style="font-size:13px;font-weight:700;color:${okiCol.border};margin-top:3px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">${okiPct.toFixed(2)}%</div>
+              <div style="font-size:24px;font-weight:900;color:${okiCol.border};margin-top:5px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">${okiPct.toFixed(2)}%</div>
               <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${okiCol.border};margin-top:8px;">据え置き検出</div>
               <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3日以上連続<br>出玉率100%超の台</div>
               <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
@@ -7389,7 +7506,7 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
       +'background:'+color+'0d;user-select:none;min-height:120px;">'
       +'<div style="font-size:40px;font-weight:900;line-height:1;color:'+color+';letter-spacing:-2px;font-variant-numeric:tabular-nums;">'
       +(noData?'—':count)+'</div>'
-      +(pctStr?'<div style="font-size:12px;font-weight:700;color:'+color+';margin-top:2px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">'+pctStr+'</div>':'')
+      +(pctStr?'<div style="font-size:20px;font-weight:900;color:'+color+';margin-top:3px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">'+pctStr+'</div>':'')
       +'<div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:'+color+';margin-top:4px;">'+label+'</div>'
       +'<div style="font-size:10px;font-weight:700;color:var(--text);margin-top:2px;line-height:1.3;">'+sublabel+'</div>'
       +(sub?'<div style="margin-top:6px;">'+sub+'</div>':'')
@@ -7735,6 +7852,23 @@ function toggleJagDetail(key) {
   if (!isOpen) {
     el.style.display = 'block';
     const tile = document.getElementById('jagTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
+}
+
+function toggleManDetail(key) {
+  const el = document.getElementById('manDetail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  ['man10k','man9k','man8k'].forEach(k => {
+    const p = document.getElementById('manDetail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('manTile_' + k);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('manTile_' + key);
     if (tile) tile.setAttribute('data-open','true');
   }
 }
