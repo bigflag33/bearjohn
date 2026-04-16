@@ -1392,6 +1392,19 @@
           <div class="pin-chart-wrap"><canvas id="pinTrendChart"></canvas></div>
         </div>
       </div>
+      <!-- ピンポイント 前後2週間比較タイル -->
+      <div id="pinDayAnalysisWrap" style="display:none;margin-top:20px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+          <div class="dot" style="background:#f59e0b"></div>
+          <span>この日の営業分析</span>
+          <span id="pinDayWindowNote" style="font-size:10px;color:var(--text3);margin-left:4px;"></span>
+        </div>
+        <div id="pinDayTypeBanner" style="margin-bottom:12px;"></div>
+        <div id="pinDayTilesRow1" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;"></div>
+        <div id="pinDayTilesRow2" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;"></div>
+        <div id="pinDayTileDetail" style="display:none;margin-top:4px;padding:14px 16px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);"></div>
+      </div>
+
       <!-- 機種別テーブル/グラフ切り替え -->
       <div style="margin-top:18px;">
         <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -7231,6 +7244,291 @@ function showNewModelChart(idx) {
   });
 }
 
+// ─────────────────────────────────────────────
+//  ピンポイント 前後2週間比較タイル
+// ─────────────────────────────────────────────
+function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
+  const wrap = document.getElementById('pinDayAnalysisWrap');
+  if (!wrap) return;
+
+  // ── 1. 比較ウィンドウ決定（前後各1週 or 過去2週） ──
+  function shiftD(d, n) {
+    const dt = new Date(d + 'T00:00:00'); dt.setDate(dt.getDate() + n);
+    return dt.toISOString().slice(0, 10);
+  }
+  const prevData = all.filter(r => r.date >= shiftD(dateVal,-7) && r.date <= shiftD(dateVal,-1));
+  const nextData = all.filter(r => r.date >= shiftD(dateVal, 1) && r.date <= shiftD(dateVal, 7));
+  const nextDays = new Set(nextData.map(r => r.date)).size;
+  let compData, windowNote, useSlide;
+  if (nextDays < 3) {
+    compData   = all.filter(r => r.date >= shiftD(dateVal,-14) && r.date <= shiftD(dateVal,-1));
+    windowNote = '（後1週データ不足→過去2週に切替）';
+    useSlide   = true;
+  } else {
+    compData   = [...prevData, ...nextData];
+    windowNote = '前後各1週間平均との比較';
+    useSlide   = false;
+  }
+  const noteEl = document.getElementById('pinDayWindowNote');
+  if (noteEl) noteEl.textContent = windowNote;
+
+  // ── 2. 全体ベースライン ──
+  const compAvgIn = compData.length > 0 ? compData.reduce((a,r)=>a+(r['IN枚数']||0),0)/compData.length : 0;
+  const compAvgPr = compData.length > 0 ? compData.reduce((a,r)=>a+(r['台粗利']||0),0)/compData.length : 0;
+  const selAvgIn  = selDay.length  > 0 ? selDay.reduce((a,r)=>a+(r['IN枚数']||0),0)/selDay.length   : 0;
+  const selAvgPr  = selDay.length  > 0 ? selDay.reduce((a,r)=>a+(r['台粗利']||0),0)/selDay.length   : 0;
+  const inDevPct  = compAvgIn  > 0 ? (selAvgIn - compAvgIn) / compAvgIn * 100 : 0;
+  const prDevPct  = compAvgPr !== 0 ? (selAvgPr - compAvgPr) / Math.abs(compAvgPr) * 100 : 0;
+
+  // ── 3. Day Type判定 ──
+  let dayType;
+  if      (inDevPct >= 8  && prDevPct >= 8)   dayType={icon:'🌟',label:'超好調日',   desc:'アウト・利益ともに上振れ',          color:'#f59e0b'};
+  else if (inDevPct >= 8  && prDevPct <= -5)   dayType={icon:'🔵',label:'集客日',     desc:'アウト高・利益低（放出寄り）',      color:'#60a5fa'};
+  else if (inDevPct <= -5 && prDevPct >= 8)    dayType={icon:'🔴',label:'絞り日',     desc:'アウト低・利益高（絞り運用）',      color:'#f87171'};
+  else if (prDevPct <= -15)                    dayType={icon:'🟠',label:'放出日',     desc:'利益が大きくマイナス方向',          color:'#f97316'};
+  else if (inDevPct >= 5)                      dayType={icon:'🟡',label:'高稼働日',   desc:'アウト高め（利益は平均的）',        color:'#fbbf24'};
+  else if (Math.abs(inDevPct)<=5 && Math.abs(prDevPct)<=8)
+                                               dayType={icon:'🟢',label:'通常営業日', desc:'前後平均に近い標準的な日',          color:'#34d399'};
+  else                                         dayType={icon:'⚪',label:'特異日',     desc:'一部機種が突出している可能性あり',  color:'#9ca3af'};
+
+  // ── 4. 機種別偏差リスト ──
+  const compByModel = {};
+  compData.forEach(r => {
+    const m = r['機種名']; if (!m) return;
+    if (!compByModel[m]) compByModel[m] = {inSum:0,prSum:0,cnt:0};
+    compByModel[m].inSum += r['IN枚数']||0;
+    compByModel[m].prSum += r['台粗利']||0;
+    compByModel[m].cnt++;
+  });
+  const devList = modelRows.map(r => {
+    const c = compByModel[r.name];
+    const cIn = c && c.cnt>0 ? c.inSum/c.cnt : null;
+    const cPr = c && c.cnt>0 ? c.prSum/c.cnt : null;
+    const inDev  = cIn!=null ? r.avgIn     - cIn : null;
+    const prDev  = cPr!=null ? r.avgProfit - cPr : null;
+    const inDPct = cIn!=null && cIn>0      ? inDev/cIn*100     : null;
+    const prDPct = cPr!=null && cPr!==0   ? prDev/Math.abs(cPr)*100 : null;
+    return Object.assign({}, r, {cIn, cPr, inDev, prDev, inDPct, prDPct});
+  });
+
+  // ── 5. 各タイル用データ ──
+  const IN_TH=15, PR_TH=20;  // 偏差閾値(%)
+  const inUp   = devList.filter(r=>r.inDPct!=null && r.inDPct>=IN_TH).sort((a,b)=>b.inDPct-a.inDPct);
+  const prUp   = devList.filter(r=>r.prDPct!=null && r.prDPct>=PR_TH).sort((a,b)=>b.prDPct-a.prDPct);
+  const inDown = devList.filter(r=>r.inDPct!=null && r.inDPct<=-IN_TH).sort((a,b)=>a.inDPct-b.inDPct);
+  const redOut = devList.filter(r=>r.profit<0).sort((a,b)=>a.profit-b.profit);
+  const jugRows = devList.filter(r=>r.name.includes('ジャグラー'));
+  const mainRows= devList.filter(r=>r.count>=4 && !r.name.includes('ジャグラー'))
+                         .sort((a,b)=>b.inmai-a.inmai).slice(0,6);
+  const varRows = devList.filter(r=>r.count<=2);
+
+  // カテゴリ集計ヘルパー
+  function catSummary(rows) {
+    if (!rows.length) return null;
+    const totalMach = rows.reduce((a,r)=>a+r.count,0);
+    const avgIn  = rows.reduce((a,r)=>a+r.avgIn*r.count,0) / Math.max(totalMach,1);
+    const avgPr  = rows.reduce((a,r)=>a+r.avgProfit*r.count,0) / Math.max(totalMach,1);
+    const cInOk  = rows.some(r=>r.cIn!=null);
+    const cAvgIn = cInOk ? rows.reduce((a,r)=>a+(r.cIn||0)*r.count,0)/Math.max(totalMach,1) : null;
+    const cAvgPr = rows.some(r=>r.cPr!=null)
+      ? rows.reduce((a,r)=>a+(r.cPr||0)*r.count,0)/Math.max(totalMach,1) : null;
+    const inDPct = cAvgIn!=null && cAvgIn>0 ? (avgIn-cAvgIn)/cAvgIn*100 : null;
+    const prDPct = cAvgPr!=null && cAvgPr!==0 ? (avgPr-cAvgPr)/Math.abs(cAvgPr)*100 : null;
+    const label  = (inDPct!=null && prDPct!=null)
+      ? (inDPct>=8&&prDPct>=8?'強化日' : inDPct>=8&&prDPct<=-5?'集客枠' : inDPct<=-5&&prDPct>=8?'絞り気味'
+       : Math.abs(inDPct)<=5&&Math.abs(prDPct)<=8?'通常運用' : '要観察')
+      : 'データ不足';
+    return {models:rows.length, machines:totalMach, avgIn:Math.round(avgIn), avgPr:Math.round(avgPr),
+            cAvgIn:cAvgIn!=null?Math.round(cAvgIn):null, cAvgPr:cAvgPr!=null?Math.round(cAvgPr):null,
+            inDPct, prDPct, label};
+  }
+
+  const jugSum  = catSummary(jugRows);
+  const mainSum = catSummary(mainRows);
+  const varSum  = catSummary(varRows);
+
+  // ── 6. HTML組み立て ──
+  const fmtPct = (v,sign) => v!=null ? (v>=0?(sign?'+':'')+v.toFixed(1)+'%':v.toFixed(1)+'%') : '—';
+  const pctCol = v => v==null?'var(--text3)':v>=0?'#34d399':'#f87171';
+
+  // Day Type バナー
+  const banner = document.getElementById('pinDayTypeBanner');
+  if (banner) {
+    banner.innerHTML = '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:10px;'
+      +'background:'+dayType.color+'18;border:1px solid '+dayType.color+'44;">'
+      +'<span style="font-size:26px;">'+dayType.icon+'</span>'
+      +'<div><div style="font-size:14px;font-weight:900;color:'+dayType.color+';">'+dayType.label+'</div>'
+      +'<div style="font-size:11px;color:var(--text2);">'+dayType.desc
+      +'　IN偏差<b style="color:'+pctCol(inDevPct)+';">'+fmtPct(inDevPct,true)+'</b>'
+      +'　利益偏差<b style="color:'+pctCol(prDevPct)+';">'+fmtPct(prDevPct,true)+'</b></div></div>'
+      +'<div style="margin-left:auto;text-align:right;font-size:10px;color:var(--text3);">'+windowNote+'</div>'
+      +'</div>';
+  }
+
+  // タイルビルダー
+  function makeTile(id, count, label, sublabel, color, topRows, valueKey, pctKey, isNeg) {
+    const top = topRows.slice(0,2);
+    const sub = top.map(r => {
+      const pct = r[pctKey]; const val = pct!=null?(pct>=0?'+':'')+pct.toFixed(0)+'%':'';
+      return '<span style="display:block;font-size:9.5px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;">'
+        +r.name.slice(0,12)+(r.name.length>12?'…':'')
+        +(val?'<span style="color:'+pctCol(pct)+';font-size:9px;margin-left:2px;">'+val+'</span>':'')+'</span>';
+    }).join('');
+    const noData = count===0 ? 'なし' : '';
+    const badgeColor = isNeg ? (count>0?'badge-alert':'badge-ok') : (count>0?'badge-warn':'badge-ok');
+    const badgeText  = isNeg ? (count>0?'要注目':'なし') : (count>0?'注目':'なし');
+    return '<div id="pdTile_'+id+'" onclick="togglePinDayDetail(\''+id+'\')"'
+      +' style="border:1px solid '+color+'44;border-radius:12px;padding:12px 10px 10px;cursor:pointer;'
+      +'background:'+color+'0d;user-select:none;min-height:120px;">'
+      +'<div style="font-size:40px;font-weight:900;line-height:1;color:'+color+';letter-spacing:-2px;font-variant-numeric:tabular-nums;">'
+      +(noData?'—':count)+'</div>'
+      +'<div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:'+color+';margin-top:4px;">'+label+'</div>'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text);margin-top:2px;line-height:1.3;">'+sublabel+'</div>'
+      +(sub?'<div style="margin-top:6px;">'+sub+'</div>':'')
+      +'<div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">'
+      +'<span class="action-badge '+badgeColor+'">'+badgeText+'</span>'
+      +'<span style="font-size:9px;color:var(--text2);">▾</span></div>'
+      +'</div>';
+  }
+
+  // カテゴリタイルビルダー
+  function makeCatTile(id, label, icon, color, sum) {
+    if (!sum) return '<div style="border:1px solid var(--border);border-radius:12px;padding:12px 10px;'
+      +'font-size:11px;color:var(--text2);">'+label+': データなし</div>';
+    const inPct = sum.inDPct!=null ? (sum.inDPct>=0?'+':'')+sum.inDPct.toFixed(0)+'%' : '—';
+    const prPct = sum.prDPct!=null ? (sum.prDPct>=0?'+':'')+sum.prDPct.toFixed(0)+'%' : '—';
+    const inCol = pctCol(sum.inDPct), prCol = pctCol(sum.prDPct);
+    const labelCol = sum.label==='強化日'?'#34d399':sum.label==='集客枠'?'#60a5fa':sum.label==='絞り気味'?'#f87171':'var(--text3)';
+    return '<div id="pdTile_'+id+'" onclick="togglePinDayDetail(\''+id+'\')"'
+      +' style="border:1px solid '+color+'44;border-radius:12px;padding:12px 10px 10px;cursor:pointer;'
+      +'background:'+color+'0d;user-select:none;min-height:120px;">'
+      +'<div style="font-size:36px;font-weight:900;line-height:1;color:'+color+';letter-spacing:-2px;">'
+      +sum.machines+'</div>'
+      +'<div style="font-size:9px;color:'+color+';font-weight:800;margin-top:3px;">台 / '+sum.models+'機種</div>'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text);margin-top:4px;">'+icon+' '+label+'</div>'
+      +'<div style="margin-top:5px;display:flex;gap:8px;">'
+      +'<span style="font-size:9.5px;">IN<b style="color:'+inCol+';margin-left:2px;">'+inPct+'</b></span>'
+      +'<span style="font-size:9.5px;">粗利<b style="color:'+prCol+';margin-left:2px;">'+prPct+'</b></span>'
+      +'</div>'
+      +'<div style="margin-top:6px;font-size:9.5px;font-weight:700;color:'+labelCol+';">'+sum.label+'</div>'
+      +'<div style="margin-top:4px;display:flex;justify-content:flex-end;">'
+      +'<span style="font-size:9px;color:var(--text2);">▾</span></div>'
+      +'</div>';
+  }
+
+  // タイル詳細データをグローバルに保存
+  window._pinDayTileData = {
+    inUp: {rows:inUp, valueKey:'avgIn', pctKey:'inDPct', label:'アウト上振れ機種',
+      cols:['機種名','台数','1台平均IN','比較平均','偏差%'],
+      vals: r=>[r.name, r.count, (r.avgIn||0).toLocaleString(), r.cIn!=null?Math.round(r.cIn).toLocaleString():'—', fmtPct(r.inDPct,true)],
+      cols_color: r=>[null,null,null,null,pctCol(r.inDPct)]},
+    prUp: {rows:prUp, valueKey:'avgProfit', pctKey:'prDPct', label:'利益上振れ機種',
+      cols:['機種名','台数','1台平均粗利','比較平均','偏差%'],
+      vals: r=>[r.name, r.count, (r.avgProfit||0).toLocaleString()+'円', r.cPr!=null?Math.round(r.cPr).toLocaleString()+'円':'—', fmtPct(r.prDPct,true)],
+      cols_color: r=>[null,null,null,null,pctCol(r.prDPct)]},
+    inDown:{rows:inDown,valueKey:'avgIn',  pctKey:'inDPct', label:'アウト下振れ機種',
+      cols:['機種名','台数','1台平均IN','比較平均','偏差%'],
+      vals: r=>[r.name, r.count, (r.avgIn||0).toLocaleString(), r.cIn!=null?Math.round(r.cIn).toLocaleString():'—', fmtPct(r.inDPct,true)],
+      cols_color: r=>[null,null,null,null,pctCol(r.inDPct)]},
+    redOut:{rows:redOut,valueKey:'profit', pctKey:'prDPct', label:'赤字放出機種',
+      cols:['機種名','台数','粗利合計','1台平均粗利','偏差%'],
+      vals: r=>[r.name, r.count, (r.profit||0).toLocaleString()+'円', (r.avgProfit||0).toLocaleString()+'円', fmtPct(r.prDPct,true)],
+      cols_color: r=>[null,null,'#f87171','#f87171',pctCol(r.prDPct)]},
+    jug:  {rows:jugRows, sum:jugSum,  label:'ジャグラー',
+      cols:['機種名','台数','1台平均IN','偏差%','1台平均粗利','偏差%'],
+      vals: r=>[r.name, r.count, (r.avgIn||0).toLocaleString(), fmtPct(r.inDPct,true), (r.avgProfit||0).toLocaleString()+'円', fmtPct(r.prDPct,true)],
+      cols_color: r=>[null,null,null,pctCol(r.inDPct),null,pctCol(r.prDPct)]},
+    main: {rows:mainRows,sum:mainSum, label:'メイン機種（4台以上・非ジャグラー）',
+      cols:['機種名','台数','1台平均IN','偏差%','1台平均粗利','偏差%'],
+      vals: r=>[r.name, r.count, (r.avgIn||0).toLocaleString(), fmtPct(r.inDPct,true), (r.avgProfit||0).toLocaleString()+'円', fmtPct(r.prDPct,true)],
+      cols_color: r=>[null,null,null,pctCol(r.inDPct),null,pctCol(r.prDPct)]},
+    variety:{rows:varRows,sum:varSum, label:'バラエティ（1〜2台機種）',
+      cols:['機種名','台数','1台平均IN','偏差%','1台平均粗利','偏差%'],
+      vals: r=>[r.name, r.count, (r.avgIn||0).toLocaleString(), fmtPct(r.inDPct,true), (r.avgProfit||0).toLocaleString()+'円', fmtPct(r.prDPct,true)],
+      cols_color: r=>[null,null,null,pctCol(r.inDPct),null,pctCol(r.prDPct)]},
+  };
+
+  // Row1: 偏差4タイル
+  const row1 = document.getElementById('pinDayTilesRow1');
+  if (row1) {
+    row1.innerHTML =
+      makeTile('inUp',  inUp.length,  'アウト上振れ', '比較比+15%以上', '#60a5fa', inUp,  'avgIn',     'inDPct', false)
+    + makeTile('prUp',  prUp.length,  '利益上振れ',   '比較比+20%以上', '#34d399', prUp,  'avgProfit', 'prDPct', false)
+    + makeTile('inDown',inDown.length,'アウト下振れ',  '比較比−15%以下', '#f97316', inDown,'avgIn',     'inDPct', true)
+    + makeTile('redOut',redOut.length,'赤字放出',      '粗利がマイナス',  '#f87171', redOut,'profit',   'prDPct', true);
+  }
+
+  // Row2: カテゴリ3タイル
+  const row2 = document.getElementById('pinDayTilesRow2');
+  if (row2) {
+    row2.innerHTML =
+      makeCatTile('jug',     'ジャグラー', '🎰', '#a78bfa', jugSum)
+    + makeCatTile('main',    'メイン機種', '⭐', '#38bdf8', mainSum)
+    + makeCatTile('variety', 'バラエティ', '🎲', '#fb923c', varSum);
+  }
+
+  wrap.style.display = '';
+}
+
+function _pdPctCol(v) { return v==null?'var(--text3)':v>=0?'#34d399':'#f87171'; }
+function _pdFmtPct(v) { return v!=null?(v>=0?'+':'')+v.toFixed(1)+'%':'—'; }
+
+function togglePinDayDetail(tileId) {
+  const panel = document.getElementById('pinDayTileDetail');
+  if (!panel) return;
+  const data = window._pinDayTileData && window._pinDayTileData[tileId];
+  if (!data) return;
+
+  // 同じタイルを再クリックで閉じる
+  if (panel.dataset.tileId === tileId && panel.style.display !== 'none') {
+    panel.style.display = 'none';
+    panel.dataset.tileId = '';
+    return;
+  }
+  panel.dataset.tileId = tileId;
+  panel.style.display = 'block';
+
+  const rows = data.rows;
+  const thS  = 'padding:6px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;border-bottom:1px solid rgba(255,255,255,0.12);';
+  const tdS  = 'padding:6px 8px;font-size:11px;';
+
+  let html = '<div style="font-size:12px;font-weight:800;color:var(--text);margin-bottom:10px;">'
+    + data.label + '　<span style="font-size:10px;color:var(--text3);">'+rows.length+'件</span></div>';
+
+  if (rows.length === 0) {
+    html += '<div style="font-size:11px;color:var(--text2);">該当する機種はありませんでした。</div>';
+  } else {
+    html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+      + '<thead><tr>' + data.cols.map(c=>'<th style="'+thS+'">'+c+'</th>').join('') + '</tr></thead>'
+      + '<tbody>';
+    rows.forEach(r => {
+      const vals   = data.vals(r);
+      const colors = data.cols_color(r);
+      html += '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">';
+      vals.forEach((v, i) => {
+        const col = colors[i] ? 'color:'+colors[i]+';font-weight:700;' : '';
+        html += '<td style="'+tdS+col+'">'+v+'</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // サマリー情報（カテゴリタイルのみ）
+  if (data.sum) {
+    const s = data.sum;
+    html += '<div style="margin-top:10px;font-size:10.5px;color:var(--text2);border-top:1px solid rgba(255,255,255,0.08);padding-top:8px;">'
+      +'合計 '+s.machines+'台（'+s.models+'機種）　平均IN: '+(s.avgIn||0).toLocaleString()+'枚'
+      +(s.cAvgIn!=null?' <span style="color:'+_pdPctCol(s.inDPct)+';">(比較:'+s.cAvgIn.toLocaleString()+'枚 '+_pdFmtPct(s.inDPct)+' )</span>':'')
+      +'　平均粗利: '+(s.avgPr||0).toLocaleString()+'円'
+      +(s.cAvgPr!=null?' <span style="color:'+_pdPctCol(s.prDPct)+';">(比較:'+s.cAvgPr.toLocaleString()+'円 '+_pdFmtPct(s.prDPct)+' )</span>':'')
+      +'　判定: <b>'+s.label+'</b>'
+      +'</div>';
+  }
+
+  panel.innerHTML = html;
+}
+
 function _nmCloseAllPanels(exceptId) {
   [['newModelDetail','newModelTile'],['nmBelowDetail','nmBelowTile'],['nmTurnoverDetail','nmTurnoverTile']].forEach(([did, tid]) => {
     if (did === exceptId) return;
@@ -7819,6 +8117,9 @@ function runPinpoint() {
   _pinModelRows = modelRows;
   renderPinModelTable(modelRows);
   setPinModelView('chart'); // デフォルトグラフ表示
+
+  // ── ピンポイント 前後2週間比較タイル ──
+  _renderPinDayAnalysis(dateVal, selDay, modelRows, all);
 
   // AIアドバイス用にデータを保存、パネルをリセット
   _storePinAdviceData(curr, comparisons, selDay, dateVal);
