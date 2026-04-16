@@ -4264,7 +4264,43 @@ function renderRivalAnalysis() {
       .sort((a, b) => b.firstDate.localeCompare(a.firstDate));
 
     newModels.forEach((m, i) => { m.idx = i; });
-    window._newModelData = newModels;
+
+    // ── 店舗平均稼働 & 稼働割れまでの日数を計算 ──
+    const storeAvgIn = all.length > 0
+      ? all.reduce((a, r) => a + (r['IN枚数'] || 0), 0) / all.length
+      : 0;
+
+    newModels.forEach(m => {
+      // 機種の日別平均IN枚数を集計
+      const modelRecs  = all.filter(r => r['機種名'] === m.model && r.date >= m.firstDate);
+      const dayAvgMap  = {};
+      modelRecs.forEach(r => {
+        if (!dayAvgMap[r.date]) dayAvgMap[r.date] = { sum: 0, cnt: 0 };
+        dayAvgMap[r.date].sum += r['IN枚数'] || 0;
+        dayAvgMap[r.date].cnt++;
+      });
+      const sortedDates = Object.keys(dayAvgMap).sort();
+      m.daysUntilBelow = null;
+      m.belowDate      = null;
+      m.belowIn        = null;
+      for (const dt of sortedDates) {
+        const avgIn = dayAvgMap[dt].sum / dayAvgMap[dt].cnt;
+        if (avgIn < storeAvgIn) {
+          m.belowDate      = dt;
+          m.daysUntilBelow = Math.round((new Date(dt + 'T00:00:00') - new Date(m.firstDate + 'T00:00:00')) / 86400000);
+          m.belowIn        = Math.round(avgIn);
+          break;
+        }
+      }
+    });
+    const belowModels = newModels.filter(m => m.daysUntilBelow !== null);
+    const avgDaysUntilBelow = belowModels.length > 0
+      ? Math.round(belowModels.reduce((a, m) => a + m.daysUntilBelow, 0) / belowModels.length)
+      : null;
+    const noBreakCount = newModels.length - belowModels.length;
+
+    window._newModelData      = newModels;
+    window._newModelStoreAvgIn = Math.round(storeAvgIn);
 
     // インサイト登録
     if (newModels.length > 0) {
@@ -4334,6 +4370,43 @@ function renderRivalAnalysis() {
         + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>';
     }
 
+    // 稼働割れ詳細テーブルビルダー
+    function _nmBelowRows(models, storeAvg) {
+      const thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
+      const rows = models.map(m => {
+        const hasBelow   = m.daysUntilBelow !== null;
+        const belowDateTxt = hasBelow ? m.belowDate : '未割れ';
+        const daysTxt    = hasBelow ? m.daysUntilBelow + '日' : '<span style="color:#34d399;font-weight:700;">未割れ</span>';
+        const belowInTxt = hasBelow ? m.belowIn.toLocaleString() : '—';
+        const daysColor  = hasBelow
+          ? (m.daysUntilBelow <= 7 ? '#f87171' : m.daysUntilBelow <= 14 ? '#fbbf24' : '#34d399')
+          : '#34d399';
+        return '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + m.model + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);white-space:nowrap;">' + m.firstDate + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);white-space:nowrap;">' + belowDateTxt + '</td>'
+          + '<td style="padding:7px 10px;font-size:14px;font-weight:900;color:' + daysColor + ';text-align:center;">' + daysTxt + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">'
+            + (m.firstWeekAvgIn != null ? Math.round(m.firstWeekAvgIn).toLocaleString() : '—') + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:' + (hasBelow ? '#f87171' : 'var(--text3)') + ';text-align:right;font-weight:700;">' + belowInTxt + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:#9ca3af;text-align:right;">' + storeAvg.toLocaleString() + '</td>'
+          + '</tr>';
+      }).join('');
+
+      const thRow = '<tr style="border-bottom:1px solid rgba(167,139,250,0.25);">'
+        + '<th style="' + thS + 'text-align:left;">機種名</th>'
+        + '<th style="' + thS + 'text-align:left;">初登場日</th>'
+        + '<th style="' + thS + 'text-align:left;">稼働割れ日</th>'
+        + '<th style="' + thS + 'text-align:center;">日数</th>'
+        + '<th style="' + thS + 'text-align:right;">初週IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">割れ時IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">店舗平均IN/台</th>'
+        + '</tr>';
+
+      return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+        + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>';
+    }
+
     html += `<div class="rival-section">
       <div class="rival-section-title" style="color:#a78bfa;">🆕 新台登場 検出</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
@@ -4343,25 +4416,57 @@ function renderRivalAnalysis() {
     if (newModels.length === 0) {
       html += `<div style="font-size:11px;color:var(--text2);">期間内に新台登場は検出されませんでした（データ開始日から${NEW_BUFFER}日以内は除外）。</div>`;
     } else {
+      const belowTileNum  = avgDaysUntilBelow !== null ? String(avgDaysUntilBelow) : '—';
+      const belowSubText  = avgDaysUntilBelow !== null
+        ? `${belowModels.length}機種が稼働割れ${noBreakCount > 0 ? '・' + noBreakCount + '機種は未割れ' : ''}`
+        : `全${newModels.length}機種とも未割れ`;
+      const belowBadgeClass = avgDaysUntilBelow !== null && avgDaysUntilBelow <= 7 ? 'badge-alert'
+        : avgDaysUntilBelow !== null && avgDaysUntilBelow <= 14 ? 'badge-warn' : 'badge-ok';
+      const belowBadgeTxt = avgDaysUntilBelow !== null && avgDaysUntilBelow <= 7 ? '早期失速'
+        : avgDaysUntilBelow !== null && avgDaysUntilBelow <= 14 ? '要観察' : '稼働維持';
+
       html += `
-      <div id="newModelTile" data-open="false" onclick="toggleNewModelDetail()"
-        style="display:inline-flex;flex-direction:column;border:1px solid #a78bfa;border-radius:14px;padding:18px 24px 14px;cursor:pointer;background:rgba(167,139,250,0.07);user-select:none;margin-bottom:16px;min-width:160px;">
-        <div style="font-size:56px;font-weight:900;line-height:1;color:#a78bfa;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${newModels.length}</div>
-        <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#a78bfa;margin-top:10px;">新台登場</div>
-        <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">期間内に初登場した<br>競合機種</div>
-        <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
-          <span class="action-badge badge-alert">要チェック</span>
-          <span style="font-size:10px;color:var(--text2);">▾</span>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:500px;margin-bottom:16px;">
+        <!-- タイル①：新台登場数 -->
+        <div id="newModelTile" data-open="false" onclick="toggleNewModelDetail()"
+          style="border:1px solid #a78bfa;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(167,139,250,0.07);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#a78bfa;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${newModels.length}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#a78bfa;margin-top:10px;">新台登場</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">期間内に初登場した<br>競合機種</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge badge-alert">要チェック</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
+        </div>
+        <!-- タイル②：稼働割れまでの日数 -->
+        <div id="nmBelowTile" data-open="false" onclick="toggleNmBelowDetail()"
+          style="border:1px solid #c084fc;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(192,132,252,0.06);user-select:none;">
+          <div style="font-size:56px;font-weight:900;line-height:1;color:#c084fc;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${belowTileNum}</div>
+          <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#c084fc;margin-top:10px;">平均稼働割れ日数</div>
+          <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">店舗平均を下回るまで<br>の日数（新台平均）</div>
+          <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+            <span class="action-badge ${belowBadgeClass}">${belowBadgeTxt}</span>
+            <span style="font-size:10px;color:var(--text2);">▾</span>
+          </div>
         </div>
       </div>
 
-      <div id="newModelDetail" style="display:none;padding:16px 18px;border-radius:12px;border:1px solid rgba(167,139,250,0.35);background:rgba(0,0,0,0.18);">
+      <!-- 新台登場詳細パネル -->
+      <div id="newModelDetail" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(167,139,250,0.35);background:rgba(0,0,0,0.18);">
         ${_nmRows(newModels)}
+      </div>
+
+      <!-- 稼働割れ詳細パネル -->
+      <div id="nmBelowDetail" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(192,132,252,0.3);background:rgba(0,0,0,0.18);">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.6;">
+          店舗平均IN/台: <b style="color:#c084fc;">${Math.round(storeAvgIn).toLocaleString()}枚</b>　${belowSubText}
+        </div>
+        ${_nmBelowRows(newModels, Math.round(storeAvgIn))}
       </div>`;
     }
 
     html += `<div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6;">
-        ※ データ開始から${NEW_BUFFER}日以内に初登場した機種は「データが途中から始まった可能性」があるため除外しています。
+        ※ データ開始から${NEW_BUFFER}日以内に初登場した機種は除外。稼働割れ＝その日の機種平均IN枚数が店舗全体平均IN枚数を初めて下回った日。
       </div>
     </div>`;
   }
@@ -7021,10 +7126,29 @@ function showNewModelChart(idx) {
 }
 
 function toggleNewModelDetail() {
-  const detail = document.getElementById('newModelDetail');
-  const tile   = document.getElementById('newModelTile');
+  const detail  = document.getElementById('newModelDetail');
+  const tile    = document.getElementById('newModelTile');
+  const detail2 = document.getElementById('nmBelowDetail');
+  const tile2   = document.getElementById('nmBelowTile');
   if (!detail) return;
   const isOpen = detail.style.display !== 'none';
+  // 他パネルを閉じる
+  if (detail2) detail2.style.display = 'none';
+  if (tile2)   tile2.setAttribute('data-open', 'false');
+  detail.style.display = isOpen ? 'none' : 'block';
+  if (tile) tile.setAttribute('data-open', String(!isOpen));
+}
+
+function toggleNmBelowDetail() {
+  const detail  = document.getElementById('nmBelowDetail');
+  const tile    = document.getElementById('nmBelowTile');
+  const detail2 = document.getElementById('newModelDetail');
+  const tile2   = document.getElementById('newModelTile');
+  if (!detail) return;
+  const isOpen = detail.style.display !== 'none';
+  // 他パネルを閉じる
+  if (detail2) detail2.style.display = 'none';
+  if (tile2)   tile2.setAttribute('data-open', 'false');
   detail.style.display = isOpen ? 'none' : 'block';
   if (tile) tile.setAttribute('data-open', String(!isOpen));
 }
