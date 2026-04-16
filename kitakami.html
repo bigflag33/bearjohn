@@ -1402,6 +1402,7 @@
         <div id="pinDayTypeBanner" style="margin-bottom:12px;"></div>
         <div id="pinDayTilesRow1" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px;"></div>
         <div id="pinDayTilesRow2" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;"></div>
+        <div id="pinDayTilesRow3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;"></div>
         <div id="pinDayTileDetail" style="display:none;margin-top:4px;padding:14px 16px;border-radius:10px;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.08);"></div>
       </div>
 
@@ -5099,6 +5100,11 @@ function renderRivalAnalysis() {
 
         const hasTaiData = Object.keys(byTai).length > 0;
 
+        // 据え置き出現率 = okiEvents ÷ (ジャグラー総台数 × 対象営業日数)
+        const jagTaiCount = new Set(jagRaw.map(r => String(r['台番'] || '').trim()).filter(t => t)).size;
+        const jagDays = new Set(jagRaw.map(r => r.date)).size;
+        const okiPct = (jagTaiCount > 0 && jagDays > 0) ? okiEvents / (jagTaiCount * jagDays) * 100 : 0;
+
         return `
         <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
           <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">台別運用パターン${!hasTaiData ? '<span style="font-size:10px;color:#f87171;margin-left:8px;">※台番データなし</span>' : ''}</div>
@@ -5106,7 +5112,8 @@ function renderRivalAnalysis() {
             <div id="jagTile_oki" data-open="false" onclick="toggleJagDetail('oki')"
               style="border:1px solid ${okiCol.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${okiCol.bg};user-select:none;">
               <div style="font-size:56px;font-weight:900;line-height:1;color:${okiCol.border};letter-spacing:-3px;font-variant-numeric:tabular-nums;">${okiEvents}</div>
-              <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${okiCol.border};margin-top:10px;">据え置き検出</div>
+              <div style="font-size:13px;font-weight:700;color:${okiCol.border};margin-top:3px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">${okiPct.toFixed(2)}%</div>
+              <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${okiCol.border};margin-top:8px;">据え置き検出</div>
               <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3日以上連続<br>出玉率100%超の台</div>
               <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
                 <span class="action-badge ${okiEvents > 0 ? 'badge-warn' : 'badge-ok'}">${okiEvents > 0 ? '設定据え置き疑い' : 'なし'}</span>
@@ -7366,7 +7373,7 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
   }
 
   // タイルビルダー
-  function makeTile(id, count, label, sublabel, color, topRows, valueKey, pctKey, isNeg) {
+  function makeTile(id, count, label, sublabel, color, topRows, valueKey, pctKey, isNeg, pctStr) {
     const top = topRows.slice(0,2);
     const sub = top.map(r => {
       const pct = r[pctKey]; const val = pct!=null?(pct>=0?'+':'')+pct.toFixed(0)+'%':'';
@@ -7382,6 +7389,7 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
       +'background:'+color+'0d;user-select:none;min-height:120px;">'
       +'<div style="font-size:40px;font-weight:900;line-height:1;color:'+color+';letter-spacing:-2px;font-variant-numeric:tabular-nums;">'
       +(noData?'—':count)+'</div>'
+      +(pctStr?'<div style="font-size:12px;font-weight:700;color:'+color+';margin-top:2px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">'+pctStr+'</div>':'')
       +'<div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:'+color+';margin-top:4px;">'+label+'</div>'
       +'<div style="font-size:10px;font-weight:700;color:var(--text);margin-top:2px;line-height:1.3;">'+sublabel+'</div>'
       +(sub?'<div style="margin-top:6px;">'+sub+'</div>':'')
@@ -7416,6 +7424,27 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
       +'</div>';
   }
 
+  // 万枚突破検出（台番レベル）
+  const taiDiffMap = {};
+  selDay.forEach(function(r) {
+    const tai   = r['台番'] != null ? String(r['台番']).trim() : '';
+    const model = r['機種名'] || '不明';
+    if (!tai) return;
+    if (!taiDiffMap[tai]) taiDiffMap[tai] = {tai:tai, model:model, name:'台'+tai, diff:0, inmai:0};
+    taiDiffMap[tai].diff  += r['差枚']  || 0;
+    taiDiffMap[tai].inmai += r['IN枚数'] || 0;
+  });
+  const allTaiArr = Object.values(taiDiffMap).sort(function(a,b){ return b.diff - a.diff; });
+  const man10k = allTaiArr.filter(function(t){ return t.diff >= 10000; });
+  const man9k  = allTaiArr.filter(function(t){ return t.diff >= 9000; });
+  const man8k  = allTaiArr.filter(function(t){ return t.diff >= 8000; });
+
+  // 万枚突破率 = 台数 ÷ (選択日の総台数 × 1日)
+  const totalTaiDay = allTaiArr.length;
+  const man10kPct = (totalTaiDay > 0 ? (man10k.length / totalTaiDay * 100) : 0).toFixed(2) + '%';
+  const man9kPct  = (totalTaiDay > 0 ? (man9k.length  / totalTaiDay * 100) : 0).toFixed(2) + '%';
+  const man8kPct  = (totalTaiDay > 0 ? (man8k.length  / totalTaiDay * 100) : 0).toFixed(2) + '%';
+
   // タイル詳細データをグローバルに保存
   window._pinDayTileData = {
     inUp: {rows:inUp, valueKey:'avgIn', pctKey:'inDPct', label:'アウト上振れ機種',
@@ -7446,6 +7475,18 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
       cols:['機種名','台数','1台平均IN','偏差%','1台平均粗利','偏差%'],
       vals: r=>[r.name, r.count, (r.avgIn||0).toLocaleString(), fmtPct(r.inDPct,true), (r.avgProfit||0).toLocaleString()+'円', fmtPct(r.prDPct,true)],
       cols_color: r=>[null,null,null,pctCol(r.inDPct),null,pctCol(r.prDPct)]},
+    man10k:{rows:man10k, label:'万枚突破（差枚10,000枚以上）台',
+      cols:['台番','機種名','差枚','IN枚数'],
+      vals: r=>[r.tai, r.model, r.diff.toLocaleString()+'枚', (r.inmai||0).toLocaleString()+'枚'],
+      cols_color: r=>[null,null,'#f59e0b',null]},
+    man9k: {rows:man9k,  label:'9,000枚突破（差枚9,000枚以上）台',
+      cols:['台番','機種名','差枚','IN枚数'],
+      vals: r=>[r.tai, r.model, r.diff.toLocaleString()+'枚', (r.inmai||0).toLocaleString()+'枚'],
+      cols_color: r=>[null,null,'#fbbf24',null]},
+    man8k: {rows:man8k,  label:'8,000枚突破（差枚8,000枚以上）台',
+      cols:['台番','機種名','差枚','IN枚数'],
+      vals: r=>[r.tai, r.model, r.diff.toLocaleString()+'枚', (r.inmai||0).toLocaleString()+'枚'],
+      cols_color: r=>[null,null,'#fb923c',null]},
   };
 
   // Row1: 偏差4タイル
@@ -7465,6 +7506,15 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
       makeCatTile('jug',     'ジャグラー', '🎰', '#a78bfa', jugSum)
     + makeCatTile('main',    'メイン機種', '⭐', '#38bdf8', mainSum)
     + makeCatTile('variety', 'バラエティ', '🎲', '#fb923c', varSum);
+  }
+
+  // Row3: 万枚突破3タイル
+  const row3 = document.getElementById('pinDayTilesRow3');
+  if (row3) {
+    row3.innerHTML =
+      makeTile('man10k', man10k.length, '万枚突破',    '差枚10,000枚以上', '#f59e0b', man10k, 'diff', null, false, man10kPct)
+    + makeTile('man9k',  man9k.length,  '9,000枚突破', '差枚9,000枚以上',  '#fbbf24', man9k,  'diff', null, false, man9kPct)
+    + makeTile('man8k',  man8k.length,  '8,000枚突破', '差枚8,000枚以上',  '#fb923c', man8k,  'diff', null, false, man8kPct);
   }
 
   wrap.style.display = '';
