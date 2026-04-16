@@ -3978,7 +3978,6 @@ function renderRivalAnalysis() {
           const prev = dateCounts[i - 1];
           const curr = dateCounts[i];
           if (prev.count === curr.count) continue;
-          // 日付ギャップが大きい場合は近似マーク
           const dayGap = Math.round((new Date(curr.date) - new Date(prev.date)) / 86400000);
           changeEvents.push({
             date:     curr.date,
@@ -3988,23 +3987,142 @@ function renderRivalAnalysis() {
             after:    curr.count,
             delta:    curr.count - prev.count,
             type:     curr.count > prev.count ? 'add' : 'remove',
-            approx:   dayGap > 3  // 3日以上ギャップがある場合は「前後不明」
+            approx:   dayGap > 3
           });
         }
       });
       changeEvents.sort((a, b) => b.date.localeCompare(a.date) || a.model.localeCompare(b.model));
+
+      // ── 前後1週間の平均 & チャートデータ (±14日) を事前計算 ──
+      changeEvents.forEach((ev, idx) => {
+        ev.idx = idx;
+        const modelRecs = all.filter(r => r['機種名'] === ev.model);
+
+        // 変化日を基準に前後のウィンドウ日付を生成
+        function addDays(dateStr, n) {
+          const d = new Date(dateStr + 'T00:00:00');
+          d.setDate(d.getDate() + n);
+          return d.toISOString().slice(0, 10);
+        }
+        const preStart  = addDays(ev.date, -7);
+        const preEnd    = addDays(ev.date, -1);
+        const postStart = ev.date;
+        const postEnd   = addDays(ev.date,  6);
+
+        const preRecs  = modelRecs.filter(r => r.date >= preStart  && r.date <= preEnd);
+        const postRecs = modelRecs.filter(r => r.date >= postStart && r.date <= postEnd);
+
+        ev.preAvgIn      = preRecs.length  > 0 ? preRecs.reduce( (a,r) => a+(r['IN枚数']||0), 0) / preRecs.length  : null;
+        ev.postAvgIn     = postRecs.length > 0 ? postRecs.reduce((a,r) => a+(r['IN枚数']||0), 0) / postRecs.length : null;
+        ev.preAvgProfit  = preRecs.length  > 0 ? preRecs.reduce( (a,r) => a+(r['台粗利']||0), 0) / preRecs.length  : null;
+        ev.postAvgProfit = postRecs.length > 0 ? postRecs.reduce((a,r) => a+(r['台粗利']||0), 0) / postRecs.length : null;
+
+        // チャートデータ ±14日
+        const chartStart = addDays(ev.date, -14);
+        const chartEnd   = addDays(ev.date,  14);
+        const chartRecs  = modelRecs.filter(r => r.date >= chartStart && r.date <= chartEnd);
+        const byDay = {};
+        chartRecs.forEach(r => {
+          if (!byDay[r.date]) byDay[r.date] = { inSum:0, prSum:0, cnt:0 };
+          byDay[r.date].inSum += r['IN枚数']||0;
+          byDay[r.date].prSum += r['台粗利']||0;
+          byDay[r.date].cnt++;
+        });
+        // 29日分のラベルを生成（欠損日はnull）
+        const labels = [], inData = [], prData = [];
+        for (let n = -14; n <= 14; n++) {
+          const dt = addDays(ev.date, n);
+          labels.push(dt.slice(5)); // MM-DD
+          if (byDay[dt] && byDay[dt].cnt > 0) {
+            inData.push(Math.round(byDay[dt].inSum / byDay[dt].cnt));
+            prData.push(Math.round(byDay[dt].prSum / byDay[dt].cnt));
+          } else {
+            inData.push(null);
+            prData.push(null);
+          }
+        }
+        ev.chartLabels = labels;
+        ev.chartInData = inData;
+        ev.chartPrData = prData;
+        ev.chartChangeIdx = 14; // ±14の中央 = インデックス14が変化日
+      });
     }
+
+    window._machineChangeData = changeEvents;
 
     // インサイト登録
     const addCount    = changeEvents.filter(e => e.type === 'add').length;
     const removeCount = changeEvents.filter(e => e.type === 'remove').length;
     if (changeEvents.length > 0) {
-      const recentAdd = changeEvents.find(e => e.type === 'add');
-      const recentRem = changeEvents.find(e => e.type === 'remove');
-      const topEvent  = changeEvents[0];
+      const topEvent = changeEvents[0];
       _pushInsight('rival', '📊',
         `増台・減台 計${changeEvents.length}件を検出`,
         `直近: ${topEvent.date.slice(5)} ${topEvent.model} ${topEvent.before}台→${topEvent.after}台（${topEvent.delta > 0 ? '+' : ''}${topEvent.delta}台）`, 3, null, 'rivalAnalysisCard');
+    }
+
+    // テーブル行ビルダー（template literal深さを減らすために関数化）
+    function _mcRows(events, accentColor) {
+      const thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
+      const isAdd = events.length > 0 && events[0].type === 'add';
+      const borderColor = isAdd ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)';
+      const rows = events.map(e => {
+        const pIn  = e.preAvgIn      != null ? Math.round(e.preAvgIn).toLocaleString()      : '—';
+        const aIn  = e.postAvgIn     != null ? Math.round(e.postAvgIn).toLocaleString()     : '—';
+        const pPr  = e.preAvgProfit  != null ? Math.round(e.preAvgProfit).toLocaleString()  : '—';
+        const aPr  = e.postAvgProfit != null ? Math.round(e.postAvgProfit).toLocaleString() : '—';
+        const inDiff  = (e.preAvgIn != null && e.postAvgIn != null)
+          ? (e.postAvgIn - e.preAvgIn >= 0 ? '+' : '') + Math.round(e.postAvgIn - e.preAvgIn).toLocaleString() : '';
+        const prDiff  = (e.preAvgProfit != null && e.postAvgProfit != null)
+          ? (e.postAvgProfit - e.preAvgProfit >= 0 ? '+' : '') + Math.round(e.postAvgProfit - e.preAvgProfit).toLocaleString() : '';
+        const inDiffColor  = (e.postAvgIn != null && e.preAvgIn != null)
+          ? (e.postAvgIn  >= e.preAvgIn  ? '#34d399' : '#f87171') : 'var(--text3)';
+        const prDiffColor  = (e.postAvgProfit != null && e.preAvgProfit != null)
+          ? (e.postAvgProfit >= e.preAvgProfit ? '#34d399' : '#f87171') : 'var(--text3)';
+        const deltaStr = (e.delta > 0 ? '+' : '') + e.delta;
+        const approxBadge = e.approx ? '<span style="font-size:9px;color:#9ca3af;margin-left:3px;" title="データ空白期間あり">※</span>' : '';
+        return '<tr class="mc-data-row" data-idx="' + e.idx + '" '
+          + 'style="border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;transition:background .15s;" '
+          + 'onclick="showMachineChangeChart(' + e.idx + ')" '
+          + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.04)\'" '
+          + 'onmouseleave="this.style.background=\'\'">'
+          + '<td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">' + e.date + approxBadge + '</td>'
+          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + e.model + ' <span style="font-size:9px;color:var(--text3);">📈</span></td>'
+          + '<td style="padding:7px 10px;font-size:13px;font-weight:700;color:var(--text2);text-align:center;">' + e.before + '台</td>'
+          + '<td style="padding:7px 10px;font-size:13px;font-weight:700;color:' + accentColor + ';text-align:center;">' + e.after + '台</td>'
+          + '<td style="padding:7px 10px;font-size:14px;font-weight:900;color:' + accentColor + ';text-align:center;">' + deltaStr + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + pIn + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:' + inDiffColor + ';text-align:right;font-weight:700;">' + aIn + (inDiff ? '<span style="font-size:9px;margin-left:3px;">(' + inDiff + ')</span>' : '') + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + pPr + '</td>'
+          + '<td style="padding:7px 10px;font-size:11px;color:' + prDiffColor + ';text-align:right;font-weight:700;">' + aPr + (prDiff ? '<span style="font-size:9px;margin-left:3px;">(' + prDiff + ')</span>' : '') + '</td>'
+          + '</tr>'
+          + '<tr id="mcChartRow_' + e.idx + '" style="display:none;">'
+          + '<td colspan="9" style="padding:0 10px 16px;">'
+          + '<div style="padding:14px;background:rgba(0,0,0,0.25);border-radius:10px;margin-top:4px;">'
+          + '<div style="font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:700;">' + e.model + ' 前後2週間トレンド（変化日: ' + e.date + '）</div>'
+          + '<div style="position:relative;height:180px;">'
+          + '<canvas id="mcCanvas_' + e.idx + '"></canvas>'
+          + '</div>'
+          + '</div>'
+          + '</td>'
+          + '</tr>';
+      }).join('');
+
+      const thRow = '<tr style="border-bottom:1px solid ' + borderColor + ';">'
+        + '<th style="' + thS + 'text-align:left;">日付</th>'
+        + '<th style="' + thS + 'text-align:left;">機種名</th>'
+        + '<th style="' + thS + 'text-align:center;">変更前</th>'
+        + '<th style="' + thS + 'text-align:center;">変更後</th>'
+        + '<th style="' + thS + 'text-align:center;">台数差</th>'
+        + '<th style="' + thS + 'text-align:right;">前1週IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">後1週IN/台</th>'
+        + '<th style="' + thS + 'text-align:right;">前1週粗利/台</th>'
+        + '<th style="' + thS + 'text-align:right;">後1週粗利/台</th>'
+        + '</tr>';
+
+      return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+        + '<thead>' + thRow + '</thead>'
+        + '<tbody>' + rows + '</tbody>'
+        + '</table></div>';
     }
 
     const thStyleC = 'padding:8px 10px;font-size:10.5px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap;user-select:none;';
@@ -4012,7 +4130,7 @@ function renderRivalAnalysis() {
     html += `<div class="rival-section">
       <div class="rival-section-title" style="color:#34d399;">増台・減台 分析</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
-        台番データをもとに、機種ごとの設置台数が変化した日を自動検出。増台（競合の強化）・減台（弱体化）を素早く把握できます。
+        台番データをもとに、機種ごとの設置台数が変化した日を自動検出。行をクリックすると前後2週間のトレンドグラフが展開します。
       </div>`;
 
     if (!hasTaibanForChange) {
@@ -4020,6 +4138,8 @@ function renderRivalAnalysis() {
     } else if (changeEvents.length === 0) {
       html += `<div style="font-size:11px;color:var(--text2);">期間内に台数変化は検出されませんでした。</div>`;
     } else {
+      const addEvents = changeEvents.filter(e => e.type === 'add');
+      const remEvents = changeEvents.filter(e => e.type === 'remove');
       html += `
       <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:400px;margin-bottom:16px;">
         <div id="machineAddTile" data-open="false" onclick="toggleMachineChangeDetail('add')"
@@ -4046,67 +4166,23 @@ function renderRivalAnalysis() {
 
       <!-- 増台詳細パネル -->
       <div id="machineAddDetail" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(52,211,153,0.35);background:rgba(0,0,0,0.18);">
-        ${addCount === 0
-          ? `<div style="font-size:11px;color:var(--text2);">増台イベントは検出されませんでした。</div>`
-          : `<div style="overflow-x:auto;">
-              <table style="width:100%;border-collapse:collapse;">
-                <thead>
-                  <tr style="border-bottom:1px solid rgba(52,211,153,0.25);">
-                    <th style="${thStyleC}text-align:left;">日付</th>
-                    <th style="${thStyleC}text-align:left;">機種名</th>
-                    <th style="${thStyleC}text-align:center;">変更前</th>
-                    <th style="${thStyleC}text-align:center;">変更後</th>
-                    <th style="${thStyleC}text-align:center;">増台数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${changeEvents.filter(e => e.type === 'add').map(e => `
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                      <td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">${e.date}${e.approx ? '<span style="font-size:9px;color:var(--text3);margin-left:3px;" title="データ空白期間があるため前後の日付は近似値">※</span>' : ''}</td>
-                      <td style="padding:7px 10px;font-size:12px;font-weight:600;color:var(--text);">${e.model}</td>
-                      <td style="padding:7px 10px;font-size:13px;font-weight:700;color:var(--text2);text-align:center;">${e.before}台</td>
-                      <td style="padding:7px 10px;font-size:13px;font-weight:700;color:#34d399;text-align:center;">${e.after}台</td>
-                      <td style="padding:7px 10px;font-size:14px;font-weight:900;color:#34d399;text-align:center;">+${e.delta}</td>
-                    </tr>`).join('')}
-                </tbody>
-              </table>
-            </div>`
+        ${addEvents.length === 0
+          ? '<div style="font-size:11px;color:var(--text2);">増台イベントは検出されませんでした。</div>'
+          : _mcRows(addEvents, '#34d399')
         }
       </div>
 
       <!-- 減台詳細パネル -->
       <div id="machineRemoveDetail" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(248,113,113,0.3);background:rgba(0,0,0,0.18);">
-        ${removeCount === 0
-          ? `<div style="font-size:11px;color:var(--text2);">減台イベントは検出されませんでした。</div>`
-          : `<div style="overflow-x:auto;">
-              <table style="width:100%;border-collapse:collapse;">
-                <thead>
-                  <tr style="border-bottom:1px solid rgba(248,113,113,0.25);">
-                    <th style="${thStyleC}text-align:left;">日付</th>
-                    <th style="${thStyleC}text-align:left;">機種名</th>
-                    <th style="${thStyleC}text-align:center;">変更前</th>
-                    <th style="${thStyleC}text-align:center;">変更後</th>
-                    <th style="${thStyleC}text-align:center;">減台数</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${changeEvents.filter(e => e.type === 'remove').map(e => `
-                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                      <td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">${e.date}${e.approx ? '<span style="font-size:9px;color:var(--text3);margin-left:3px;" title="データ空白期間があるため前後の日付は近似値">※</span>' : ''}</td>
-                      <td style="padding:7px 10px;font-size:12px;font-weight:600;color:var(--text);">${e.model}</td>
-                      <td style="padding:7px 10px;font-size:13px;font-weight:700;color:var(--text2);text-align:center;">${e.before}台</td>
-                      <td style="padding:7px 10px;font-size:13px;font-weight:700;color:#f87171;text-align:center;">${e.after}台</td>
-                      <td style="padding:7px 10px;font-size:14px;font-weight:900;color:#f87171;text-align:center;">${e.delta}</td>
-                    </tr>`).join('')}
-                </tbody>
-              </table>
-            </div>`
+        ${remEvents.length === 0
+          ? '<div style="font-size:11px;color:var(--text2);">減台イベントは検出されませんでした。</div>'
+          : _mcRows(remEvents, '#f87171')
         }
       </div>`;
     }
 
     html += `<div style="font-size:10.5px;color:var(--text2);margin-top:4px;line-height:1.6;">
-        ※ データ取得日が連続していない場合、変化日は「その機種の直前データ日〜検出日」の間に発生した近似値です。
+        ※ データ取得日が連続していない場合、変化日は近似値です。前後1週間の数値はIN枚数・台粗利の1台あたり平均です。
       </div>
     </div>`;
   }
@@ -6559,6 +6635,134 @@ function sortZentai100Table(key) {
   if (_zentai100SortKey === key) { _zentai100SortDir = _zentai100SortDir==='asc'?'desc':'asc'; }
   else { _zentai100SortKey = key; _zentai100SortDir = 'desc'; }
   renderZentai100Table();
+}
+
+function showMachineChangeChart(idx) {
+  const ev = window._machineChangeData && window._machineChangeData[idx];
+  if (!ev) return;
+
+  const chartRow = document.getElementById('mcChartRow_' + idx);
+  if (!chartRow) return;
+
+  const isOpen = chartRow.style.display !== 'none';
+  // 同じ行を再クリックで閉じる
+  if (isOpen) {
+    chartRow.style.display = 'none';
+    return;
+  }
+
+  // 他の開いているチャートは閉じない（複数展開OK）
+  chartRow.style.display = '';
+
+  // 既にレンダリング済みならスキップ
+  if (chartRow.dataset.rendered === '1') return;
+  chartRow.dataset.rendered = '1';
+
+  const canvas = document.getElementById('mcCanvas_' + idx);
+  if (!canvas) return;
+
+  const isAdd      = ev.type === 'add';
+  const accentColor = isAdd ? '#34d399' : '#f87171';
+  const changeI    = ev.chartChangeIdx; // = 14
+
+  // 変化日の垂直線を afterDraw で描画するインラインプラグイン
+  const vLinePlugin = {
+    id: 'mcVLine_' + idx,
+    afterDraw(chart) {
+      const ctx    = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      if (!xScale || !yScale) return;
+      const x = xScale.getPixelForValue(changeI);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x, chart.chartArea.top);
+      ctx.lineTo(x, chart.chartArea.bottom);
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth   = 2;
+      ctx.setLineDash([5, 4]);
+      ctx.globalAlpha = 0.75;
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  const old = Chart.getChart(canvas);
+  if (old) old.destroy();
+
+  new Chart(canvas, {
+    type: 'line',
+    plugins: [vLinePlugin],
+    data: {
+      labels: ev.chartLabels,
+      datasets: [
+        {
+          label: 'IN枚数/台',
+          data:  ev.chartInData,
+          borderColor: '#60a5fa',
+          backgroundColor: 'rgba(96,165,250,0.10)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          spanGaps: true,
+          yAxisID: 'yIn',
+        },
+        {
+          label: '台粗利',
+          data:  ev.chartPrData,
+          borderColor: '#fbbf24',
+          backgroundColor: 'rgba(251,191,36,0.08)',
+          fill: false,
+          tension: 0.35,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+          spanGaps: true,
+          yAxisID: 'yPr',
+          borderDash: [4, 3],
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 14 }
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const lbl = items[0]?.label || '';
+              return lbl + (items[0]?.dataIndex === changeI ? '  ← 台数変化日' : '');
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#6b7280', font: { size: 9.5 }, maxTicksLimit: 10 },
+          grid:  { color: 'rgba(255,255,255,0.05)' }
+        },
+        yIn: {
+          type: 'linear',
+          position: 'left',
+          ticks: { color: '#60a5fa', font: { size: 9.5 }, callback: v => v != null ? v.toLocaleString() : '' },
+          grid:  { color: 'rgba(255,255,255,0.06)' },
+          title: { display: true, text: 'IN枚数/台', color: '#60a5fa', font: { size: 9 } }
+        },
+        yPr: {
+          type: 'linear',
+          position: 'right',
+          ticks: { color: '#fbbf24', font: { size: 9.5 }, callback: v => v != null ? v.toLocaleString() : '' },
+          grid:  { drawOnChartArea: false },
+          title: { display: true, text: '台粗利', color: '#fbbf24', font: { size: 9 } }
+        }
+      }
+    }
+  });
 }
 
 function toggleMachineChangeDetail(type) {
