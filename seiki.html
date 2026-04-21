@@ -848,20 +848,32 @@
     </div>
     <div class="header-date-range" id="dataRange"></div>
     <span id="uploadMsg" class="upload-msg-inline"></span>
-    <button class="upload-fab" onclick="document.getElementById('fileInput').click()">
+    <label for="fileInput" class="upload-fab" style="cursor:pointer;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Excelを追加
-    </button>
+    </label>
     <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display:none" onchange="handleUpload(event)">
-    <button id="exportDataBtn" onclick="exportUserData()" style="display:none;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;align-items:center;gap:6px;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      データ配信
-    </button>
+    <div id="adminMenuWrap" style="display:none;position:relative;">
+      <button onclick="toggleAdminMenu()" style="background:linear-gradient(135deg,#475569,#334155);color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:15px;height:15px;"><circle cx="12" cy="5" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="19" r="1.5" fill="currentColor"/></svg>
+        管理
+      </button>
+      <div id="adminMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--border);border-radius:12px;padding:6px;z-index:500;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,0.4);flex-direction:column;gap:4px;">
+        <button id="exportDataBtn" onclick="exportUserData()" style="background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;width:100%;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;flex-shrink:0;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          データ配信
+        </button>
+        <label id="restoreJsonBtn" for="restoreJsonInput" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;flex-shrink:0;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          JSONから復元
+        </label>
+        <button id="fullBackupBtn" onclick="exportFullBackup()" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;width:100%;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:14px;height:14px;flex-shrink:0;"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          全データバックアップ
+        </button>
+      </div>
+    </div>
     <span id="remoteDataBadge" style="display:none;font-size:11px;font-weight:700;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.4);border-radius:20px;padding:3px 10px;white-space:nowrap;"></span>
-    <button id="restoreJsonBtn" onclick="document.getElementById('restoreJsonInput').click()" style="display:none;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;display:none;gap:6px;align-items:center;">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-      JSONから復元
-    </button>
     <input type="file" id="restoreJsonInput" accept=".json" multiple style="display:none" onchange="restoreFromJson(event)">
   </div>
 </div>
@@ -1571,7 +1583,7 @@ const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX
 // ║  ★ 配布設定 ― この3行だけ編集して各担当者に渡してください ★  ║
 // ╚══════════════════════════════════════════════════════════════╝
 // 見られる店舗名をここに列挙。空 [] なら全店舗OK（管理者用）
-const STORE_WHITELIST = ["八戸ひまわり", "メガガイア青森中央", "スーパードーム青森東店", "業界ベンチマーク"];          // 例: ['店舗A', '店舗B']
+const STORE_WHITELIST = ["八戸ひまわり", "メガガイア青森中央", "スーパードーム青森東", "業界ベンチマーク"];          // 例: ['店舗A', '店舗B']
 // このファイルを使う人の名前（ヘッダーに表示）
 const USER_LABEL = '21世紀さん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
@@ -1604,9 +1616,10 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'dynam_higashi', label: 'ダイナム東さん専用',        stores: ["D'STATION上田店",'100万ドル上田インター'] },
   { file: 'dynam_nishi',   label: 'ダイナム西さん専用',        stores: ['ICHI-BAN本店','オーギヤ彦根','エスパス古津賀','K-1 500','ウイング神辺','K-1 400'] },
   { file: 'dynam_minami',  label: 'ダイナム南さん専用',        stores: ['メガフェイス朝倉',"D'STATION 39大村"] },
-  { file: 'seiki',         label: '21世紀さん専用',            stores: ['八戸ひまわり', 'メガガイア青森中央', 'スーパードーム青森東店'] },
+  { file: 'seiki',         label: '21世紀さん専用',            stores: ['八戸ひまわり', 'メガガイア青森中央', 'スーパードーム青森東'] },
   { file: 'tokai_unu',    label: '東海UNUさん専用',           stores: ['スーパーライブガーデン野木', 'MGM境'] },
   { file: 'facegroup',    label: '株式会社フェイスグループさん専用', stores: ['ワンダーランド大刀洗'] },
+  { file: 'kisuke',      label: 'キスケ株式会社さん専用',          stores: ['セントラルディーボ小坂','パチンコ天国朝生田本店','ナングン東温','ダイナム愛媛今治黄金','丸の内ヘリオス竹原','ポポロ伊予店'] },
 ];
 const DEFAULT_STORE = { id: 'default', name: 'デフォルト店舗', key: _NS + 'bi_added_data_default' };
 // 業界ベンチマーク仮想ストア（localStorageに保存しない・DB_CACHE['__benchmark__']で管理）
@@ -1938,6 +1951,44 @@ async function exportUserData() {
   console.log('[診断] --- 診断終了 ---');
 
   showMsg(`✅ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
+}
+
+// ── 管理者専用：全データ一括バックアップ ──
+function toggleAdminMenu() {
+  const m = document.getElementById('adminMenu');
+  m.style.display = m.style.display === 'flex' ? 'none' : 'flex';
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('adminMenuWrap');
+  if (wrap && !wrap.contains(e.target)) document.getElementById('adminMenu').style.display = 'none';
+});
+
+async function exportFullBackup() {
+  showMsg('⏳ 全データをバックアップ中...', 'ok');
+  const allStores = getStores().filter(s => s.id !== 'default' && s.id !== '__benchmark__');
+  const exportData = { generated: new Date().toISOString(), type: 'full_backup', stores: {} };
+  let totalRecords = 0;
+  for (const store of allStores) {
+    const records = DB_CACHE[store.key] && DB_CACHE[store.key].length
+      ? DB_CACHE[store.key]
+      : await _idbGet(store.key);
+    if (!records || records.length === 0) continue;
+    const cols = Object.keys(records[0]);
+    exportData.stores[store.name] = {
+      cols,
+      rows: records.map(r => cols.map(c => r[c] !== undefined ? r[c] : null))
+    };
+    totalRecords += records.length;
+  }
+  const blob = new Blob([JSON.stringify(exportData)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'full_backup_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  showMsg('✅ バックアップ完了！ ' + allStores.length + '店舗・' + totalRecords.toLocaleString() + '件', 'ok');
 }
 
 async function restoreFromJson(event) {
@@ -2552,8 +2603,8 @@ function init() {
   if (USER_ID === 'admin' && USERS_CONFIG.length > 0) {
     const btn = document.getElementById('exportDataBtn');
     if (btn) btn.style.display = 'flex';
-    const rbtn = document.getElementById('restoreJsonBtn');
-    if (rbtn) rbtn.style.display = 'flex';
+    const wrap = document.getElementById('adminMenuWrap');
+    if (wrap) wrap.style.display = 'block';
   }
 
   // ── USER_LABEL バッジ表示 ──
@@ -9872,6 +9923,51 @@ async function checkAuth() {
 }
 
 // ページ読み込み時の認証チェック
+// ── ドラッグ＆ドロップ（Chromeのfile://制限を回避）──
+(function() {
+  let _dragCount = 0;
+  const overlay = document.createElement('div');
+  overlay.id = 'dropOverlay';
+  overlay.style.cssText = 'display:none;position:fixed;inset:0;z-index:19999;background:rgba(34,197,94,0.18);border:4px dashed #22c55e;border-radius:16px;pointer-events:none;align-items:center;justify-content:center;';
+  overlay.innerHTML = '<div style="text-align:center;color:#22c55e;font-size:22px;font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,0.6);">📂 ここにファイルをドロップ<br><span style="font-size:14px;font-weight:600;opacity:.8;">Excel（.xlsx）または バックアップJSON（.json）</span></div>';
+  document.addEventListener('DOMContentLoaded', () => document.body.appendChild(overlay));
+
+  document.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    _dragCount++;
+    overlay.style.display = 'flex';
+  });
+  document.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    _dragCount--;
+    if (_dragCount <= 0) { _dragCount = 0; overlay.style.display = 'none'; }
+  });
+  document.addEventListener('dragover', (e) => { e.preventDefault(); });
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    _dragCount = 0;
+    overlay.style.display = 'none';
+    const files = Array.from(e.dataTransfer.files);
+    if (!files.length) return;
+    const excels = files.filter(f => /\.(xlsx|xls)$/i.test(f.name));
+    const jsons  = files.filter(f => /\.json$/i.test(f.name));
+    if (excels.length) {
+      const dt = new DataTransfer();
+      excels.forEach(f => dt.items.add(f));
+      const inp = document.getElementById('fileInput');
+      Object.defineProperty(inp, 'files', { value: dt.files, configurable: true });
+      handleUpload({ target: inp });
+    }
+    if (jsons.length) {
+      const dt = new DataTransfer();
+      jsons.forEach(f => dt.items.add(f));
+      const inp = document.getElementById('restoreJsonInput');
+      Object.defineProperty(inp, 'files', { value: dt.files, configurable: true });
+      restoreFromJson({ target: inp });
+    }
+  });
+})();
+
 window.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem(AUTH_KEY) === '1') {
     document.getElementById('authOverlay').style.display = 'none';
@@ -9892,7 +9988,7 @@ function _checkAdminDataEmpty() {
     showMsg('⚠️ データが空です。バックアップJSONから復元してください', 'warn');
     setTimeout(() => {
       if (confirm('⚠️ 管理者データが空です。\n\nバックアップJSONから復元しますか？')) {
-        document.getElementById('restoreJsonInput').click();
+        document.getElementById('restoreJsonBtn').click();
       }
     }, 500);
   }
