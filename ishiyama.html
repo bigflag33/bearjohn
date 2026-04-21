@@ -979,6 +979,10 @@
     </div>
     <button class="filter-btn" onclick="applyFilter()">適用</button>
     <button class="filter-btn reset" onclick="resetFilter()">リセット</button>
+    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);white-space:nowrap;padding:4px 0;" title="IN枚数=0かつ翌日から稼働の台を集計から除外します">
+      <input type="checkbox" id="excludeSettingDay" onchange="applyFilter()" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;">
+      🆕 新台セッティング日を除外
+    </label>
   </div>
 
   <div id="aiGreetingBar" class="ai-greeting-bar" style="display:none;"></div>
@@ -2830,12 +2834,68 @@ function init() {
   if (_initAllD.length) document.getElementById('pinDateInput').value = _initAllD[_initAllD.length-1];
 }
 
+// 新台セッティング日を判定する：
+// 条件：その機種・台番がデータ上で「初登場」した日 かつ IN枚数=0 かつ 翌営業日に稼働している
+function buildSettingDaySet(data) {
+  const settingSet = new Set();
+
+  // 機種名_台番 → { dates: [ソート済み], dateInMap: {date: IN枚数} }
+  const machineMap = {};
+  for (const r of data) {
+    const mKey = `${r['機種名']}_${r['台番']}`;
+    if (!machineMap[mKey]) machineMap[mKey] = { dates: [], dateInMap: {} };
+    machineMap[mKey].dates.push(r.date);
+    machineMap[mKey].dateInMap[r.date] = (r['IN枚数'] || 0);
+  }
+
+  // 全日付をソート（翌日検索用）
+  const allDates = [...new Set(data.map(d => d.date))].sort();
+  const dateIdx  = {};
+  allDates.forEach((d, i) => dateIdx[d] = i);
+
+  for (const mKey of Object.keys(machineMap)) {
+    const { dates, dateInMap } = machineMap[mKey];
+    const sortedDates = [...new Set(dates)].sort();
+    const firstDate   = sortedDates[0];                    // この機種・台番の初登場日
+
+    if ((dateInMap[firstDate] || 0) > 0) continue;        // 初日に稼働あり → セッティング日ではない
+
+    // 翌営業日（データ上の次の日付）を取得
+    const idx = dateIdx[firstDate];
+    if (idx === undefined || idx >= allDates.length - 1) continue;
+    const nextDate = allDates[idx + 1];
+    const nextIn   = dateInMap[nextDate];
+    if (nextIn > 0) {
+      settingSet.add(`${firstDate}_${mKey}`);              // 初日セッティングとして記録
+    }
+  }
+  return settingSet;
+}
+
 function applyFilter() {
   const from  = document.getElementById('dateFrom').value;
   const to    = document.getElementById('dateTo').value;
   const model = document.getElementById('modelFilter').value;
+  const excludeSetting = document.getElementById('excludeSettingDay')?.checked;
   const all   = loadAllData();
-  filtered = all.filter(d => d.date >= from && d.date <= to && (!model || d['機種名'] === model));
+
+  // セッティング日セットを事前構築（チェック時のみ）
+  const settingSet = excludeSetting ? buildSettingDaySet(all) : null;
+
+  filtered = all.filter(d => {
+    if (d.date < from || d.date > to) return false;
+    if (model && d['機種名'] !== model) return false;
+    if (settingSet) {
+      if (settingSet.has(`${d.date}_${d['機種名']}_${d['台番']}`)) return false;
+    }
+    return true;
+  });
+
+  // 除外件数をメッセージ表示
+  if (settingSet && settingSet.size > 0) {
+    showMsg(`🆕 新台セッティング日: ${settingSet.size}件を除外しました`, 'ok');
+  }
+
   render();
 }
 
