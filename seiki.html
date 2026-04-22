@@ -1029,6 +1029,9 @@
       <div class="chart-title"><div class="dot" style="background:#a78bfa"></div>📊 日次トレンド分析</div>
       <div id="trendAnalysisBody" style="padding:4px 4px 8px;"></div>
     </div>
+    <!-- 直近3日間ポストイットコーナー -->
+    <div id="alertTilesBar" style="display:none;grid-column:1 / -1;margin:4px 0;"></div>
+
     <div class="chart-card full" id="forecastCard" style="display:none;">
       <div class="chart-title">
         <div class="dot" style="background:linear-gradient(135deg,#60a5fa,#a78bfa)"></div>
@@ -3715,7 +3718,7 @@ function render() {
   window._insightsFeed = [];
 
   const fns = [renderKPIs, renderCharts, renderCalendar,
-               renderDayTable, renderDOW, renderDigit, renderModelTable, renderRivalAnalysis];
+               renderDayTable, renderDOW, renderDigit, renderModelTable, renderRivalAnalysis, renderAlertTiles];
   // 機種別集計ビューをテーブルモードにリセット
   modelAggMode = 'table';
   document.getElementById('modelAggTableView').style.display = '';
@@ -3731,6 +3734,403 @@ function render() {
 }
 
 function sum(arr, key) { return arr.reduce((a,b) => a + (b[key]||0), 0); }
+
+// ══════════════════════════════════════
+//  直近3日イベントアラートタイル
+// ══════════════════════════════════════
+function renderAlertTiles() {
+  const bar = document.getElementById('alertTilesBar');
+  if (!bar) return;
+
+  const all = loadAllData();
+  if (!all.length) { bar.style.display = 'none'; return; }
+
+  // 直近3日を特定（フィルター期間内の最新3日）
+  const allDates = [...new Set(filtered.map(d => d.date))].sort();
+  if (!allDates.length) { bar.style.display = 'none'; return; }
+  const recent3 = allDates.slice(-3);
+  const recent3Set = new Set(recent3);
+
+  // 全データ（フィルター前）も使う（初登場・台移動の判定に全期間必要）
+  const allForMeta = loadAllData();
+  const allDatesAll = [...new Set(allForMeta.map(d => d.date))].sort();
+  const dateIdxAll = {};
+  allDatesAll.forEach((d, i) => dateIdxAll[d] = i);
+
+  const tiles = [];
+
+  // ── 共通集計 ──
+  // 日付×機種 → 台数マップ（全期間）
+  const modelCountByDate = {}; // date → { model: Set<tai> }
+  allForMeta.forEach(r => {
+    const tai = r['台番'] != null ? String(r['台番']).trim() : '';
+    if (!r.date || !r['機種名'] || !tai) return;
+    if (!modelCountByDate[r.date]) modelCountByDate[r.date] = {};
+    if (!modelCountByDate[r.date][r['機種名']]) modelCountByDate[r.date][r['機種名']] = new Set();
+    modelCountByDate[r.date][r['機種名']].add(tai);
+  });
+
+  // 機種の初登場日マップ（全期間）
+  const modelFirstDate = {};
+  allForMeta.forEach(r => {
+    if (!r['機種名'] || !r.date) return;
+    if (!modelFirstDate[r['機種名']] || r.date < modelFirstDate[r['機種名']])
+      modelFirstDate[r['機種名']] = r.date;
+  });
+
+  // 台番の機種履歴（台移動検出用）
+  const taiModelByDate = {}; // date → { tai: model }
+  allForMeta.forEach(r => {
+    const tai = r['台番'] != null ? String(r['台番']).trim() : '';
+    if (!r.date || !tai || !r['機種名']) return;
+    if (!taiModelByDate[r.date]) taiModelByDate[r.date] = {};
+    taiModelByDate[r.date][tai] = r['機種名'];
+  });
+
+  // ── ① 新台登場（直近3日に初登場した機種） ──
+  recent3.forEach(date => {
+    Object.keys(modelFirstDate).forEach(model => {
+      if (modelFirstDate[model] === date) {
+        tiles.push({
+          type: 'new',
+          date,
+          text: `新台登場`,
+          abbr: 'NEW',
+          sub:  `${date.slice(5)}に${model}が登場しました`,
+          color: '#16a34a',
+          bg:   'rgba(22,163,74,0.12)',
+          border: 'rgba(22,163,74,0.35)',
+          jumpTo: 'rivalNewModelSection',
+        });
+      }
+    });
+  });
+
+  // ── ② 増台・減台（直近3日、前営業日比） ──
+  recent3.forEach(date => {
+    const idx = dateIdxAll[date];
+    if (idx === undefined || idx === 0) return;
+    const prevDate = allDatesAll[idx - 1];
+    const curr = modelCountByDate[date]     || {};
+    const prev = modelCountByDate[prevDate] || {};
+    const allModels = new Set([...Object.keys(curr), ...Object.keys(prev)]);
+    allModels.forEach(model => {
+      const cCount = curr[model] ? curr[model].size : 0;
+      const pCount = prev[model] ? prev[model].size : 0;
+      if (cCount > pCount && pCount > 0) {
+        tiles.push({
+          type: 'inc',
+          date,
+          text: `増台`,
+          abbr: 'ADD',
+          sub:  `${date.slice(5)}に${model}が${pCount}台から${cCount}台に増台しました`,
+          color: '#3b82f6',
+          bg:   'rgba(59,130,246,0.12)',
+          border: 'rgba(59,130,246,0.35)',
+          jumpTo: 'rivalAnalysisCard',
+        });
+      } else if (cCount < pCount && cCount > 0) {
+        tiles.push({
+          type: 'dec',
+          date,
+          text: `減台`,
+          abbr: 'DEL',
+          sub:  `${date.slice(5)}に${model}が${pCount}台から${cCount}台に減台しました`,
+          color: '#ef4444',
+          bg:   'rgba(239,68,68,0.12)',
+          border: 'rgba(239,68,68,0.35)',
+          jumpTo: 'rivalAnalysisCard',
+        });
+      }
+    });
+  });
+
+  // ── ③ 台移動（直近3日、同台番に前日と違う機種） ──
+  recent3.forEach(date => {
+    const idx = dateIdxAll[date];
+    if (idx === undefined || idx === 0) return;
+    const prevDate = allDatesAll[idx - 1];
+    const curr = taiModelByDate[date]     || {};
+    const prev = taiModelByDate[prevDate] || {};
+    const moved = {};
+    Object.keys(curr).forEach(tai => {
+      if (prev[tai] && prev[tai] !== curr[tai]) {
+        const key = `${prev[tai]}→${curr[tai]}`;
+        if (!moved[key]) moved[key] = 0;
+        moved[key]++;
+      }
+    });
+    Object.entries(moved).forEach(([change, cnt]) => {
+      const [from, to] = change.split('→');
+      tiles.push({
+        type: 'move',
+        date,
+        text: `台移動`,
+        abbr: 'MOV',
+        sub:  `${date.slice(5)}に${from}から${to}へ台移動がありました（${cnt}台）`,
+        color: '#8b5cf6',
+        bg:   'rgba(139,92,246,0.12)',
+        border: 'rgba(139,92,246,0.35)',
+        jumpTo: 'rivalAnalysisCard',
+      });
+    });
+  });
+
+  // ── ④ 万枚（直近3日、差枚10,000枚以上） ──
+  const hasTaiban = allForMeta.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
+  if (hasTaiban) {
+    const manMap = {};
+    allForMeta.forEach(r => {
+      const tai = r['台番'] != null ? String(r['台番']).trim() : '';
+      if (!tai || !r.date || !recent3Set.has(r.date)) return;
+      const k = r.date + '\x00' + tai;
+      if (!manMap[k]) manMap[k] = { date: r.date, tai, model: r['機種名'] || '', diff: 0 };
+      manMap[k].diff += r['差枚'] || 0;
+    });
+    Object.values(manMap).filter(v => v.diff >= 10000).forEach(v => {
+      tiles.push({
+        type: 'man',
+        date: v.date,
+        text: `万枚突破`,
+        sub:  `${v.date.slice(5)}に${v.model}（台${v.tai}）で万枚が出ました（+${v.diff.toLocaleString()}枚）`,
+        abbr: '10K',
+        color: '#f59e0b',
+        bg:   'rgba(245,158,11,0.12)',
+        border: 'rgba(245,158,11,0.35)',
+        jumpTo: 'rivalManmaiSection',
+      });
+    });
+  }
+
+  // ── ⑤ 全台系（直近3日、攻略分析と同じ閾値） ──
+  if (hasTaiban) {
+    const ZENTAI_MIN_MACHINES = 3;
+    const ZENTAI_MIN_IN       = 20000;
+    const ZENTAI_MIN_PAYOUT   = 1.05;
+    const byKey = {};
+    allForMeta.forEach(r => {
+      const tai = String(r['台番'] || '').trim();
+      if (!r.date || !r['機種名'] || !tai || !recent3Set.has(r.date)) return;
+      const k = r.date + '\x00' + r['機種名'] + '\x00' + tai;
+      if (!byKey[k]) byKey[k] = { date: r.date, model: r['機種名'], tai, inSum: 0, diffSum: 0 };
+      byKey[k].inSum   += r['IN枚数'] || 0;
+      byKey[k].diffSum += r['差枚']   || 0;
+    });
+    const byDateModel = {};
+    Object.values(byKey).forEach(v => {
+      const k = v.date + '\x00' + v.model;
+      if (!byDateModel[k]) byDateModel[k] = { date: v.date, model: v.model, tais: [] };
+      byDateModel[k].tais.push({
+        inAmt:  v.inSum,
+        payout: v.inSum > 0 ? (v.inSum + v.diffSum) / v.inSum : 0,
+      });
+    });
+    Object.values(byDateModel).forEach(({ date, model, tais }) => {
+      if (tais.length < ZENTAI_MIN_MACHINES)               return;
+      if (!tais.every(t => t.inAmt  >= ZENTAI_MIN_IN))    return;
+      if (!tais.every(t => t.payout >= ZENTAI_MIN_PAYOUT)) return;
+      tiles.push({
+        type: 'zentai',
+        date,
+        text: `全台系`,
+        sub:  `${date.slice(5)}に${model}で全台系が出ました（${tais.length}台・出玉率${(Math.min(...tais.map(t=>t.payout))*100).toFixed(1)}%以上）`,
+        abbr: 'ALL',
+        color: '#fbbf24',
+        bg:   'rgba(251,191,36,0.12)',
+        border: 'rgba(251,191,36,0.35)',
+        jumpTo: 'rivalZentaiSection',
+      });
+    });
+  }
+
+  // ── ⑥ メイン機種 直近3日勝率80%以上検出 ──
+  {
+    // ジャグラー除外・IN枚数上位5機種を特定
+    const jagExcluded = allForMeta.filter(r => r['機種名'] && !r['機種名'].includes('ジャグラー'));
+    const modelInMap = {};
+    jagExcluded.forEach(r => {
+      if (!r['機種名']) return;
+      modelInMap[r['機種名']] = (modelInMap[r['機種名']] || 0) + (r['IN枚数'] || 0);
+    });
+    const topModels = Object.entries(modelInMap).sort((a,b) => b[1]-a[1]).slice(0,5).map(([name]) => name);
+
+    topModels.forEach(modelName => {
+      const modelRecs = allForMeta.filter(r => r['機種名'] === modelName);
+      const byDT = {};
+      modelRecs.forEach(r => {
+        const tai = String(r['台番'] || '').trim();
+        if (!tai || !r.date || !recent3Set.has(r.date)) return;
+        const k = r.date + '\x00' + tai;
+        if (!byDT[k]) byDT[k] = { date: r.date, inSum: 0, diffSum: 0 };
+        byDT[k].inSum   += r['IN枚数'] || 0;
+        byDT[k].diffSum += r['差枚']   || 0;
+      });
+      const byDate = {};
+      Object.values(byDT).forEach(e => {
+        if (!byDate[e.date]) byDate[e.date] = { win: 0, total: 0 };
+        byDate[e.date].total++;
+        if (e.diffSum >= 0) byDate[e.date].win++;
+      });
+      const days = Object.entries(byDate).filter(([,d]) => d.total > 0).map(([date,d]) => ({ date, rate: d.win/d.total }));
+      if (!days.length) return;
+      // 直近3日のうち1日でも80%以上なら出す
+      const hitDays = days.filter(d => d.rate * 100 >= 80).sort((a,b) => b.date.localeCompare(a.date));
+      if (hitDays.length > 0) {
+        const pct = Math.round(hitDays[0].rate * 100);
+        tiles.push({
+          type: 'winrate',
+          date: hitDays[0].date,
+          text: 'メイン機種 高勝率',
+          abbr: 'WIN',
+          sub:  `${hitDays[0].date.slice(5)}に${modelName}の勝率が${pct}%に達しました`,
+          color: '#34d399',
+          bg:   'rgba(52,211,153,0.12)',
+          border: 'rgba(52,211,153,0.35)',
+          jumpTo: 'rivalMainSection',
+        });
+      }
+    });
+  }
+
+  // ── ⑦ ジャグラー据え置き検出（直近3日以内に3日連続出玉率100%超） ──
+  {
+    const jagRaw = allForMeta.filter(r => r['機種名'] && r['機種名'].includes('ジャグラー'));
+    if (jagRaw.length) {
+      const storeAvgIn = allForMeta.length > 0
+        ? allForMeta.reduce((s, r) => s + (r['IN枚数'] || 0), 0) / allForMeta.length : 0;
+
+      const byTai = {};
+      jagRaw.forEach(r => {
+        const tai = String(r['台番'] || '').trim();
+        if (!tai) return;
+        const key = r['機種名'] + '\x00' + tai;
+        if (!byTai[key]) byTai[key] = { model: r['機種名'], tai, days: {} };
+        const d = byTai[key].days;
+        if (!d[r.date]) d[r.date] = { inSum: 0, diffSum: 0 };
+        d[r.date].inSum   += r['IN枚数'] || 0;
+        d[r.date].diffSum += r['差枚']   || 0;
+      });
+
+      Object.values(byTai).forEach(entry => {
+        const eligDays = Object.entries(entry.days)
+          .filter(([, v]) => v.inSum >= storeAvgIn && v.diffSum >= 0)
+          .map(([dt]) => dt).sort();
+        if (eligDays.length < 3) return;
+
+        let run = [eligDays[0]];
+        for (let i = 1; i < eligDays.length; i++) {
+          const diff = (new Date(eligDays[i]) - new Date(eligDays[i-1])) / 86400000;
+          if (diff === 1) {
+            run.push(eligDays[i]);
+          } else {
+            if (run.length >= 3 && run.some(d => recent3Set.has(d))) {
+              tiles.push({
+                type: 'oki', date: run[run.length-1],
+                text: 'ジャグラー据え置き疑い',
+                abbr: 'HOLD',
+                sub:  `${entry.model} 台${entry.tai}が${run.length}日連続で出玉率100%超です`,
+                color: '#fcd34d',
+                bg:   'rgba(252,211,77,0.12)',
+                border: 'rgba(252,211,77,0.35)',
+                jumpTo: 'rivalJugglerSection',
+              });
+            }
+            run = [eligDays[i]];
+          }
+        }
+        if (run.length >= 3 && run.some(d => recent3Set.has(d))) {
+          tiles.push({
+            type: 'oki', date: run[run.length-1],
+            text: 'ジャグラー据え置き疑い',
+            abbr: 'HOLD',
+            sub:  `${entry.model} 台${entry.tai}が${run.length}日連続で出玉率100%超です`,
+            color: '#fcd34d',
+            bg:   'rgba(252,211,77,0.12)',
+            border: 'rgba(252,211,77,0.35)',
+            jumpTo: 'rivalJugglerSection',
+          });
+        }
+      });
+    }
+  }
+
+  if (!tiles.length) {
+    tiles.push({
+      type: 'none',
+      date: '',
+      text: '該当なし',
+      abbr: 'CLEAR',
+      sub:  '直近3日間は特記すべきイベントはありませんでした',
+      color: 'var(--text2)',
+      bg:   'var(--card2)',
+      border: 'var(--border)',
+      jumpTo: '',
+    });
+  }
+
+  // 日付降順→種別順でソート
+  tiles.sort((a, b) => b.date.localeCompare(a.date));
+
+  // 描画
+  bar.style.display = 'block';
+  bar.innerHTML = `
+    <div style="padding:0;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="width:4px;height:16px;background:var(--accent);border-radius:2px;"></div>
+        <span style="font-size:13px;font-weight:700;color:var(--text);">直近3日間ポストイットコーナー</span>
+        <span style="font-size:11px;font-weight:600;background:rgba(108,99,255,0.15);color:var(--accent);border:1px solid rgba(108,99,255,0.3);border-radius:20px;padding:2px 10px;">${tiles.length}件</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--text2);font-weight:500;">横にスクロールできます &nbsp;›</span>
+      </div>
+      <div style="position:relative;">
+        <div id="alertTilesScroll" style="display:flex;align-items:stretch;gap:18px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none;">
+          ${tiles.map(t => `
+            <div onclick="wzJumpTo('${t.jumpTo || ''}')"
+                 style="flex:0 0 130px;background:${t.bg};border:1px solid ${t.border};border-top:4px solid ${t.color};border-radius:4px 4px 6px 6px;padding:8px 10px 8px;cursor:pointer;display:flex;flex-direction:column;gap:5px;box-shadow:2px 3px 10px rgba(0,0,0,0.25),0 1px 3px rgba(0,0,0,0.15);transition:transform .15s,box-shadow .15s;"
+                 onmouseenter="this.style.transform='translateY(-3px)';this.style.boxShadow='2px 6px 18px rgba(0,0,0,0.35),0 1px 3px rgba(0,0,0,0.15)'"
+                 onmouseleave="this.style.transform='';this.style.boxShadow='2px 3px 10px rgba(0,0,0,0.25),0 1px 3px rgba(0,0,0,0.15)'">
+              <div style="font-size:11px;font-weight:800;color:${t.color};letter-spacing:.7px;">${t.text}</div>
+              <div style="font-size:42px;font-weight:900;color:${t.color};letter-spacing:-1px;line-height:1;opacity:0.9;">${t.abbr||''}</div>
+              <div style="font-size:13.5px;font-weight:600;color:var(--text);line-height:1.6;flex:1;">${t.sub}</div>
+              <div style="font-size:10px;color:${t.color};opacity:0.7;font-weight:600;">タップで詳細へ</div>
+            </div>
+          `).join('')}
+        </div>
+        <!-- 右側フェードアウト（スクロール可能を示す） -->
+        <div id="alertScrollFade" style="pointer-events:none;position:absolute;right:0;top:0;bottom:4px;width:80px;background:linear-gradient(to right,transparent,var(--bg));border-radius:0 4px 4px 0;"></div>
+      </div>
+    </div>
+    <style>#alertTilesScroll::-webkit-scrollbar{display:none;}</style>`;
+
+  // スクロール量に応じてフェードを消す
+  const scrollEl = document.getElementById('alertTilesScroll');
+  const fadeEl   = document.getElementById('alertScrollFade');
+  if (scrollEl && fadeEl) {
+    scrollEl.addEventListener('scroll', () => {
+      const atEnd = scrollEl.scrollLeft + scrollEl.clientWidth >= scrollEl.scrollWidth - 10;
+      fadeEl.style.opacity = atEnd ? '0' : '1';
+    });
+  }
+}
+function wzJumpTo(id) {
+  if (!id) return;
+  // 攻略分析セクション内のIDは動的生成のため、まず親カードへ飛んで再描画後にスクロール
+  const rivalSections = ['rivalNewModelSection','rivalZentaiSection','rivalManmaiSection','rivalJugglerSection','rivalMainSection'];
+  if (rivalSections.includes(id)) {
+    const body = document.getElementById('rivalAnalysisBody');
+    if (body && body.innerHTML.trim() === '') {
+      try { renderRivalAnalysis(); } catch(e) {}
+    }
+    // 少し待ってから対象セクションへ
+    setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
+  } else {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+// ══ /直近3日イベントアラートタイル ══
 
 // ══════════════════════════════════════
 //  攻略分析
@@ -4186,7 +4586,7 @@ function renderRivalAnalysis() {
       ['avgPayout', '平均出玉率', 'right'],
     ];
 
-    html += `<div class="rival-section">
+    html += `<div class="rival-section" id="rivalZentaiSection">
       <div class="rival-section-title" style="color:#f59e0b;">全台系イベント検出</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
         3台以上設置の機種で、全台それぞれがIN枚数2万枚超・出玉率105%超を達成した日。台番単位で個別判定。
@@ -4957,7 +5357,7 @@ function renderRivalAnalysis() {
         + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>';
     }
 
-    html += `<div class="rival-section">
+    html += `<div class="rival-section" id="rivalNewModelSection">
       <div class="rival-section-title" style="color:#a78bfa;">🆕 新台登場 検出</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
         期間内に初めて登場した機種（＝新台）を自動検出。初週と直近の1台あたりアウト・粗利を比較することで、新台が定着しているか・落ちているかを把握できます。行クリックで登場後28日グラフ展開。
@@ -5161,7 +5561,7 @@ function renderRivalAnalysis() {
         + '</div></div>';
     }
 
-    html += '<div class="rival-section">';
+    html += '<div class="rival-section" id="rivalManmaiSection">';
     html += '<div class="rival-section-title" style="color:#f59e0b;">🎰 万枚突破分析</div>';
     html += '<div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">'
       + '台番レベルで差枚を日次集計し、10,000枚・9,000枚・8,000枚を突破したイベントを全期間から検出します。'
@@ -5552,7 +5952,7 @@ function renderRivalAnalysis() {
     _pushInsight('juggler','🫐',`ジャグラー ${jagMachines}台（${jagInstallRate.toFixed(0)}%）— ${jagComment.split('—')[0].trim()}`,
       `設置比率${jagInstallRate.toFixed(1)}%に対し利益比率${jagProfitRate.toFixed(1)}%・アウト比率${jagInRate.toFixed(1)}%。${jagInComment}`, 3, jagVis, 'rivalAnalysisCard');
 
-    html += `<div class="rival-section">
+    html += `<div class="rival-section" id="rivalJugglerSection">
       <div class="rival-section-title" style="color:#f59e0b;">🫐 ジャグラーシリーズ分析</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
         <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
@@ -6051,7 +6451,7 @@ function renderRivalAnalysis() {
         }
       }
 
-      html += `<div class="rival-section">
+      html += `<div class="rival-section" id="rivalMainSection">
         <div class="rival-section-title" style="color:#60a5fa;">メイン機種分析 — 総アウト上位5機種</div>
         <div style="font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
           総アウト（推定）が最も大きい上位5機種。店舗稼働の主軸となっている機種群。
