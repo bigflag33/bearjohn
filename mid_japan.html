@@ -509,83 +509,7 @@
   }
   .anomaly-chip:hover { background: rgba(251,191,36,0.22); }
 
-  /* ── インサイトフィード ── */
-  #insightFeedCard { margin-bottom: 20px; }
-  .insight-feed-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
-  .insight-feed-grid.has-top {
-    grid-template-columns: 1.6fr 1fr;
-  }
-  .insight-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    cursor: default;
-    transition: border-color .18s, transform .18s;
-    position: relative;
-    overflow: hidden;
-  }
-  .insight-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    border-radius: 12px 12px 0 0;
-  }
-  .insight-card.top-story { grid-row: span 2; }
-  .insight-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-  .insight-tag {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 10px; font-weight: 800; letter-spacing: .5px;
-    padding: 2px 8px; border-radius: 20px;
-    width: fit-content;
-  }
-  .insight-headline {
-    font-size: 13.5px; font-weight: 800; line-height: 1.45;
-    color: var(--text);
-  }
-  .insight-card.top-story .insight-headline { font-size: 15px; }
-  .insight-body {
-    font-size: 11.5px; line-height: 1.65;
-    color: var(--text2);
-    margin-top: 2px;
-  }
-  .insight-card.top-story .insight-body { font-size: 12px; }
-  .insight-meta {
-    font-size: 10px; color: var(--text2);
-    margin-top: auto;
-    padding-top: 6px;
-    border-top: 1px solid var(--border);
-  }
-  /* カラーテーマ per category */
-  .insight-card[data-cat="trend"]::before   { background: linear-gradient(90deg,#a78bfa,#6c63ff); }
-  .insight-card[data-cat="rival"]::before   { background: linear-gradient(90deg,#f87171,#fb923c); }
-  .insight-card[data-cat="variety"]::before { background: linear-gradient(90deg,#34d399,#059669); }
-  .insight-card[data-cat="juggler"]::before { background: linear-gradient(90deg,#fbbf24,#f59e0b); }
-  .insight-card[data-cat="compare"]::before { background: linear-gradient(90deg,#60a5fa,#3b82f6); }
-  .insight-tag[data-cat="trend"]   { background:rgba(167,139,250,.15); color:#c4b5fd; }
-  .insight-tag[data-cat="rival"]   { background:rgba(248,113,113,.15); color:#fca5a5; }
-  .insight-tag[data-cat="variety"] { background:rgba(52,211,153,.15);  color:#6ee7b7; }
-  .insight-tag[data-cat="juggler"] { background:rgba(251,191,36,.15);  color:#fcd34d; }
-  .insight-tag[data-cat="compare"] { background:rgba(96,165,250,.15);  color:#93c5fd; }
-  .insight-visual { flex-shrink: 0; opacity: 0.9; align-self: flex-start; margin-top: 2px; }
-  .insight-jump-hint {
-    font-size: 9.5px; color: var(--text2); margin-top: 8px;
-    opacity: 0; letter-spacing: .4px; transition: opacity .2s;
-    border-top: 1px solid var(--border); padding-top: 5px;
-  }
-  .insight-card:hover .insight-jump-hint { opacity: 1; }
-  @media(max-width:700px){
-    .insight-feed-grid,.insight-feed-grid.has-top { grid-template-columns: 1fr; }
-    .insight-card.top-story { grid-row: span 1; }
-  }
+  /* インサイトフィード CSS 削除済み */
 
   .ai-section-head {
     font-size: 12px; font-weight: 800; letter-spacing: .5px;
@@ -1052,44 +976,7 @@
     </div>
   </div>
 
-  <div class="table-card">
-    <div class="table-title" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
-      <div style="display:flex;align-items:center;gap:8px;">
-        <div class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent3)"></div>
-        日別集計
-      </div>
-      <div class="view-toggle">
-        <button class="vtab" id="dayViewTable" onclick="setDayView('table')">📋 テーブル</button>
-        <button class="vtab active" id="dayViewChart" onclick="setDayView('chart')">📊 グラフ</button>
-      </div>
-    </div>
-    <!-- テーブルビュー -->
-    <div id="dayTableView" style="display:none;">
-      <div class="table-wrapper">
-        <table id="dayTable">
-          <thead id="dayTableHead"></thead>
-          <tbody id="dayTableBody"></tbody>
-        </table>
-      </div>
-    </div>
-    <!-- グラフビュー -->
-    <div id="dayChartView">
-      <div class="day-charts-grid">
-        <div class="day-chart-box full-width">
-          <div class="day-chart-label">推定粗利 / 推定売上（日別）</div>
-          <div style="position:relative;height:220px;"><canvas id="dayProfitSalesChart"></canvas></div>
-        </div>
-        <div class="day-chart-box">
-          <div class="day-chart-label">利益率（%）</div>
-          <div style="position:relative;height:180px;"><canvas id="dayRateChart2"></canvas></div>
-        </div>
-        <div class="day-chart-box">
-          <div class="day-chart-label in-label" data-s="1台平均IN枚数" data-p="1台平均アウト">1台平均IN枚数</div>
-          <div style="position:relative;height:180px;"><canvas id="dayINChart2"></canvas></div>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- 日別集計カード削除済み -->
 
 
   <!-- 曜日分析 -->
@@ -1629,15 +1516,7 @@
 
   </div><!-- /.pin-section-wrapper -->
 
-  <!-- ── インサイトフィード（ページ末尾） ── -->
-  <div class="chart-card full" id="insightFeedCard" style="display:none;margin-top:20px;">
-    <div class="chart-title">
-      <div class="dot" style="background:linear-gradient(135deg,#a78bfa,#60a5fa)"></div>
-      📰 インサイトフィード
-      <span style="margin-left:auto;font-size:10px;color:var(--text2);font-weight:600;" id="insightFeedMeta"></span>
-    </div>
-    <div id="insightFeedBody" style="padding:4px 0 4px;"></div>
-  </div>
+  <!-- インサイトフィード削除済み -->
 
 </div>
 <script>
@@ -1694,7 +1573,7 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'aviva',         label: 'アビバさん専用',            stores: ['ジアス大船','ZAPプレステージ','ガイアネクスト海老名駅前','デイズ新杉田','タイガー7綱島','M&M綱島','ジアス上大岡','プラザ上大岡アンドミラージュ','スーパーハリウッド伊勢佐木','吉兆横浜駒岡','横須賀マリーン','パラッツォ湘南台','鶴見UNO','アビバアネックススクエア','アビバ三春町','アビバ上大岡','アビバ南足柄','アビバ新杉田','アビバ横須賀中央','アビバ海老名','アビバ綱島南','アビバ綱島樽町','アビバ逗子駅前','アフェスタ三春町','アビバ三浦海岸','クリエ湘南台','COSMO 405','ダイナム四街道','アビバ四街道','クレストプラス姉崎'] },
   { file: 'concerto',      label: 'コンチェルトさん専用',      stores: ['楽園ハッピーロード大山','ピーアーク北千住SSS'] },
   { file: 'ishiyama',      label: '石山オメガさん専用',        stores: ['レークプラザ','ダラムS-1'] },
-  { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴','メガフェイス朝倉'] },
+  { file: 'yuko',          label: 'ユーコーラッキーさん専用',  stores: ['スーパーハリウッド1120','スタジアム2001八女','HINODE大野城',"Super D'STATION 39筑紫野",'ワンダーランド大刀洗','ワンダーランド東合川','ワンダーランド三潴','メガフェイス朝倉','ジアス大船'] },
   { file: 'matahari',      label: 'マタハリーさん専用',        stores: ['楽園アメ横','楽園アメ横（4P）','楽園町田','楽園町田（4P）','エスパス上野新館','エスパス上野新館（4P）','エスパス上野本館','エスパス上野本館（4P）','ジアス大船','ジアス大船（4P）','楽園川崎','楽園川崎（4P）','楽園柏','楽園柏（4P）'] },
   { file: 'central',       label: 'セントラルさん専用',        stores: ['キクヤ春日井','メガコンコルド春日井','ZENT木曽川','ZENT梅坪','ZENT豊田本店','メガガイア一宮','リブレ遊援館'] },
   { file: 'kowa',          label: '興和商事さん専用',          stores: ['サンコー梅島'] },
@@ -1708,6 +1587,7 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'tokai_unu',    label: '東海UNUさん専用',           stores: ['スーパーライブガーデン野木', 'MGM境'] },
   { file: 'facegroup',    label: '株式会社フェイスグループさん専用', stores: ['ワンダーランド大刀洗'] },
   { file: 'kisuke',      label: 'キスケ株式会社さん専用',          stores: ['セントラルディーボ小坂','パチンコ天国朝生田本店','ナングン東温','ダイナム愛媛今治黄金','丸の内ヘリオス竹原','ポポロ伊予','ピーアーク北千住SSS','エスパス上野本館','楽園町田'] },
+  { file: 'bsd',         label: 'BSDさん専用',                    stores: ['八戸ひまわり','メガガイア青森中央','スーパードーム青森東','WINS北上ライト館','パチンコ22花巻南','ニラク福島瀬上','ベガスベガス函館昭和','函館ひまわり'] },
 ];
 const DEFAULT_STORE = { id: 'default', name: 'デフォルト店舗', key: _NS + 'bi_added_data_default' };
 // 業界ベンチマーク仮想ストア（localStorageに保存しない・DB_CACHE['__benchmark__']で管理）
@@ -3596,11 +3476,7 @@ function renderComparisons() {
 //  インサイトフィード
 // ══════════════════════════════════════
 window._insightsFeed = [];
-
-// visual=SVG文字列, anchor=ジャンプ先のelementId
-function _pushInsight(cat, icon, headline, body, priority, visual, anchor) {
-  window._insightsFeed.push({ cat, icon, headline, body, priority: priority || 5, visual: visual || '', anchor: anchor || '' });
-}
+function _pushInsight() {}  // インサイトフィード削除済み（no-op）
 
 // ── SVGミニチャートヘルパー ──
 function _svgVBar(values, labels, colors, w, h) {
@@ -3718,7 +3594,7 @@ function render() {
   window._insightsFeed = [];
 
   const fns = [renderKPIs, renderCharts, renderCalendar,
-               renderDayTable, renderDOW, renderDigit, renderModelTable, renderRivalAnalysis, renderAlertTiles];
+               renderDOW, renderDigit, renderModelTable, renderRivalAnalysis, renderAlertTiles];
   // 機種別集計ビューをテーブルモードにリセット
   modelAggMode = 'table';
   document.getElementById('modelAggTableView').style.display = '';
@@ -3730,7 +3606,7 @@ function render() {
   fns.forEach(fn => { try { fn(); } catch(e) { console.error(fn.name, e); } });
   try { if (typeof dayViewMode !== 'undefined' && dayViewMode === 'chart') renderDayCharts(); } catch(e) { console.error('renderDayCharts', e); }
   // 全分析終了後にインサイトフィードを描画
-  try { renderInsightFeed(); } catch(e) { console.error('renderInsightFeed', e); }
+  // renderInsightFeed 削除済み
 }
 
 function sum(arr, key) { return arr.reduce((a,b) => a + (b[key]||0), 0); }
