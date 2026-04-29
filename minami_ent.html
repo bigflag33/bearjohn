@@ -770,6 +770,10 @@
       <button class="theme-btn t-light"        id="tbtn-light" onclick="setTheme('light')" title="ライト"></button>
       <button class="theme-btn t-cool"         id="tbtn-cool"  onclick="setTheme('cool')"  title="クール"></button>
     </div>
+    <button onclick="(function(){ const el = document.getElementById('rivalAnalysisCard'); const headerH = (document.querySelector('.header') ? document.querySelector('.header').offsetHeight : 70) + (document.querySelector('.filter-bar') ? document.querySelector('.filter-bar').offsetHeight : 80); const top = el.getBoundingClientRect().top + window.scrollY - headerH - 16; window.scrollTo({top, behavior:'smooth'}); })()"
+      style="background:linear-gradient(135deg,#1e293b,#0f172a);color:#e2e8f0;border:1px solid rgba(148,163,184,0.3);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;letter-spacing:1.5px;white-space:nowrap;">
+      REPORTへ
+    </button>
     <div class="header-date-range" id="dataRange"></div>
     <span id="uploadMsg" class="upload-msg-inline"></span>
     <label for="fileInput" class="upload-fab" style="cursor:pointer;">
@@ -1232,9 +1236,9 @@
   <!-- ▼ 攻略分析 ▼ -->
   <div class="table-card" id="rivalAnalysisCard">
     <div class="table-title" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
-      <div style="display:flex;align-items:center;gap:8px;">
+      <div style="display:flex;align-items:center;gap:12px;">
         <div class="dot" style="background:#f87171;"></div>
-        🎯 攻略分析 — この店舗を攻略するには
+        <span style="font-size:28px;font-weight:900;letter-spacing:3px;color:var(--text);">THE REPORT</span>
       </div>
     </div>
     <div id="rivalAnalysisBody" style="padding:4px 0 8px;">
