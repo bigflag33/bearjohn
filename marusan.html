@@ -2898,6 +2898,22 @@ function _inLabel(short) {
 function _inUnit() { return _isPachinkoStore() ? '発' : '枚'; }
 // アウト/IN枚数 値を適切な単位でフォーマット
 function _fmtInVal(v) { return Math.round(v).toLocaleString() + _inUnit(); }
+// ジャグラー or 海物語 キーワード
+function _seriesKeyword() { return _isPachinkoStore() ? '海物語' : 'ジャグラー'; }
+function _seriesLabel()   { return _isPachinkoStore() ? '海物語シリーズ' : 'ジャグラーシリーズ'; }
+// 万枚/万発 閾値・ラベル設定
+function _manConfig() {
+  const p = _isPachinkoStore();
+  return p
+    ? { t1:100000, t2:70000, t3:50000,
+        l1:'10万発突破', l2:'7万発突破', l3:'5万発突破',
+        d1:'差玉100,000発以上', d2:'差玉70,000発以上', d3:'差玉50,000発以上',
+        title:'万発突破分析', postit:'5万発突破', postitUnit:'発' }
+    : { t1:10000,  t2:9000,  t3:8000,
+        l1:'万枚突破', l2:'9,000枚突破', l3:'8,000枚突破',
+        d1:'差枚10,000枚以上', d2:'差枚9,000枚以上', d3:'差枚8,000枚以上',
+        title:'万枚突破分析', postit:'万枚突破', postitUnit:'枚' };
+}
 
 // パチンコ/スロットに応じてUIラベルを一括更新
 function _refreshInLabels() {
@@ -3756,34 +3772,38 @@ function renderAlertTiles() {
     });
   });
 
-  // ── ④ 万枚（直近3日、差枚10,000枚以上） ──
-  const hasTaiban = allForMeta.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
-  if (hasTaiban) {
-    const manMap = {};
-    allForMeta.forEach(r => {
-      const tai = r['台番'] != null ? String(r['台番']).trim() : '';
-      if (!tai || !r.date || !recent3Set.has(r.date)) return;
-      const k = r.date + '\x00' + tai;
-      if (!manMap[k]) manMap[k] = { date: r.date, tai, model: r['機種名'] || '', diff: 0 };
-      manMap[k].diff += r['差枚'] || 0;
-    });
-    Object.values(manMap).filter(v => v.diff >= 10000).forEach(v => {
-      tiles.push({
-        type: 'man',
-        date: v.date,
-        text: `万枚突破`,
-        sub:  `${v.date.slice(5)}に${v.model}（台${v.tai}）で万枚が出ました（+${v.diff.toLocaleString()}枚）`,
-        abbr: '10K',
-        color: '#f59e0b',
-        bg:   'rgba(245,158,11,0.12)',
-        border: 'rgba(245,158,11,0.35)',
-        jumpTo: 'rivalManmaiSection',
+  // ── ④ 万枚/万発（直近3日） ──
+  {
+    const _mc = _manConfig();
+    const hasTaiban = allForMeta.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
+    if (hasTaiban) {
+      const manMap = {};
+      allForMeta.forEach(r => {
+        const tai = r['台番'] != null ? String(r['台番']).trim() : '';
+        if (!tai || !r.date || !recent3Set.has(r.date)) return;
+        const k = r.date + '\x00' + tai;
+        if (!manMap[k]) manMap[k] = { date: r.date, tai, model: r['機種名'] || '', diff: 0 };
+        manMap[k].diff += r['差枚'] || 0;
       });
-    });
+      Object.values(manMap).filter(v => v.diff >= _mc.t3).forEach(v => {
+        const achieved = v.diff >= _mc.t1 ? _mc.l1 : v.diff >= _mc.t2 ? _mc.l2 : _mc.l3;
+        tiles.push({
+          type: 'man',
+          date: v.date,
+          text: achieved,
+          sub:  `${v.date.slice(5)}に${v.model}（台${v.tai}）で${achieved}が出ました（+${v.diff.toLocaleString()}${_mc.postitUnit}）`,
+          abbr: _isPachinkoStore() ? (v.diff >= _mc.t1 ? '10万' : v.diff >= _mc.t2 ? '7万' : '5万') : '10K',
+          color: '#f59e0b',
+          bg:   'rgba(245,158,11,0.12)',
+          border: 'rgba(245,158,11,0.35)',
+          jumpTo: 'rivalManmaiSection',
+        });
+      });
+    }
   }
 
-  // ── ⑤ 全台系（直近3日、攻略分析と同じ閾値） ──
-  if (hasTaiban) {
+  // ── ⑤ 全台系（直近3日、攻略分析と同じ閾値）※パチンコは対象外 ──
+  if (hasTaiban && !_isPachinkoStore()) {
     const ZENTAI_MIN_MACHINES = 3;
     const ZENTAI_MIN_IN       = 20000;
     const ZENTAI_MIN_PAYOUT   = 1.05;
@@ -3826,7 +3846,7 @@ function renderAlertTiles() {
   // ── ⑥ メイン機種 直近3日勝率80%以上検出 ──
   {
     // ジャグラー除外・IN枚数上位5機種を特定
-    const jagExcluded = allForMeta.filter(r => r['機種名'] && !r['機種名'].includes('ジャグラー'));
+    const jagExcluded = allForMeta.filter(r => r['機種名'] && !r['機種名'].includes(_seriesKeyword()));
     const modelInMap = {};
     jagExcluded.forEach(r => {
       if (!r['機種名']) return;
@@ -3872,9 +3892,9 @@ function renderAlertTiles() {
     });
   }
 
-  // ── ⑦ ジャグラー据え置き検出（直近3日以内に3日連続出玉率100%超） ──
+  // ── ⑦ ジャグラー/海物語据え置き検出（直近3日以内に4日連続出玉率100%超） ──
   {
-    const jagRaw = allForMeta.filter(r => r['機種名'] && r['機種名'].includes('ジャグラー'));
+    const jagRaw = allForMeta.filter(r => r['機種名'] && r['機種名'].includes(_seriesKeyword()));
     if (jagRaw.length) {
       const storeAvgIn = allForMeta.length > 0
         ? allForMeta.reduce((s, r) => s + (r['IN枚数'] || 0), 0) / allForMeta.length : 0;
@@ -3906,7 +3926,7 @@ function renderAlertTiles() {
             if (run.length >= 4 && run.some(d => recent3Set.has(d))) {
               tiles.push({
                 type: 'oki', date: run[run.length-1],
-                text: 'ジャグラー据え置き疑い',
+                text: _seriesLabel() + '据え置き疑い',
                 abbr: 'HOLD',
                 sub:  `${entry.model} 台${entry.tai}が${run.length}日連続で出玉率100%超です（4日以上）`,
                 color: '#fcd34d',
@@ -4054,7 +4074,7 @@ function renderAlertTiles() {
 function wzJumpTo(id) {
   if (!id) return;
   // 攻略分析セクション内のIDは動的生成のため、まず親カードへ飛んで再描画後にスクロール
-  const rivalSections = ['rivalNewModelSection','rivalZentaiSection','rivalManmaiSection','rivalJugglerSection','rivalMainSection'];
+  const rivalSections = ['rivalNewModelSection','rivalZentaiSection','rivalManmaiSection','rivalJugglerSection','rivalEvaSection','rivalHokutoSection','rivalMainSection'];
   if (rivalSections.includes(id)) {
     const body = document.getElementById('rivalAnalysisBody');
     if (body && body.innerHTML.trim() === '') {
@@ -4442,7 +4462,8 @@ function renderRivalAnalysis() {
     </div>`;
   }
 
-  // ②-b 全台系イベント検出
+  // ②-b 全台系イベント検出（パチンコは対象外）
+  if (!_isPachinkoStore())
   {
     const ZENTAI_MIN_MACHINES = 3;
     const ZENTAI_MIN_IN       = 20000;
@@ -5446,10 +5467,12 @@ function renderRivalAnalysis() {
       });
     }
 
+    const _mc = _manConfig();
     const allManEvents = Object.values(manTaiDayMap).sort((a, b) => b.diff - a.diff);
-    const manEvt10k = allManEvents.filter(t => t.diff >= 10000);
-    const manEvt9k  = allManEvents.filter(t => t.diff >= 9000);
-    const manEvt8k  = allManEvents.filter(t => t.diff >= 8000);
+    const manEvt10k = allManEvents.filter(t => t.diff >= _mc.t1);
+    const manEvt9k  = allManEvents.filter(t => t.diff >= _mc.t2);
+    const manEvt8k  = allManEvents.filter(t => t.diff >= _mc.t3);
+    const _manUnit  = _inUnit();
 
     // 出現率の分母: ユニーク台番数 × 営業日数
     const manTotalDays = new Set(all.map(r => r.date).filter(Boolean)).size;
@@ -5460,8 +5483,8 @@ function renderRivalAnalysis() {
     // インサイト登録
     if (manEvt10k.length > 0) {
       _pushInsight('rival', '🎰',
-        '万枚突破 ' + manEvt10k.length + '件を検出',
-        '最大: ' + manEvt10k[0].date + ' 台' + manEvt10k[0].tai + '（' + manEvt10k[0].model + '）差枚' + manEvt10k[0].diff.toLocaleString() + '枚',
+        _mc.l1 + ' ' + manEvt10k.length + '件を検出',
+        '最大: ' + manEvt10k[0].date + ' 台' + manEvt10k[0].tai + '（' + manEvt10k[0].model + '）差' + _manUnit + manEvt10k[0].diff.toLocaleString() + _manUnit,
         2, null, 'rivalAnalysisCard');
     }
 
@@ -5472,21 +5495,24 @@ function renderRivalAnalysis() {
       if (!events || events.length === 0)
         return '<div style="font-size:11px;color:var(--text2);padding:10px 0;">該当なし</div>';
       const thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
+      const u = _inUnit();
+      const inLabel = _isPachinkoStore() ? 'アウト' : 'IN枚数';
+      const diffLabel = _isPachinkoStore() ? '差玉' : '差枚';
       const rows = events.slice(0, 30).map(e =>
         '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
         + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);white-space:nowrap;">' + e.date + '</td>'
         + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:center;">' + e.tai + '</td>'
         + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + e.model + '</td>'
-        + '<td style="padding:7px 10px;font-size:14px;font-weight:900;color:' + accentColor + ';text-align:right;">' + e.diff.toLocaleString() + '枚</td>'
-        + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + (e.inmai || 0).toLocaleString() + '枚</td>'
+        + '<td style="padding:7px 10px;font-size:14px;font-weight:900;color:' + accentColor + ';text-align:right;">' + e.diff.toLocaleString() + u + '</td>'
+        + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + (e.inmai || 0).toLocaleString() + u + '</td>'
         + '</tr>'
       ).join('');
       const thRow = '<tr style="border-bottom:1px solid ' + accentColor + '44;">'
         + '<th style="' + thS + 'text-align:left;">日付</th>'
         + '<th style="' + thS + 'text-align:center;">台番</th>'
         + '<th style="' + thS + 'text-align:left;">機種名</th>'
-        + '<th style="' + thS + 'text-align:right;">差枚</th>'
-        + '<th style="' + thS + 'text-align:right;">IN枚数</th>'
+        + '<th style="' + thS + 'text-align:right;">' + diffLabel + '</th>'
+        + '<th style="' + thS + 'text-align:right;">' + inLabel + '</th>'
         + '</tr>';
       return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
         + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>'
@@ -5512,30 +5538,30 @@ function renderRivalAnalysis() {
     }
 
     html += '<div class="rival-section" id="rivalManmaiSection">';
-    html += '<div class="rival-section-title" style="color:#f59e0b;">🎰 万枚突破分析</div>';
+    html += '<div class="rival-section-title" style="color:#f59e0b;">' + _mc.title + '</div>';
     html += '<div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">'
-      + '台番レベルで差枚を日次集計し、10,000枚・9,000枚・8,000枚を突破したイベントを全期間から検出します。'
+      + '台番レベルで差' + _manUnit + 'を日次集計し、' + _mc.l1 + '・' + _mc.l2 + '・' + _mc.l3 + 'したイベントを全期間から検出します。'
       + '出現率＝件数÷（ユニーク台番数×営業日数）。タイルクリックで一覧展開。</div>';
 
     if (!hasTaibanForMan) {
-      html += '<div style="font-size:11px;color:var(--text2);">台番データがないため万枚突破分析を実行できません。</div>';
+      html += '<div style="font-size:11px;color:var(--text2);">台番データがないため' + _mc.title + 'を実行できません。</div>';
     } else {
       html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:660px;margin-bottom:16px;">';
-      html += _manTile('man10k', manEvt10k.length, '万枚突破',    '差枚10,000枚以上', '#f59e0b', manPct(manEvt10k.length));
-      html += _manTile('man9k',  manEvt9k.length,  '9,000枚突破', '差枚9,000枚以上',  '#fbbf24', manPct(manEvt9k.length));
-      html += _manTile('man8k',  manEvt8k.length,  '8,000枚突破', '差枚8,000枚以上',  '#fb923c', manPct(manEvt8k.length));
+      html += _manTile('man10k', manEvt10k.length, _mc.l1, _mc.d1, '#f59e0b', manPct(manEvt10k.length));
+      html += _manTile('man9k',  manEvt9k.length,  _mc.l2, _mc.d2, '#fbbf24', manPct(manEvt9k.length));
+      html += _manTile('man8k',  manEvt8k.length,  _mc.l3, _mc.d3, '#fb923c', manPct(manEvt8k.length));
       html += '</div>';
 
       html += '<div id="manDetail_man10k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(245,158,11,0.3);background:rgba(0,0,0,0.18);">'
-        + '<div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:12px;">万枚突破 一覧（差枚10,000枚以上 全' + manEvt10k.length + '件）</div>'
+        + '<div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:12px;">' + _mc.l1 + ' 一覧（' + _mc.d1 + ' 全' + manEvt10k.length + '件）</div>'
         + _manRows(manEvt10k, '#f59e0b') + '</div>';
 
       html += '<div id="manDetail_man9k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(251,191,36,0.3);background:rgba(0,0,0,0.18);">'
-        + '<div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:12px;">9,000枚突破 一覧（差枚9,000枚以上 全' + manEvt9k.length + '件）</div>'
+        + '<div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:12px;">' + _mc.l2 + ' 一覧（' + _mc.d2 + ' 全' + manEvt9k.length + '件）</div>'
         + _manRows(manEvt9k, '#fbbf24') + '</div>';
 
       html += '<div id="manDetail_man8k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(251,146,60,0.3);background:rgba(0,0,0,0.18);">'
-        + '<div style="font-size:12px;font-weight:700;color:#fb923c;margin-bottom:12px;">8,000枚突破 一覧（差枚8,000枚以上 全' + manEvt8k.length + '件）</div>'
+        + '<div style="font-size:12px;font-weight:700;color:#fb923c;margin-bottom:12px;">' + _mc.l3 + ' 一覧（' + _mc.d3 + ' 全' + manEvt8k.length + '件）</div>'
         + _manRows(manEvt8k, '#fb923c') + '</div>';
     }
 
@@ -5866,8 +5892,8 @@ function renderRivalAnalysis() {
     </div>
   </div>`;
 
-  // ④ ジャグラーシリーズ分析
-  const jagModels      = modelList.filter(m => m.name.includes('ジャグラー'));
+  // ④ ジャグラー/海物語シリーズ分析
+  const jagModels      = modelList.filter(m => m.name.includes(_seriesKeyword()));
   const jagMachines    = jagModels.reduce((a,m) => a + m.estimatedMachines, 0);
   const jagProfit      = jagModels.reduce((a,m) => a + m.totalProfit, 0);
   const jagIn          = jagModels.reduce((a,m) => a + m.avgIn * m.dayCount * m.estimatedMachines, 0);
@@ -5903,7 +5929,7 @@ function renderRivalAnalysis() {
       `設置比率${jagInstallRate.toFixed(1)}%に対し利益比率${jagProfitRate.toFixed(1)}%・アウト比率${jagInRate.toFixed(1)}%。${jagInComment}`, 3, jagVis, 'rivalAnalysisCard');
 
     html += `<div class="rival-section" id="rivalJugglerSection">
-      <div class="rival-section-title" style="color:#f59e0b;">🫐 ジャグラーシリーズ分析</div>
+      <div class="rival-section-title" style="color:#f59e0b;">${_seriesLabel()}分析</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
         <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
           <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">ジャグラー総台数</div>
@@ -5941,7 +5967,7 @@ function renderRivalAnalysis() {
       </div>
       ${(() => {
         // ── ジャグラー台別運用パターン (据え置き率 & ドボン台設定上げ) ──
-        const jagRaw = all.filter(r => r['機種名'] && r['機種名'].includes('ジャグラー'));
+        const jagRaw = all.filter(r => r['機種名'] && r['機種名'].includes(_seriesKeyword()));
         if (!jagRaw.length) return '';
 
         // 店舗全体の平均IN枚数（ジャグラー含む全台）
@@ -6142,12 +6168,159 @@ function renderRivalAnalysis() {
     </div>`;
   }
 
+  // ④-b エヴァシリーズ・北斗の拳シリーズ分析（パチンコ時のみ）
+  if (_isPachinkoStore()) {
+    // ── 共通ヘルパー: シリーズセクション生成 ──
+    const _renderPachinkoSeriesSection = (serKeyword, serLabel, serId, serColor, serBg, serBorder) => {
+      const serModels      = modelList.filter(m => m.name.includes(serKeyword));
+      if (!serModels.length) return;
+
+      const serMachines    = serModels.reduce((a,m) => a + m.estimatedMachines, 0);
+      const serProfit      = serModels.reduce((a,m) => a + m.totalProfit, 0);
+      const serIn          = serModels.reduce((a,m) => a + m.avgIn * m.dayCount * m.estimatedMachines, 0);
+      const serInstallRate = allTotalMachines > 0 ? serMachines / allTotalMachines * 100 : 0;
+      const serProfitRate  = allTotalProfit !== 0  ? serProfit  / Math.abs(allTotalProfit) * 100 : 0;
+      const serInRate      = allTotalIn > 0        ? serIn      / allTotalIn * 100 : 0;
+
+      const serComment = serProfitRate > serInstallRate + 10
+        ? `${serLabel}が設置比率を超えた利益貢献 — 収益の主力として運用している`
+        : serProfitRate < serInstallRate - 10
+        ? `${serLabel}の利益比率が設置比率を下回る — 集客・放出枠として使っている可能性`
+        : `${serLabel}の利益貢献は設置比率とほぼ同水準`;
+
+      const serInComment = serInRate > serInstallRate + 8
+        ? `アウト比率が設置比率より高く、${serLabel}に客が集まっている（稼働効率◎）`
+        : serInRate < serInstallRate - 8
+        ? `アウト比率が設置比率より低く、${serLabel}の稼働が上がっていない`
+        : `稼働はほぼ設置比率通り`;
+
+      const serSorted = [...serModels].sort((a,b) => b.avgProfit - a.avgProfit);
+
+      // 据え置き疑い台リスト（4日以上連続 差玉≥0 かつ 店舗平均IN以上）
+      const serRaw = all.filter(r => r['機種名'] && r['機種名'].includes(serKeyword));
+      let okiDetailSer = [];
+      if (serRaw.length) {
+        const storeAvgInAllSer = all.length > 0
+          ? all.reduce((s, r) => s + (r['IN枚数'] || 0), 0) / all.length : 0;
+        const byTaiSer = {};
+        serRaw.forEach(r => {
+          const tai = String(r['台番'] || '').trim();
+          if (!tai || tai === '0') return;
+          const key = (r['機種名'] || '') + '||' + tai;
+          if (!byTaiSer[key]) byTaiSer[key] = { model: r['機種名'] || '', tai, records: [] };
+          byTaiSer[key].records.push({ date: String(r['日付'] || ''), val: (r['IN枚数']||0), diff: (r['差枚数']||0) });
+        });
+        Object.values(byTaiSer).forEach(entry => {
+          const recs = entry.records
+            .filter(x => x.date)
+            .sort((a,b) => a.date.localeCompare(b.date));
+          if (recs.length < 4) return;
+          let run = [recs[0]];
+          const check = (runArr) => {
+            if (runArr.length >= 4 && runArr.every(x => x.val >= storeAvgInAllSer && x.diff >= 0)) {
+              okiDetailSer.push({ model: entry.model, tai: entry.tai, startDate: runArr[0].date, days: runArr.length });
+            }
+          };
+          for (let i = 1; i < recs.length; i++) {
+            const prev = new Date(run[run.length-1].date);
+            const cur  = new Date(recs[i].date);
+            const diff = (cur - prev) / 86400000;
+            if (diff === 1) { run.push(recs[i]); }
+            else { check(run); run = [recs[i]]; }
+          }
+          check(run);
+        });
+        okiDetailSer = okiDetailSer.filter((v,i,a) =>
+          a.findIndex(x => x.model===v.model && x.tai===v.tai && x.startDate===v.startDate) === i
+        );
+      }
+
+      const okiIdSer  = serId + '_oki';
+      const okiDetId  = serId + '_okiDetail';
+
+      html += `<div class="rival-section" id="${serId}">
+      <div class="rival-section-title" style="color:${serColor};">${serLabel}分析</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+        <div style="background:${serBg};border:1px solid ${serBorder};border-radius:12px;padding:12px 18px;min-width:130px;">
+          <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">${serLabel}総台数</div>
+          <div style="font-size:18px;font-weight:800;color:${serColor};">${serMachines}<span style="font-size:11px;color:var(--text2);"> / ${allTotalMachines}台</span></div>
+        </div>
+        <div style="background:${serBg};border:1px solid ${serBorder};border-radius:12px;padding:12px 18px;min-width:130px;">
+          <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">設置比率</div>
+          <div style="font-size:18px;font-weight:800;color:${serColor};">${serInstallRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+        </div>
+        <div style="background:${serBg};border:1px solid ${serBorder};border-radius:12px;padding:12px 18px;min-width:130px;">
+          <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">利益比率</div>
+          <div style="font-size:18px;font-weight:800;color:${serProfitRate >= 0 ? serColor : '#f87171'};">${serProfitRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+        </div>
+        <div style="background:${serBg};border:1px solid ${serBorder};border-radius:12px;padding:12px 18px;min-width:130px;">
+          <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">アウト比率</div>
+          <div style="font-size:18px;font-weight:800;color:${serColor};">${serInRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+        </div>
+        <div style="flex:1;min-width:220px;background:${serBg};border:1px solid ${serBorder};border-radius:12px;padding:12px 16px;">
+          <div style="font-size:11.5px;color:var(--text2);line-height:1.7;">💡 ${serComment}<br><br>${serInComment}</div>
+        </div>
+      </div>
+      <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:10px;">機種別内訳（台粗利順・${serModels.length}機種）</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:${okiDetailSer.length ? '12px' : '0'};">
+        ${serSorted.map(m => {
+          const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
+          const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
+          const profitCol = m.avgProfit >= storeAvgProfit ? serColor : m.avgProfit >= 0 ? serColor : '#f87171';
+          const sn = m.name.replace(/'/g,"\\'");
+          return `<span class="rival-model-chip" style="background:${serBg};border:1px solid ${serBorder};color:${profitCol};cursor:pointer;"
+            onclick="navigateToModel('${sn}')"
+            title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
+            <span class="chip-name">${m.name}</span><span class="chip-pct">${profitStr}</span>
+          </span>`;
+        }).join('')}
+      </div>
+      ${okiDetailSer.length > 0 ? `
+      <div id="${okiIdSer}" data-open="false"
+        onclick="(function(el){const o=el.dataset.open==='true';el.dataset.open=String(!o);document.getElementById('${okiDetId}').style.display=o?'none':'block';el.querySelector('.ser-oki-arrow').textContent=o?'▾':'▴';})(this)"
+        style="cursor:pointer;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.25);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;margin-top:8px;user-select:none;">
+        <div>
+          <span style="font-size:11.5px;font-weight:800;color:#f59e0b;">据え置き疑い台 ${okiDetailSer.length}件</span>
+          <span style="font-size:10.5px;color:var(--text2);margin-left:8px;">4日以上連続 差玉≥0 かつ 平均IN以上</span>
+        </div>
+        <span class="ser-oki-arrow" style="font-size:12px;color:var(--text2);">▾</span>
+      </div>
+      <div id="${okiDetId}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;">
+        <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+          <tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+            <th style="text-align:left;padding:7px 8px;font-weight:700;">機種名</th>
+            <th style="text-align:center;padding:7px 8px;font-weight:700;">台番</th>
+            <th style="text-align:center;padding:7px 8px;font-weight:700;">開始日</th>
+            <th style="text-align:center;padding:7px 8px;font-weight:700;">連続日数</th>
+          </tr>
+          ${okiDetailSer.sort((a,b)=>b.days-a.days).slice(0,25).map(e=>`
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+            <td style="padding:6px 8px;color:var(--text);">${e.model}</td>
+            <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.tai}</td>
+            <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.startDate}</td>
+            <td style="padding:6px 8px;color:#f59e0b;text-align:center;font-weight:800;">${e.days}日</td>
+          </tr>`).join('')}
+          ${okiDetailSer.length>25?`<tr><td colspan="4" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${okiDetailSer.length-25} 件</td></tr>`:''}
+        </table></div>
+      </div>` : ''}
+    </div>`;
+    };
+
+    _renderPachinkoSeriesSection(
+      'エヴァ', 'エヴァシリーズ', 'rivalEvaSection',
+      '#a78bfa', 'rgba(167,139,250,0.08)', 'rgba(167,139,250,0.3)'
+    );
+    _renderPachinkoSeriesSection(
+      '北斗の拳', '北斗の拳シリーズ', 'rivalHokutoSection',
+      '#fb923c', 'rgba(251,146,60,0.08)', 'rgba(251,146,60,0.3)'
+    );
+  }
 
   // ⑤ メイン機種分析 — 総アウト上位5機種（ジャグラーシリーズ除外）
   {
     const mainModels = [...modelList]
       .map(m => ({ ...m, totalIn: m.avgIn * m.dayCount * m.estimatedMachines }))
-      .filter(m => !m.name.includes('ジャグラー'))
+      .filter(m => !m.name.includes(_seriesKeyword()))
       .sort((a, b) => b.totalIn - a.totalIn)
       .slice(0, 5);
 
@@ -6405,7 +6578,7 @@ function renderRivalAnalysis() {
         <div class="rival-section-title" style="color:#60a5fa;">メイン機種分析 — 総アウト上位5機種</div>
         <div style="font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
           総アウト（推定）が最も大きい上位5機種。店舗稼働の主軸となっている機種群。
-          <span style="display:inline-block;margin-top:4px;padding:2px 8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:4px;font-size:10.5px;color:#fbbf24;">※ジャグラーシリーズを除く</span>
+          <span style="display:inline-block;margin-top:4px;padding:2px 8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:4px;font-size:10.5px;color:#fbbf24;">※${_seriesLabel()}を除く</span>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
           ${_kpiBox('メイン機種 総台数', mainTotalMachines + '<span style="font-size:11px;color:var(--text2);"> / ' + allTotalMachines + '台</span>', '', '#60a5fa')}
@@ -8562,8 +8735,8 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
   const prUp   = devList.filter(r=>r.prDPct!=null && r.prDPct>=PR_TH).sort((a,b)=>b.prDPct-a.prDPct);
   const inDown = devList.filter(r=>r.inDPct!=null && r.inDPct<=-IN_TH).sort((a,b)=>a.inDPct-b.inDPct);
   const redOut = devList.filter(r=>r.profit<0).sort((a,b)=>a.profit-b.profit);
-  const jugRows = devList.filter(r=>r.name.includes('ジャグラー'));
-  const mainRows= devList.filter(r=>r.count>=4 && !r.name.includes('ジャグラー'))
+  const jugRows = devList.filter(r=>r.name.includes(_seriesKeyword()));
+  const mainRows= devList.filter(r=>r.count>=4 && !r.name.includes(_seriesKeyword()))
                          .sort((a,b)=>b.inmai-a.inmai).slice(0,6);
   const varRows = devList.filter(r=>r.count<=2);
 
@@ -8672,12 +8845,13 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
     taiDiffMap[tai].diff  += r['差枚']  || 0;
     taiDiffMap[tai].inmai += r['IN枚数'] || 0;
   });
+  const _pinMc = _manConfig();
   const allTaiArr = Object.values(taiDiffMap).sort(function(a,b){ return b.diff - a.diff; });
-  const man10k = allTaiArr.filter(function(t){ return t.diff >= 10000; });
-  const man9k  = allTaiArr.filter(function(t){ return t.diff >= 9000; });
-  const man8k  = allTaiArr.filter(function(t){ return t.diff >= 8000; });
+  const man10k = allTaiArr.filter(function(t){ return t.diff >= _pinMc.t1; });
+  const man9k  = allTaiArr.filter(function(t){ return t.diff >= _pinMc.t2; });
+  const man8k  = allTaiArr.filter(function(t){ return t.diff >= _pinMc.t3; });
 
-  // 万枚突破率 = 台数 ÷ (選択日の総台数 × 1日)
+  // 突破率 = 台数 ÷ 選択日の総台数
   const totalTaiDay = allTaiArr.length;
   const man10kPct = (totalTaiDay > 0 ? (man10k.length / totalTaiDay * 100) : 0).toFixed(2) + '%';
   const man9kPct  = (totalTaiDay > 0 ? (man9k.length  / totalTaiDay * 100) : 0).toFixed(2) + '%';
@@ -8746,13 +8920,13 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
     + makeCatTile('variety', 'バラエティ', '🎲', '#fb923c', varSum);
   }
 
-  // Row3: 万枚突破3タイル
+  // Row3: 万枚/万発突破3タイル
   const row3 = document.getElementById('pinDayTilesRow3');
   if (row3) {
     row3.innerHTML =
-      makeTile('man10k', man10k.length, '万枚突破',    '差枚10,000枚以上', '#f59e0b', man10k, 'diff', null, false, man10kPct)
-    + makeTile('man9k',  man9k.length,  '9,000枚突破', '差枚9,000枚以上',  '#fbbf24', man9k,  'diff', null, false, man9kPct)
-    + makeTile('man8k',  man8k.length,  '8,000枚突破', '差枚8,000枚以上',  '#fb923c', man8k,  'diff', null, false, man8kPct);
+      makeTile('man10k', man10k.length, _pinMc.l1, _pinMc.d1, '#f59e0b', man10k, 'diff', null, false, man10kPct)
+    + makeTile('man9k',  man9k.length,  _pinMc.l2, _pinMc.d2, '#fbbf24', man9k,  'diff', null, false, man9kPct)
+    + makeTile('man8k',  man8k.length,  _pinMc.l3, _pinMc.d3, '#fb923c', man8k,  'diff', null, false, man8kPct);
   }
 
   wrap.style.display = '';
