@@ -1592,6 +1592,7 @@ const USERS_CONFIG = USER_ID !== 'admin' ? [] : [
   { file: 'facegroup',    label: '株式会社フェイスグループさん専用', stores: ['ワンダーランド大刀洗'] },
   { file: 'kisuke',      label: 'キスケ株式会社さん専用',          stores: ['セントラルディーボ小坂','パチンコ天国朝生田本店','ナングン東温','ダイナム愛媛今治黄金','丸の内ヘリオス竹原','ポポロ伊予','ピーアーク北千住SSS','エスパス上野本館','楽園町田'] },
   { file: 'bsd',         label: 'BSDさん専用',                    stores: ['八戸ひまわり','メガガイア青森中央','スーパードーム青森東','WINS北上ライト館','パチンコ22花巻南','ニラク福島瀬上','ベガスベガス函館昭和','函館ひまわり'] },
+  { file: 'nexus',       label: 'NEXUSさん専用',                  stores: ['ピーアーク北千住SSS','ビックマーチ伊勢崎','ZENT太田','スーパーライブガーデン行田'] },
 ];
 const DEFAULT_STORE = { id: 'default', name: 'デフォルト店舗', key: _NS + 'bi_added_data_default' };
 // 業界ベンチマーク仮想ストア（localStorageに保存しない・DB_CACHE['__benchmark__']で管理）
@@ -3773,9 +3774,9 @@ function renderAlertTiles() {
   });
 
   // ── ④ 万枚/万発（直近3日） ──
+  const hasTaiban = allForMeta.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
   {
     const _mc = _manConfig();
-    const hasTaiban = allForMeta.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
     if (hasTaiban) {
       const manMap = {};
       allForMeta.forEach(r => {
