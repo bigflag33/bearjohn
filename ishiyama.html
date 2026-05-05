@@ -3786,14 +3786,14 @@ function renderAlertTiles() {
         if (!manMap[k]) manMap[k] = { date: r.date, tai, model: r['機種名'] || '', diff: 0 };
         manMap[k].diff += r['差枚'] || 0;
       });
-      Object.values(manMap).filter(v => v.diff >= _mc.t3).forEach(v => {
-        const achieved = v.diff >= _mc.t1 ? _mc.l1 : v.diff >= _mc.t2 ? _mc.l2 : _mc.l3;
+      Object.values(manMap).filter(v => v.diff >= _mc.t1).forEach(v => {
+        const achieved = _mc.l1;
         tiles.push({
           type: 'man',
           date: v.date,
           text: achieved,
           sub:  `${v.date.slice(5)}に${v.model}（台${v.tai}）で${achieved}が出ました（+${v.diff.toLocaleString()}${_mc.postitUnit}）`,
-          abbr: _isPachinkoStore() ? (v.diff >= _mc.t1 ? '10万' : v.diff >= _mc.t2 ? '7万' : '5万') : '10K',
+          abbr: _isPachinkoStore() ? '10万' : '10K',
           color: '#f59e0b',
           bg:   'rgba(245,158,11,0.12)',
           border: 'rgba(245,158,11,0.35)',
@@ -3955,14 +3955,9 @@ function renderAlertTiles() {
     }
   }
 
-  // ── ⑧ 機種トレンドアラート（MECE）への新台登場 ──
+  // ── ⑧ 機種トレンドアラート（MECE）: 前期比で新たにカテゴリ入りした機種 ──
   {
-    const newModels = new Set(
-      Object.entries(modelFirstDate)
-        .filter(([, d]) => recent3Set.has(d))
-        .map(([m]) => m)
-    );
-    if (newModels.size > 0 && Object.keys(_lastClassified).length) {
+    if (Object.keys(_lastClassifiedNew).length) {
       const meceDefs = [
         { key: 'rising_profit',  label: 'アウト上昇×粗利高い', color: '#ef4444', bg: 'rgba(239,68,68,0.12)',  border: 'rgba(239,68,68,0.35)'  },
         { key: 'rising_low',     label: 'アウト上昇×粗利低い', color: '#eab308', bg: 'rgba(234,179,8,0.12)',  border: 'rgba(234,179,8,0.35)'  },
@@ -3970,15 +3965,15 @@ function renderAlertTiles() {
         { key: 'falling_low',    label: 'アウト下降×粗利低い', color: '#22c55e', bg: 'rgba(34,197,94,0.12)',  border: 'rgba(34,197,94,0.35)'  },
       ];
       meceDefs.forEach(def => {
-        const hits = (_lastClassified[def.key] || []).filter(m => newModels.has(m.name));
+        const hits = _lastClassifiedNew[def.key] || [];
         if (!hits.length) return;
         const names = hits.slice(0, 2).map(m => m.name).join('・');
         const more  = hits.length > 2 ? `他${hits.length - 2}機種` : '';
         tiles.push({
           type: 'mece_new', date: recent3[recent3.length - 1],
-          text: 'トレンド新台',
-          abbr: 'NEW',
-          sub:  `${names}${more ? '・' + more : ''}が「${def.label}」に登場`,
+          text: 'トレンド変化',
+          abbr: 'TRD',
+          sub:  `${names}${more ? '・' + more : ''}が新たに「${def.label}」に入りました`,
           color: def.color, bg: def.bg, border: def.border,
           jumpTo: 'rivalAnalysisCard',
         });
@@ -3986,33 +3981,25 @@ function renderAlertTiles() {
     }
   }
 
-  // ── ⑨ バラエティ機種分析への新台登場 ──
+  // ── ⑨ バラエティ機種分析: 前期比で新たにカテゴリ入りした機種 ──
   {
-    const newModels = new Set(
-      Object.entries(modelFirstDate)
-        .filter(([, d]) => recent3Set.has(d))
-        .map(([m]) => m)
-    );
-    if (newModels.size > 0) {
-      const varDefs = [
-        { arr: _lastVarietyCopy,  label: '利益管理が巧みな機種', color: '#34d399', bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.35)' },
-        { arr: _lastVarietySpice, label: '集客スパイス機種',      color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.35)' },
-      ];
-      varDefs.forEach(def => {
-        const hits = def.arr.filter(m => newModels.has(m.name));
-        if (!hits.length) return;
-        const names = hits.slice(0, 2).map(m => m.name).join('・');
-        const more  = hits.length > 2 ? `他${hits.length - 2}機種` : '';
-        tiles.push({
-          type: 'variety_new', date: recent3[recent3.length - 1],
-          text: 'バラエティ新台',
-          abbr: 'NEW',
-          sub:  `${names}${more ? '・' + more : ''}が「${def.label}」に登場`,
-          color: def.color, bg: def.bg, border: def.border,
-          jumpTo: 'rivalAnalysisCard',
-        });
+    const varDefs = [
+      { arr: _lastVarietyCopyNew,  label: '利益管理が巧みな機種', color: '#34d399', bg: 'rgba(52,211,153,0.12)', border: 'rgba(52,211,153,0.35)' },
+      { arr: _lastVarietySpiceNew, label: '集客スパイス機種',      color: '#60a5fa', bg: 'rgba(96,165,250,0.12)', border: 'rgba(96,165,250,0.35)' },
+    ];
+    varDefs.forEach(def => {
+      if (!def.arr.length) return;
+      const names = def.arr.slice(0, 2).map(m => m.name).join('・');
+      const more  = def.arr.length > 2 ? `他${def.arr.length - 2}機種` : '';
+      tiles.push({
+        type: 'variety_new', date: recent3[recent3.length - 1],
+        text: 'バラエティ変化',
+        abbr: 'VAR',
+        sub:  `${names}${more ? '・' + more : ''}が新たに「${def.label}」に入りました`,
+        color: def.color, bg: def.bg, border: def.border,
+        jumpTo: 'rivalAnalysisCard',
       });
-    }
+    });
   }
 
   if (!tiles.length) {
@@ -4096,9 +4083,12 @@ function wzJumpTo(id) {
 // ══════════════════════════════════════
 //  攻略分析
 // ポストイット連携用キャッシュ（renderRivalAnalysis → renderAlertTiles）
-let _lastClassified   = {};
-let _lastVarietyCopy  = [];
-let _lastVarietySpice = [];
+let _lastClassified      = {};
+let _lastVarietyCopy     = [];
+let _lastVarietySpice    = [];
+let _lastClassifiedNew   = {};   // 前期比: 今期新たにカテゴリ入りした機種
+let _lastVarietyCopyNew  = [];   // 前期比: 新たにコピー機種入りした機種
+let _lastVarietySpiceNew = [];   // 前期比: 新たにスパイス機種入りした機種
 
 // ══════════════════════════════════════
 function renderRivalAnalysis() {
@@ -4245,6 +4235,87 @@ function renderRivalAnalysis() {
   _lastClassified   = classified;
   _lastVarietyCopy  = varietyCopy;
   _lastVarietySpice = varietySpice;
+
+  // ── 前期比較: 直近3日を除いた期間の分類と比較して「新たにカテゴリ入り」を検出 ──
+  {
+    const allSortedDates = [...new Set(all.map(r => r.date).filter(Boolean))].sort();
+    const recent3Prev    = new Set(allSortedDates.slice(-3));
+    const prevAll        = all.filter(r => !recent3Prev.has(r.date));
+
+    if (prevAll.length >= 10) {
+      // 前期 byModel 集計
+      const prevByModel = {};
+      prevAll.forEach(r => {
+        const m = r['機種名'];
+        if (!m) return;
+        if (!prevByModel[m]) prevByModel[m] = { profit:0, inmai:0, count:0, dates:new Set(), earlyIn:0, earlyCount:0, lateIn:0, lateCount:0 };
+        prevByModel[m].profit += r['台粗利'] || 0;
+        prevByModel[m].inmai  += r['IN枚数'] || 0;
+        prevByModel[m].count  += 1;
+        prevByModel[m].dates.add(r.date);
+      });
+      const prevDates = [...new Set(prevAll.map(r => r.date).filter(Boolean))].sort();
+      const prevMid   = Math.floor(prevDates.length / 2);
+      const prevEarlySet = new Set(prevDates.slice(0, prevMid));
+      const prevLateSet  = new Set(prevDates.slice(prevMid));
+      prevAll.forEach(r => {
+        const m = r['機種名'];
+        if (!m || !prevByModel[m]) return;
+        if (prevEarlySet.has(r.date)) { prevByModel[m].earlyIn += r['IN枚数']||0; prevByModel[m].earlyCount++; }
+        if (prevLateSet.has(r.date))  { prevByModel[m].lateIn  += r['IN枚数']||0; prevByModel[m].lateCount++;  }
+      });
+
+      const prevAvgProfit = prevAll.reduce((a,r) => a+(r['台粗利']||0), 0) / prevAll.length;
+      const prevAvgIn     = prevAll.reduce((a,r) => a+(r['IN枚数']||0), 0) / prevAll.length;
+
+      const prevModelList = Object.entries(prevByModel).map(([name, v]) => {
+        const dayCount   = v.dates.size;
+        const avgProfit  = v.profit / Math.max(v.count, 1);
+        const avgIn      = v.inmai  / Math.max(v.count, 1);
+        const earlyAvgIn = v.earlyCount > 0 ? v.earlyIn / v.earlyCount : 0;
+        const lateAvgIn  = v.lateCount  > 0 ? v.lateIn  / v.lateCount  : 0;
+        const inTrend    = earlyAvgIn > 0 ? (lateAvgIn - earlyAvgIn) / earlyAvgIn : 0;
+        const estMachines = Math.max(Math.round(v.count / Math.max(dayCount,1)), 1);
+        return { name, avgProfit, avgIn, inTrend, dayCount, estimatedMachines: estMachines };
+      }).filter(m => m.dayCount >= 3);
+
+      // 前期 MECE 分類
+      const prevClassified = { rising_profit:new Set(), rising_low:new Set(), falling_profit:new Set(), falling_low:new Set(), stable:new Set() };
+      prevModelList.forEach(m => {
+        const isHP = m.avgProfit >= prevAvgProfit * HIGH_PROFIT_TH;
+        const up   = m.inTrend  >= TREND_UP_TH;
+        const dn   = m.inTrend  <= TREND_DOWN_TH;
+        if      (up && isHP)  prevClassified.rising_profit.add(m.name);
+        else if (up && !isHP) prevClassified.rising_low.add(m.name);
+        else if (dn && isHP)  prevClassified.falling_profit.add(m.name);
+        else if (dn && !isHP) prevClassified.falling_low.add(m.name);
+        else                  prevClassified.stable.add(m.name);
+      });
+
+      // 前期バラエティ
+      const prevVariety     = prevModelList.filter(m => m.estimatedMachines <= 2 && m.dayCount >= 5);
+      const prevCopySet     = new Set(prevVariety.filter(m => m.avgProfit >= prevAvgProfit*0.7 && m.avgIn >= prevAvgIn*0.8).map(m => m.name));
+      const prevSpiceSet    = new Set(prevVariety.filter(m => m.avgIn >= prevAvgIn && m.avgProfit < prevAvgProfit*0.5).map(m => m.name));
+
+      // 差分: 今期カテゴリにいるが前期に同カテゴリにいなかった機種
+      const classifiedNew = {};
+      ['rising_profit','rising_low','falling_profit','falling_low'].forEach(key => {
+        classifiedNew[key] = (classified[key] || []).filter(m => !prevClassified[key].has(m.name));
+      });
+
+      _lastClassifiedNew   = classifiedNew;
+      _lastVarietyCopyNew  = varietyCopy.filter(m  => !prevCopySet.has(m.name));
+      _lastVarietySpiceNew = varietySpice.filter(m => !prevSpiceSet.has(m.name));
+
+    } else {
+      // 前期データ不足 → 全件を「新規入り」扱い
+      const ck = {};
+      ['rising_profit','rising_low','falling_profit','falling_low'].forEach(k => { ck[k] = classified[k] || []; });
+      _lastClassifiedNew   = ck;
+      _lastVarietyCopyNew  = [...varietyCopy];
+      _lastVarietySpiceNew = [...varietySpice];
+    }
+  }
 
   // ── HTML組み立て ──
   let html = '';
@@ -5491,15 +5562,38 @@ function renderRivalAnalysis() {
 
     window._manTachiData = { man10k: manEvt10k, man9k: manEvt9k, man8k: manEvt8k };
 
-    // テーブルビルダー
-    function _manRows(events, accentColor) {
+    // 機種チップサマリー生成
+    function _manModelChips(events, accentColor) {
+      if (!events || !events.length) return '';
+      const modelCounts = {};
+      events.forEach(e => { modelCounts[e.model] = (modelCounts[e.model] || 0) + 1; });
+      const sorted = Object.entries(modelCounts).sort((a,b) => b[1]-a[1]);
+      const chips = sorted.map(([name, cnt]) =>
+        '<span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;'
+        + 'background:' + accentColor + '18;border:1px solid ' + accentColor + '44;'
+        + 'font-size:11px;font-weight:700;color:var(--text);white-space:nowrap;">'
+        + '<span style="color:' + accentColor + ';font-size:12px;font-weight:900;">' + cnt + '回</span>'
+        + name + '</span>'
+      ).join('');
+      return '<div style="margin-bottom:14px;">'
+        + '<div style="font-size:10.5px;font-weight:700;color:var(--text2);margin-bottom:8px;letter-spacing:.4px;">機種別 発生回数</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:6px;">' + chips + '</div>'
+        + '</div>';
+    }
+
+    // テーブルビルダー（ソート対応）
+    function _manRows(events, accentColor, sortKey) {
       if (!events || events.length === 0)
         return '<div style="font-size:11px;color:var(--text2);padding:10px 0;">該当なし</div>';
+      let sorted = [...events];
+      if (sortKey === 'model') sorted.sort((a,b) => a.model.localeCompare(b.model, 'ja'));
+      else if (sortKey === 'diff') sorted.sort((a,b) => b.diff - a.diff);
+      else sorted.sort((a,b) => b.date.localeCompare(a.date)); // 最新順（デフォルト）
       const thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
       const u = _inUnit();
       const inLabel = _isPachinkoStore() ? 'アウト' : 'IN枚数';
       const diffLabel = _isPachinkoStore() ? '差玉' : '差枚';
-      const rows = events.slice(0, 30).map(e =>
+      const rows = sorted.slice(0, 50).map(e =>
         '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
         + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);white-space:nowrap;">' + e.date + '</td>'
         + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:center;">' + e.tai + '</td>'
@@ -5517,7 +5611,23 @@ function renderRivalAnalysis() {
         + '</tr>';
       return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
         + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>'
-        + (events.length > 30 ? '<div style="font-size:10px;color:var(--text3);padding:4px 2px;">… 他 ' + (events.length - 30) + ' 件</div>' : '');
+        + (events.length > 50 ? '<div style="font-size:10px;color:var(--text2);padding:4px 2px;">… 他 ' + (events.length - 50) + ' 件</div>' : '');
+    }
+
+    // ソートボタン生成
+    function _manSortButtons(tier, accentColor, currentSort) {
+      const btn = (key, label) => {
+        const active = currentSort === key;
+        return '<button onclick="_manSetSort(\'' + tier + '\',\'' + key + '\')" style="'
+          + 'padding:4px 12px;border-radius:6px;font-size:10.5px;font-weight:700;cursor:pointer;border:1px solid '
+          + (active ? accentColor : 'var(--border)') + ';background:'
+          + (active ? accentColor + '22' : 'transparent') + ';color:'
+          + (active ? accentColor : 'var(--text2)') + ';transition:all .15s;">'
+          + label + '</button>';
+      };
+      return '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">'
+        + btn('date', '最新順') + btn('model', '機種名順') + btn('diff', '差枚数順')
+        + '</div>';
     }
 
     // タイルビルダー（攻略分析用）
@@ -5553,17 +5663,26 @@ function renderRivalAnalysis() {
       html += _manTile('man8k',  manEvt8k.length,  _mc.l3, _mc.d3, '#fb923c', manPct(manEvt8k.length));
       html += '</div>';
 
+      // ソートキーキャッシュ
+      window._manSortKey = window._manSortKey || {};
+
+      function _manDetailHtml(tier, events, label, desc, accentColor) {
+        const sk = window._manSortKey[tier] || 'date';
+        return '<div style="font-size:12px;font-weight:700;color:' + accentColor + ';margin-bottom:12px;">'
+          + label + ' 一覧（' + desc + ' 全' + events.length + '件）</div>'
+          + _manModelChips(events, accentColor)
+          + _manSortButtons(tier, accentColor, sk)
+          + '<div id="manTable_' + tier + '">' + _manRows(events, accentColor, sk) + '</div>';
+      }
+
       html += '<div id="manDetail_man10k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(245,158,11,0.3);background:rgba(0,0,0,0.18);">'
-        + '<div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:12px;">' + _mc.l1 + ' 一覧（' + _mc.d1 + ' 全' + manEvt10k.length + '件）</div>'
-        + _manRows(manEvt10k, '#f59e0b') + '</div>';
+        + _manDetailHtml('man10k', manEvt10k, _mc.l1, _mc.d1, '#f59e0b') + '</div>';
 
       html += '<div id="manDetail_man9k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(251,191,36,0.3);background:rgba(0,0,0,0.18);">'
-        + '<div style="font-size:12px;font-weight:700;color:#fbbf24;margin-bottom:12px;">' + _mc.l2 + ' 一覧（' + _mc.d2 + ' 全' + manEvt9k.length + '件）</div>'
-        + _manRows(manEvt9k, '#fbbf24') + '</div>';
+        + _manDetailHtml('man9k', manEvt9k, _mc.l2, _mc.d2, '#fbbf24') + '</div>';
 
       html += '<div id="manDetail_man8k" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid rgba(251,146,60,0.3);background:rgba(0,0,0,0.18);">'
-        + '<div style="font-size:12px;font-weight:700;color:#fb923c;margin-bottom:12px;">' + _mc.l3 + ' 一覧（' + _mc.d3 + ' 全' + manEvt8k.length + '件）</div>'
-        + _manRows(manEvt8k, '#fb923c') + '</div>';
+        + _manDetailHtml('man8k', manEvt8k, _mc.l3, _mc.d3, '#fb923c') + '</div>';
     }
 
     html += '<div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6;">'
@@ -9150,6 +9269,58 @@ function toggleJagDetail(key) {
     const tile = document.getElementById('jagTile_' + key);
     if (tile) tile.setAttribute('data-open','true');
   }
+}
+
+function _manSetSort(tier, sortKey) {
+  if (!window._manTachiData) return;
+  window._manSortKey = window._manSortKey || {};
+  window._manSortKey[tier] = sortKey;
+  const events = window._manTachiData[tier] || [];
+  const colorMap = { man10k: '#f59e0b', man9k: '#fbbf24', man8k: '#fb923c' };
+  const color = colorMap[tier] || '#f59e0b';
+
+  // テーブル再描画
+  const tableEl = document.getElementById('manTable_' + tier);
+  if (!tableEl) return;
+  let sorted = [...events];
+  if (sortKey === 'model') sorted.sort((a,b) => a.model.localeCompare(b.model, 'ja'));
+  else if (sortKey === 'diff') sorted.sort((a,b) => b.diff - a.diff);
+  else sorted.sort((a,b) => b.date.localeCompare(a.date));
+  const u = typeof _inUnit === 'function' ? _inUnit() : '枚';
+  const isPachi = typeof _isPachinkoStore === 'function' ? _isPachinkoStore() : false;
+  const inLabel = isPachi ? 'アウト' : 'IN枚数';
+  const diffLabel = isPachi ? '差玉' : '差枚';
+  const thS = 'padding:7px 8px;font-size:10px;font-weight:700;color:var(--text2);white-space:nowrap;';
+  const rows = sorted.slice(0, 50).map(e =>
+    '<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">'
+    + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);white-space:nowrap;">' + e.date + '</td>'
+    + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:center;">' + e.tai + '</td>'
+    + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + e.model + '</td>'
+    + '<td style="padding:7px 10px;font-size:14px;font-weight:900;color:' + color + ';text-align:right;">' + e.diff.toLocaleString() + u + '</td>'
+    + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + (e.inmai || 0).toLocaleString() + u + '</td>'
+    + '</tr>'
+  ).join('');
+  const thRow = '<tr style="border-bottom:1px solid ' + color + '44;">'
+    + '<th style="' + thS + 'text-align:left;">日付</th>'
+    + '<th style="' + thS + 'text-align:center;">台番</th>'
+    + '<th style="' + thS + 'text-align:left;">機種名</th>'
+    + '<th style="' + thS + 'text-align:right;">' + diffLabel + '</th>'
+    + '<th style="' + thS + 'text-align:right;">' + inLabel + '</th>'
+    + '</tr>';
+  tableEl.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">'
+    + '<thead>' + thRow + '</thead><tbody>' + rows + '</tbody></table></div>'
+    + (events.length > 50 ? '<div style="font-size:10px;color:var(--text2);padding:4px 2px;">… 他 ' + (events.length - 50) + ' 件</div>' : '');
+
+  // ボタンのアクティブ状態更新
+  const detailEl = document.getElementById('manDetail_' + tier);
+  if (!detailEl) return;
+  detailEl.querySelectorAll('button').forEach(btn => {
+    const onclick = btn.getAttribute('onclick') || '';
+    const isActive = onclick.includes("'" + sortKey + "'");
+    btn.style.borderColor = isActive ? color : 'var(--border)';
+    btn.style.background  = isActive ? color + '22' : 'transparent';
+    btn.style.color       = isActive ? color : 'var(--text2)';
+  });
 }
 
 function toggleManDetail(key) {
