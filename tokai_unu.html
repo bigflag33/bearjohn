@@ -392,13 +392,17 @@
   }
   .rival-section:first-of-type { border-top: none; padding-top: 0; }
   .rival-section-title {
-    font-size: 13px; font-weight: 800; color: #f87171;
+    font-size: 15px; font-weight: 800; color: #f87171;
     letter-spacing: .5px; margin-bottom: 16px;
     display: flex; align-items: center; gap: 8px;
   }
   .rival-section-title::before {
-    content: ''; display: block; width: 4px; height: 16px;
+    content: ''; display: block; width: 4px; height: 19px;
     background: currentColor; border-radius: 2px; flex-shrink: 0;
+  }
+  .rst-en {
+    font-size: 9px; font-weight: 900; letter-spacing: 1.5px;
+    opacity: 0.55; vertical-align: middle;
   }
   /* 絞り日/集客日カレンダー */
   .rival-day-grid {
@@ -4480,7 +4484,7 @@ function renderRivalAnalysis() {
     };
 
     html += `<div class="rival-section">
-      <div class="rival-section-title">機種トレンドアラート — 今どこに向かっているか</div>
+      <div class="rival-section-title"><span class="rst-en">TREND</span> 機種トレンドアラート — 今どこに向かっているか</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.6;">アウト推移（前半/後半比較）× 粗利水準 の2軸で全機種をMECE分類。タイルをタップで詳細を開閉。</div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">`;
 
@@ -4635,7 +4639,7 @@ function renderRivalAnalysis() {
     ];
 
     html += `<div class="rival-section" id="rivalZentaiSection">
-      <div class="rival-section-title" style="color:#f59e0b;">全台系イベント検出</div>
+      <div class="rival-section-title" style="color:#f59e0b;"><span class="rst-en">EVENT</span> 全台系イベント検出</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
         3台以上設置の機種で、全台それぞれがIN枚数2万枚超・出玉率105%超を達成した日。台番単位で個別判定。
       </div>`;
@@ -4906,7 +4910,7 @@ function renderRivalAnalysis() {
     const thStyleC = 'padding:8px 10px;font-size:10.5px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap;user-select:none;';
 
     html += `<div class="rival-section">
-      <div class="rival-section-title" style="color:#34d399;">増台・減台 分析</div>
+      <div class="rival-section-title" style="color:#34d399;"><span class="rst-en">SHIFT</span> 増台・減台 分析</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
         台番データをもとに、機種ごとの設置台数が変化した日を自動検出。行をクリックすると前後2週間のトレンドグラフが展開します。
       </div>`;
@@ -4926,7 +4930,7 @@ function renderRivalAnalysis() {
         <div id="machineAddTile" data-open="false" onclick="toggleMachineChangeDetail('add')"
           style="border:1px solid #34d399;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(52,211,153,0.07);user-select:none;">
           <div style="font-size:56px;font-weight:900;line-height:1;color:#34d399;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${addCount}</div>
-          <div style="font-size:12px;font-weight:700;color:#34d399;margin-top:4px;min-height:16px;">${addInUpCount > 0 ? '（内' + addInUpCount + '機種アウト増）' : ''}</div>
+          <div style="font-size:12px;font-weight:700;color:${addInUpCount > 0 ? '#34d399' : 'var(--text2)'};margin-top:4px;">（内${addInUpCount}機種アウト増）</div>
           <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#34d399;margin-top:6px;">増台イベント</div>
           <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">設置台数が増えた<br>機種・日付</div>
           <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
@@ -4937,7 +4941,7 @@ function renderRivalAnalysis() {
         <div id="machineRemoveTile" data-open="false" onclick="toggleMachineChangeDetail('remove')"
           style="border:1px solid #f87171;border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:rgba(248,113,113,0.07);user-select:none;">
           <div style="font-size:56px;font-weight:900;line-height:1;color:#f87171;letter-spacing:-3px;font-variant-numeric:tabular-nums;">${removeCount}</div>
-          <div style="font-size:12px;font-weight:700;color:#f87171;margin-top:4px;min-height:16px;">${remInUpCount > 0 ? '（内' + remInUpCount + '機種アウト増）' : ''}</div>
+          <div style="font-size:12px;font-weight:700;color:${remInUpCount > 0 ? '#f87171' : 'var(--text2)'};margin-top:4px;">（内${remInUpCount}機種アウト増）</div>
           <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#f87171;margin-top:6px;">減台イベント</div>
           <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">設置台数が減った<br>機種・日付</div>
           <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
@@ -5104,7 +5108,7 @@ function renderRivalAnalysis() {
       const mvBg  = mvCnt > 0 ? 'rgba(167,139,250,0.07)' : 'rgba(107,114,128,0.05)';
 
       html += '<div class="rival-section">';
-      html += '<div class="rival-section-title" style="color:#a78bfa;">🔄 台移動分析</div>';
+      html += '<div class="rival-section-title" style="color:#a78bfa;"><span class="rst-en">MOVE</span> 台移動分析</div>';
       html += '<div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">'
         + '台番データをもとに「台数は変わらないが台番が入れ替わった日」を自動検出。台の物理的な移動（席移動・コーナー変更など）を推定します。行クリックで前後2週間グラフ展開。</div>';
 
@@ -5115,7 +5119,7 @@ function renderRivalAnalysis() {
           + '<div id="moveTile" data-open="false" onclick="toggleMoveDetail()"'
           + ' style="border:1px solid ' + mvCol + ';border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:' + mvBg + ';user-select:none;">'
           + '<div style="font-size:56px;font-weight:900;line-height:1;color:' + mvCol + ';letter-spacing:-3px;font-variant-numeric:tabular-nums;">' + mvCnt + '</div>'
-          + '<div style="font-size:12px;font-weight:700;color:' + mvCol + ';margin-top:4px;min-height:16px;">' + (mvInUpCnt > 0 ? '（内' + mvInUpCnt + '機種アウト増）' : '') + '</div>'
+          + '<div style="font-size:12px;font-weight:700;color:' + (mvInUpCnt > 0 ? '#34d399' : 'var(--text2)') + ';margin-top:4px;">（内' + mvInUpCnt + '機種アウト増）</div>'
           + '<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:' + mvCol + ';margin-top:6px;">台移動イベント</div>'
           + '<div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">台数同・台番変化<br>席移動・コーナー変更</div>'
           + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">'
@@ -5406,7 +5410,7 @@ function renderRivalAnalysis() {
     }
 
     html += `<div class="rival-section" id="rivalNewModelSection">
-      <div class="rival-section-title" style="color:#a78bfa;">🆕 新台登場 検出</div>
+      <div class="rival-section-title" style="color:#a78bfa;"><span class="rst-en">NEW</span> 新台登場 検出</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
         期間内に初めて登場した機種（＝新台）を自動検出。初週と直近の1台あたりアウト・粗利を比較することで、新台が定着しているか・落ちているかを把握できます。行クリックで登場後28日グラフ展開。
       </div>`;
@@ -5654,7 +5658,7 @@ function renderRivalAnalysis() {
     }
 
     html += '<div class="rival-section" id="rivalManmaiSection">';
-    html += '<div class="rival-section-title" style="color:#f59e0b;">' + _mc.title + '</div>';
+    html += '<div class="rival-section-title" style="color:#f59e0b;"><span class="rst-en">BREAK</span> ' + _mc.title + '</div>';
     html += '<div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">'
       + '台番レベルで差' + _manUnit + 'を日次集計し、' + _mc.l1 + '・' + _mc.l2 + '・' + _mc.l3 + 'したイベントを全期間から検出します。'
       + '出現率＝件数÷（ユニーク台番数×営業日数）。タイルクリックで一覧展開。</div>';
@@ -5831,7 +5835,7 @@ function renderRivalAnalysis() {
     const _profitBadge2 = p => _eBadge(p, '#a78bfa', 'rgba(167,139,250,0.1)', 'rgba(167,139,250,0.35)');
 
     html += `<div class="rival-section">
-      <div class="rival-section-title" style="color:#a78bfa;">運用努力機種 — 設定の上げ下げが見える機種</div>
+      <div class="rival-section-title" style="color:#a78bfa;"><span class="rst-en">EFFORT</span> 運用努力機種 — 設定の上げ下げが見える機種</div>
       <div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">
         店舗平均アウト以上の機種のうち、「毎週◯曜日」または「◯の付く日」で
         稼働（IN枚数）または利益（台粗利）が±20%以上ズレている機種。タイルをタップで詳細を開閉。
@@ -5934,7 +5938,7 @@ function renderRivalAnalysis() {
   }
 
   html += `<div class="rival-section">
-    <div class="rival-section-title">🎲 バラエティ機種分析 — 1〜2台設置の運用グセ</div>
+    <div class="rival-section-title"><span class="rst-en">VARIETY</span> バラエティ機種分析 — 1〜2台設置の運用グセ</div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
       <div style="background:rgba(167,139,250,0.08);border:1px solid rgba(167,139,250,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
         <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">バラエティ総台数</div>
@@ -6054,7 +6058,7 @@ function renderRivalAnalysis() {
       `設置比率${jagInstallRate.toFixed(1)}%に対し利益比率${jagProfitRate.toFixed(1)}%・アウト比率${jagInRate.toFixed(1)}%。${jagInComment}`, 3, jagVis, 'rivalAnalysisCard');
 
     html += `<div class="rival-section" id="rivalJugglerSection">
-      <div class="rival-section-title" style="color:#f59e0b;">${_seriesLabel()}分析</div>
+      <div class="rival-section-title" style="color:#f59e0b;"><span class="rst-en">SERIES</span> ${_seriesLabel()}分析</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
         <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
           <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">ジャグラー総台数</div>
@@ -6290,6 +6294,116 @@ function renderRivalAnalysis() {
           </div>
         </div>`;
       })()}
+      ${(() => {
+        // ── ジャグラーシリーズ 勝率トレンド（台数上位5機種）──
+        const jagWinTop5 = [...jagModels].sort((a, b) => b.estimatedMachines - a.estimatedMachines).slice(0, 5);
+        if (!jagWinTop5.length) return '';
+
+        const jagWinRates = {};
+        const jagWinDaily = {};
+        jagWinTop5.forEach(m => {
+          const modelRecs = all.filter(r => r['機種名'] === m.name);
+          if (!modelRecs.length) { jagWinRates[m.name] = null; jagWinDaily[m.name] = []; return; }
+          const byDT = {};
+          modelRecs.forEach(r => {
+            const tai = String(r['台番'] || '').trim();
+            if (!tai || !r.date) return;
+            const k = r.date + '\x00' + tai;
+            if (!byDT[k]) byDT[k] = { date: r.date, inSum: 0, diffSum: 0 };
+            byDT[k].inSum   += r['IN枚数'] || 0;
+            byDT[k].diffSum += r['差枚']   || 0;
+          });
+          const byDate2 = {};
+          Object.values(byDT).forEach(e => {
+            if (!byDate2[e.date]) byDate2[e.date] = { win: 0, total: 0 };
+            byDate2[e.date].total++;
+            if (e.diffSum >= 0) byDate2[e.date].win++;
+          });
+          const days = Object.entries(byDate2)
+            .filter(([, d]) => d.total > 0)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([date, d]) => ({ date, win: d.win, total: d.total, rate: d.win / d.total }));
+          jagWinDaily[m.name] = days;
+          jagWinRates[m.name] = days.length ? days.reduce((s, d) => s + d.rate, 0) / days.length * 100 : null;
+        });
+
+        const tileHtml = jagWinTop5.map((m, idx) => {
+          const wr  = jagWinRates[m.name];
+          const wrN = wr !== null && wr !== undefined ? Math.round(wr) : null;
+          const tc  = wrN === null ? { border:'#6b7280', bg:'rgba(107,114,128,0.05)' }
+                    : wrN >= 60   ? { border:'#34d399', bg:'rgba(52,211,153,0.07)' }
+                    : wrN >= 40   ? { border:'#f59e0b', bg:'rgba(245,158,11,0.07)' }
+                    :               { border:'#f87171', bg:'rgba(248,113,113,0.07)' };
+          const badge = wrN === null ? 'badge-ok' : wrN >= 60 ? 'badge-alert' : wrN >= 40 ? 'badge-warn' : 'badge-ok';
+          const shortName = m.name.length > 10 ? m.name.slice(0, 10) + '…' : m.name;
+          return `<div id="jagWinTile_${idx}" data-open="false" onclick="toggleJagWinDetail(${idx})"
+            style="border:1px solid ${tc.border};border-radius:14px;padding:16px 12px 12px;cursor:pointer;background:${tc.bg};user-select:none;">
+            <div style="font-size:48px;font-weight:900;line-height:1;color:${tc.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${wrN !== null ? wrN : '—'}<span style="font-size:18px;font-weight:700;">${wrN !== null ? '%' : ''}</span></div>
+            <div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:${tc.border};margin-top:8px;">平均勝率</div>
+            <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">${shortName}</div>
+            <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
+              <span class="action-badge ${badge}">${m.estimatedMachines}台設置</span>
+              <span style="font-size:10px;color:var(--text2);">▾</span>
+            </div>
+          </div>`;
+        }).join('');
+
+        const detailHtml = jagWinTop5.map((m, idx) => {
+          const days = jagWinDaily[m.name] || [];
+          const n = days.length;
+          if (n === 0) return `<div id="jagWinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;"><div style="font-size:11px;color:var(--text2);">台番データなし</div></div>`;
+
+          const W=600, H=150, padL=36, padR=12, padT=12, padB=28;
+          const cW=W-padL-padR, cH=H-padT-padB;
+          const barW = Math.max(4, Math.min(22, cW/n*0.72));
+
+          const grids = [0,25,50,75,100].map(pct => {
+            const gy = (padT + cH*(1-pct/100)).toFixed(1);
+            const col = pct===50 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)';
+            const lw  = pct===50 ? '1' : '0.5';
+            return `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="${col}" stroke-width="${lw}"/><text x="${padL-4}" y="${gy}" text-anchor="end" font-size="8" fill="var(--text2)" dominant-baseline="middle">${pct}%</text>`;
+          }).join('');
+
+          const bars = days.map((d, i) => {
+            const cx = padL + (n > 1 ? i/(n-1)*cW : cW/2);
+            const x  = cx - barW/2;
+            const bH = Math.max(2, d.rate * cH);
+            const y  = padT + cH - bH;
+            const col = d.rate >= 0.6 ? '#34d399' : d.rate >= 0.4 ? '#f59e0b' : '#f87171';
+            const tip = `${d.date}　勝率${Math.round(d.rate*100)}%（${d.win}/${d.total}台）`;
+            return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${col}" opacity="0.85" rx="2" onmouseenter="showWinTip(event,'${tip}')" onmouseleave="hideWinTip()"/>`;
+          }).join('');
+
+          const wr = jagWinRates[m.name];
+          const avgLine = wr !== null ? (() => {
+            const ay = (padT + cH*(1-wr/100)).toFixed(1);
+            return `<line x1="${padL}" y1="${ay}" x2="${W-padR}" y2="${ay}" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/><text x="${W-padR+2}" y="${ay}" font-size="8" fill="#fbbf24" dominant-baseline="middle">${Math.round(wr)}%</text>`;
+          })() : '';
+
+          const lblStep = Math.max(1, Math.ceil(n/8));
+          const lbls = days.map((d,i) => ({d,i})).filter(({i}) => i%lblStep===0 || i===n-1)
+            .map(({d,i}) => { const cx = (padL + (n>1 ? i/(n-1)*cW : cW/2)).toFixed(1); return `<text x="${cx}" y="${H-4}" text-anchor="middle" font-size="8" fill="var(--text2)">${d.date.slice(5,7)}/${d.date.slice(8,10)}</text>`; }).join('');
+
+          return `<div id="jagWinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+            <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:10px;">${m.name} — 日別勝率（${n}日分）</div>
+            <div style="overflow-x:auto;"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:320px;height:auto;display:block;">
+              <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+              ${grids}<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+cH}" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+              ${bars}${avgLine}${lbls}
+            </svg></div>
+            <div style="font-size:10px;color:var(--text2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
+              <span>🟢 60%以上（放出寄り）</span><span style="color:#f59e0b;">🟡 40～60%（均衡）</span>
+              <span>🔴 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
+            </div></div>`;
+        }).join('');
+
+        return `
+        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
+          <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">機種別 勝率トレンド — 日別平均勝率（台数上位5機種）</div>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${tileHtml}</div>
+          ${detailHtml}
+        </div>`;
+      })()}
     </div>`;
   }
 
@@ -6364,7 +6478,7 @@ function renderRivalAnalysis() {
       const okiDetId  = serId + '_okiDetail';
 
       html += `<div class="rival-section" id="${serId}">
-      <div class="rival-section-title" style="color:${serColor};">${serLabel}分析</div>
+      <div class="rival-section-title" style="color:${serColor};"><span class="rst-en">SERIES</span> ${serLabel}分析</div>
       <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
         <div style="background:${serBg};border:1px solid ${serBorder};border-radius:12px;padding:12px 18px;min-width:130px;">
           <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">${serLabel}総台数</div>
@@ -6700,7 +6814,7 @@ function renderRivalAnalysis() {
       }
 
       html += `<div class="rival-section" id="rivalMainSection">
-        <div class="rival-section-title" style="color:#60a5fa;">メイン機種分析 — 総アウト上位5機種</div>
+        <div class="rival-section-title" style="color:#60a5fa;"><span class="rst-en">TOP 5</span> メイン機種分析 — 総アウト上位5機種</div>
         <div style="font-size:11px;color:var(--text2);margin-bottom:16px;line-height:1.6;">
           総アウト（推定）が最も大きい上位5機種。店舗稼働の主軸となっている機種群。
           <span style="display:inline-block;margin-top:4px;padding:2px 8px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);border-radius:4px;font-size:10.5px;color:#fbbf24;">※${_seriesLabel()}を除く</span>
@@ -9287,6 +9401,23 @@ function toggleJagDetail(key) {
   if (!isOpen) {
     el.style.display = 'block';
     const tile = document.getElementById('jagTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
+}
+
+function toggleJagWinDetail(idx) {
+  const el = document.getElementById('jagWinDetail_' + idx);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  [0,1,2,3,4].forEach(i => {
+    const p = document.getElementById('jagWinDetail_' + i);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('jagWinTile_' + i);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('jagWinTile_' + idx);
     if (tile) tile.setAttribute('data-open','true');
   }
 }
