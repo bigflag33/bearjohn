@@ -391,6 +391,13 @@
     border-top: 1px solid rgba(255,255,255,0.06);
   }
   .rival-section:first-of-type { border-top: none; padding-top: 0; }
+  @keyframes chartWipeRight {
+    from { clip-path: inset(0 100% 0 0); opacity: 0.4; }
+    to   { clip-path: inset(0 0%   0 0); opacity: 1; }
+  }
+  .chart-animate {
+    animation: chartWipeRight 2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
   .rival-section-title {
     font-size: 15px; font-weight: 800; color: #f87171;
     letter-spacing: .5px; margin-bottom: 16px;
@@ -902,7 +909,7 @@
       <select id="modelFilter" onchange="applyFilter()"><option value="">全機種</option></select>
     </div>
     <div class="filter-group">
-      <label>日次チャート指標</label>
+      <label></label>
       <select id="metricFilter" onchange="applyFilter()">
         <option value="IN枚数">IN枚数（アウト）</option>
         <option value="台粗利">推定粗利</option>
@@ -926,40 +933,34 @@
   <div class="kpi-grid">
     <div class="kpi-card">
       <div class="kpi-label">推定総粗利</div>
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-        <div class="kpi-value" id="kpi-profit">-</div>
-        <div id="kpi-profit-rate" style="font-size:13px;font-weight:700;color:var(--text2);"></div>
-      </div>
-      <div class="kpi-sub">期間合計</div>
+      <div class="kpi-value" id="kpi-profit">-</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">推定総売上</div>
       <div class="kpi-value blue" id="kpi-sales">-</div>
-      <div class="kpi-sub">期間合計</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label" data-in-label="IN枚数（アウト）平均" data-in-label-p="アウト平均">IN枚数（アウト）平均</div>
       <div class="kpi-value yellow" id="kpi-machines">-</div>
-      <div class="kpi-sub">1台1日平均</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">1台平均粗利</div>
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
-        <div class="kpi-value" id="kpi-avg-profit">-</div>
-        <div id="kpi-coin-profit" style="font-size:13px;font-weight:700;color:var(--text2);"></div>
-      </div>
-      <div class="kpi-sub">1日平均</div>
+      <div class="kpi-value" id="kpi-avg-profit">-</div>
+      <div id="kpi-profit-rate" style="font-size:12px;font-weight:700;color:var(--text2);margin-top:6px;"></div>
+      <div id="kpi-coin-profit" style="font-size:12px;font-weight:700;color:var(--text2);margin-top:2px;"></div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label" id="kpi-tai-label">総設置台数</div>
-      <div class="kpi-value" id="kpi-tai" style="color:var(--text);">-</div>
-      <div class="kpi-sub" id="kpi-tai-sub">台</div>
+      <div style="display:flex;align-items:baseline;gap:5px;flex-wrap:wrap;">
+        <div class="kpi-value" id="kpi-tai" style="color:var(--text);">-</div>
+        <div id="kpi-tai-sub" style="font-size:14px;font-weight:700;color:var(--text2);">台</div>
+      </div>
     </div>
   </div>
 
   <div class="charts-grid">
     <div class="chart-card full">
-      <div class="chart-title"><div class="dot" style="background:var(--accent)"></div>日次推移</div>
+      <div class="chart-title"><div class="dot" style="background:var(--accent)"></div></div>
       <div class="chart-wrapper"><canvas id="trendChart"></canvas></div>
     </div>
     <div class="chart-card full" id="trendAnalysisCard">
@@ -7689,7 +7690,7 @@ function renderKPIs() {
     ).size;
     const taiCount = uniqueTai > 0 ? uniqueTai : Math.round(avgMachines);
     taiEl.textContent = taiCount.toLocaleString();
-    if (taiLblEl) taiLblEl.textContent = _isPachinkoStore() ? '総設置台数' : '総設置台数';
+    if (taiLblEl) taiLblEl.textContent = '総設置台数';
     if (taiSubEl) taiSubEl.textContent  = uniqueTai > 0 ? '台（台番集計）' : '台（1日平均）';
   }
 }
@@ -7748,6 +7749,7 @@ function renderCharts() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
+      animation: false,
       plugins: {
         legend: { labels: { color: tc.tick, font: { size: 11 } } },
         tooltip: { mode: 'index', intersect: false }
@@ -7765,8 +7767,12 @@ function renderCharts() {
       }
     }
   });
-  document.getElementById('trendChart').style.cursor = 'pointer';
-  document.getElementById('trendChart').title = '日付クリックでピンポイント分析へ';
+  const _tc = document.getElementById('trendChart');
+  _tc.style.cursor = 'pointer';
+  _tc.title = '日付クリックでピンポイント分析へ';
+  _tc.classList.remove('chart-animate');
+  void _tc.offsetWidth; // reflow で animation をリセット
+  _tc.classList.add('chart-animate');
 
   // 日次トレンド分析を描画
   renderTrendAnalysis(filteredDates, trendData, metricKey);
