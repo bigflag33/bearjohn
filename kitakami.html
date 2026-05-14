@@ -4041,8 +4041,8 @@ function renderAlertTiles() {
       </div>
       <div style="position:relative;">
         <div id="alertTilesScroll" style="display:flex;align-items:stretch;gap:18px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none;">
-          ${tiles.map(t => `
-            <div onclick="wzJumpTo('${t.jumpTo || ''}')"
+          ${tiles.map((t, idx) => `
+            <div data-flip-idx="${idx}" onclick="wzJumpTo('${t.jumpTo || ''}')"
                  style="flex:0 0 130px;background:${t.bg};border:1px solid ${t.border};border-top:4px solid ${t.color};border-radius:4px 4px 6px 6px;padding:8px 10px 8px;cursor:pointer;display:flex;flex-direction:column;gap:5px;box-shadow:2px 3px 10px rgba(0,0,0,0.25),0 1px 3px rgba(0,0,0,0.15);transition:transform .15s,box-shadow .15s;"
                  onmouseenter="this.style.transform='translateY(-3px)';this.style.boxShadow='2px 6px 18px rgba(0,0,0,0.35),0 1px 3px rgba(0,0,0,0.15)'"
                  onmouseleave="this.style.transform='';this.style.boxShadow='2px 3px 10px rgba(0,0,0,0.25),0 1px 3px rgba(0,0,0,0.15)'">
@@ -4058,6 +4058,33 @@ function renderAlertTiles() {
       </div>
     </div>
     <style>#alertTilesScroll::-webkit-scrollbar{display:none;}</style>`;
+
+  // ポストイット 3Dフリップ（IntersectionObserver + Web Animations API）
+  // タイルを最初は非表示にしておき、スクロールで見えたタイミングでフリップ
+  document.querySelectorAll('#alertTilesScroll > div[data-flip-idx]').forEach(el => {
+    el.style.opacity = '0';
+  });
+
+  const _alertBar = document.getElementById('alertTilesBar');
+  if (_alertBar) {
+    const _flipObs = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        _flipObs.disconnect();
+        document.querySelectorAll('#alertTilesScroll > div[data-flip-idx]').forEach(el => {
+          const idx = parseInt(el.dataset.flipIdx, 10);
+          el.animate(
+            [
+              { transform: 'perspective(600px) rotateY(-90deg)', opacity: '0' },
+              { transform: 'perspective(600px) rotateY(0deg)',   opacity: '1' }
+            ],
+            { duration: 550, delay: idx * 100, easing: 'cubic-bezier(0.22,1,0.36,1)', fill: 'both' }
+          );
+        });
+      });
+    }, { threshold: 0.15 });
+    _flipObs.observe(_alertBar);
+  }
 
   // スクロール量に応じてフェードを消す
   const scrollEl = document.getElementById('alertTilesScroll');
@@ -7643,6 +7670,22 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   try { renderForecast(); } catch(e) { console.warn('renderForecast', e); }
 
   el.innerHTML = html;
+
+}
+
+function _countUp(el, target, duration, fmt) {
+  if (!el) return;
+  const abs   = Math.abs(target);
+  const sign  = target < 0 ? -1 : 1;
+  const steps = Math.max(30, Math.round(duration / 16));
+  let   step  = 0;
+  const id    = setInterval(() => {
+    step++;
+    const t     = step / steps;
+    const eased = 1 - Math.pow(1 - Math.min(t, 1), 4);
+    el.textContent = fmt(Math.round(abs * eased) * sign);
+    if (step >= steps) { clearInterval(id); el.textContent = fmt(target); }
+  }, 16);
 }
 
 function renderKPIs() {
@@ -7689,9 +7732,9 @@ function renderKPIs() {
               .map(r => String(r['台番']).trim())
     ).size;
     const taiCount = uniqueTai > 0 ? uniqueTai : Math.round(avgMachines);
-    taiEl.textContent = taiCount.toLocaleString();
     if (taiLblEl) taiLblEl.textContent = '総設置台数';
     if (taiSubEl) taiSubEl.textContent  = uniqueTai > 0 ? '台（台番集計）' : '台（1日平均）';
+    taiEl.textContent = taiCount.toLocaleString();
   }
 }
 
