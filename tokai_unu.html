@@ -6436,7 +6436,351 @@ function renderRivalAnalysis() {
     </div>`;
   }
 
-  // ④-b エヴァシリーズ・北斗の拳シリーズ分析（パチンコ時のみ）
+  // ④-b 30Φシリーズ分析（20スロのみ）
+  if (!_isPachinkoStore()) {
+    const phi30Keywords = ['ハナハナ','沖ドキ','オキドキ'];
+    const phi30Models   = modelList.filter(m => phi30Keywords.some(kw => m.name.includes(kw)));
+    const phi30Machines = phi30Models.reduce((a,m) => a + m.estimatedMachines, 0);
+    const phi30Profit   = phi30Models.reduce((a,m) => a + m.totalProfit, 0);
+    const phi30In       = phi30Models.reduce((a,m) => a + m.avgIn * m.dayCount * m.estimatedMachines, 0);
+    const phi30InstallRate = allTotalMachines > 0 ? phi30Machines / allTotalMachines * 100 : 0;
+    const phi30ProfitRate  = allTotalProfit !== 0  ? phi30Profit  / Math.abs(allTotalProfit) * 100 : 0;
+    const phi30InRate      = allTotalIn > 0        ? phi30In      / allTotalIn * 100 : 0;
+
+    if (phi30Models.length > 0) {
+      const phi30Color = '#06b6d4';
+      const phi30Comment = phi30ProfitRate > phi30InstallRate + 10
+        ? '30Φが設置比率を超えた利益貢献 — 収益の主力として運用している'
+        : phi30ProfitRate < phi30InstallRate - 10
+        ? '30Φの利益比率が設置比率を下回る — 集客・放出枠として使っている可能性'
+        : '30Φの利益貢献は設置比率とほぼ同水準';
+      const phi30InComment = phi30InRate > phi30InstallRate + 8
+        ? `アウト比率が設置比率より高く、30Φに客が集まっている（稼働効率◎）`
+        : phi30InRate < phi30InstallRate - 8
+        ? `アウト比率が設置比率より低く、30Φの稼働が上がっていない`
+        : `稼働はほぼ設置比率通り`;
+      const phi30Sorted = [...phi30Models].sort((a,b) => b.avgProfit - a.avgProfit);
+
+      const phi30Vis = _svgVBar(
+        [phi30InstallRate, phi30ProfitRate, phi30InRate],
+        ['設置','利益','アウト'],
+        ['#06b6d4', phi30ProfitRate > phi30InstallRate ? '#34d399' : '#f87171', '#67e8f9'],
+        84, 44);
+      _pushInsight('juggler','🐚',`30Φ ${phi30Machines}台（${phi30InstallRate.toFixed(0)}%）— ${phi30Comment.split('—')[0].trim()}`,
+        `設置比率${phi30InstallRate.toFixed(1)}%に対し利益比率${phi30ProfitRate.toFixed(1)}%・アウト比率${phi30InRate.toFixed(1)}%。${phi30InComment}`, 3.5, phi30Vis, 'rivalAnalysisCard');
+
+      html += `<div class="rival-section" id="rival30PhiSection">
+        <div class="rival-section-title" style="color:${phi30Color};"><span class="rst-en">SERIES</span> 30Φシリーズ分析</div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+          <div style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
+            <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">30Φ総台数</div>
+            <div style="font-size:18px;font-weight:800;color:${phi30Color};">${phi30Machines}<span style="font-size:11px;color:var(--text2);"> / ${allTotalMachines}台</span></div>
+          </div>
+          <div style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
+            <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">設置比率</div>
+            <div style="font-size:18px;font-weight:800;color:${phi30Color};">${phi30InstallRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+          </div>
+          <div style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
+            <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">利益比率</div>
+            <div style="font-size:18px;font-weight:800;color:${phi30ProfitRate >= 0 ? phi30Color : '#f87171'};">${phi30ProfitRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+          </div>
+          <div style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
+            <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">アウト比率</div>
+            <div style="font-size:18px;font-weight:800;color:${phi30Color};">${phi30InRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
+          </div>
+          <div style="flex:1;min-width:220px;background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;">
+            <div style="font-size:11.5px;color:var(--text2);line-height:1.7;">💡 ${phi30Comment}<br><br>${phi30InComment}</div>
+          </div>
+        </div>
+        <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:10px;">機種別内訳（台粗利順・${phi30Models.length}機種）</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${phi30Sorted.map(m => {
+            const profitStr = (m.avgProfit>=0?'+':'') + Math.round(m.avgProfit).toLocaleString() + '円';
+            const inStr     = Math.round(m.avgIn).toLocaleString() + _inUnit();
+            const profitCol = m.avgProfit >= storeAvgProfit ? phi30Color : m.avgProfit >= 0 ? '#67e8f9' : '#f87171';
+            const sn = m.name.replace(/'/g,"\\'");
+            return `<span class="rival-model-chip" style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.3);color:${profitCol};cursor:pointer;"
+              onclick="navigateToModel('${sn}')"
+              title="${m.name}｜台粗利 ${profitStr}｜1台IN ${inStr}｜推定${m.estimatedMachines}台 — クリックで機種別集計へ">
+              <span class="chip-name">${m.name}</span><span class="chip-pct">${profitStr}</span>
+            </span>`;
+          }).join('')}
+        </div>
+        ${(() => {
+          // ── 30Φ台別運用パターン (据え置き率 & ドボン台設定上げ) ──
+          const phi30Raw = all.filter(r => r['機種名'] && phi30Keywords.some(kw => r['機種名'].includes(kw)));
+          if (!phi30Raw.length) return '';
+
+          const storeAvgInAll = all.length > 0 ? all.reduce((s,r) => s + (r['IN枚数']||0), 0) / all.length : 0;
+
+          // ── 据え置き率 ──
+          const byTai30 = {};
+          phi30Raw.forEach(r => {
+            const tai = String(r['台番']||'').trim();
+            if (!tai) return;
+            const key = (r['機種名']||'') + '\x00' + tai;
+            if (!byTai30[key]) byTai30[key] = { model:r['機種名'], tai, days:{} };
+            const d = byTai30[key].days;
+            if (!d[r.date]) d[r.date] = { inSum:0, diffSum:0 };
+            d[r.date].inSum   += r['IN枚数']||0;
+            d[r.date].diffSum += r['差枚']  ||0;
+          });
+
+          let oki30Events = 0;
+          const oki30Detail = [];
+          Object.values(byTai30).forEach(entry => {
+            const eligDays = Object.entries(entry.days)
+              .filter(([,v]) => v.inSum >= storeAvgInAll && v.diffSum >= 0)
+              .map(([dt]) => dt).sort();
+            if (eligDays.length < 3) return;
+            let run = [eligDays[0]];
+            for (let i=1; i<eligDays.length; i++) {
+              const diff = (new Date(eligDays[i]) - new Date(eligDays[i-1])) / 86400000;
+              if (diff===1) { run.push(eligDays[i]); }
+              else {
+                if (run.length>=3) { oki30Events++; oki30Detail.push({model:entry.model,tai:entry.tai,startDate:run[0],days:run.length}); }
+                run = [eligDays[i]];
+              }
+            }
+            if (run.length>=3) { oki30Events++; oki30Detail.push({model:entry.model,tai:entry.tai,startDate:run[0],days:run.length}); }
+          });
+
+          // ── ドボン台 ──
+          const byDMT30 = {};
+          phi30Raw.forEach(r => {
+            const tai = String(r['台番']||'').trim();
+            if (!r.date || !r['機種名'] || !tai) return;
+            const k = r.date+'\x00'+r['機種名']+'\x00'+tai;
+            if (!byDMT30[k]) byDMT30[k] = {date:r.date,model:r['機種名'],tai,inSum:0,diffSum:0};
+            byDMT30[k].inSum   += r['IN枚数']||0;
+            byDMT30[k].diffSum += r['差枚']  ||0;
+          });
+          const byDM30 = {};
+          Object.values(byDMT30).forEach(e => {
+            const k = e.date+'\x00'+e.model;
+            if (!byDM30[k]) byDM30[k] = {date:e.date,model:e.model,tais:[]};
+            const payout = e.inSum>0 ? (e.inSum+e.diffSum)/e.inSum : 0;
+            byDM30[k].tais.push({tai:e.tai,inSum:e.inSum,payout});
+          });
+          let dobon30Total=0, dobon30Hits=0;
+          const dobon30Detail = [];
+          Object.values(byDM30).forEach(group => {
+            if (group.tais.length<2) return;
+            const minIn = Math.min(...group.tais.map(t=>t.inSum));
+            const activeTais = group.tais.filter(t=>t.inSum>0);
+            const minPayout  = activeTais.length>0 ? Math.min(...activeTais.map(t=>t.payout)) : null;
+            const dobonSet = new Set([
+              ...group.tais.filter(t=>t.inSum===minIn).map(t=>t.tai),
+              ...(minPayout!==null ? activeTais.filter(t=>t.payout===minPayout).map(t=>t.tai) : []),
+            ]);
+            const dobons = group.tais.filter(t=>dobonSet.has(t.tai));
+            const nd = new Date(group.date); nd.setDate(nd.getDate()+1);
+            const nextDate = nd.toISOString().split('T')[0];
+            dobons.forEach(dobon => {
+              dobon30Total++;
+              const nextDay = byDMT30[nextDate+'\x00'+group.model+'\x00'+dobon.tai];
+              const nextPayout = nextDay&&nextDay.inSum>0 ? (nextDay.inSum+nextDay.diffSum)/nextDay.inSum : null;
+              const hit = nextPayout!==null && nextPayout>=1.0 && nextDay.inSum>=storeAvgInAll;
+              if (hit) dobon30Hits++;
+              dobon30Detail.push({date:group.date,model:group.model,tai:dobon.tai,payout:dobon.payout,nextPayout,hit:!!hit});
+            });
+          });
+          const dobon30Rate = dobon30Total>0 ? dobon30Hits/dobon30Total*100 : 0;
+
+          const phi30TaiCount = new Set(phi30Raw.map(r=>String(r['台番']||'').trim()).filter(t=>t)).size;
+          const phi30Days     = new Set(phi30Raw.map(r=>r.date)).size;
+          const oki30Pct = (phi30TaiCount>0&&phi30Days>0) ? oki30Events/(phi30TaiCount*phi30Days)*100 : 0;
+
+          const okiCol30  = oki30Events>0  ? {border:'#06b6d4',bg:'rgba(6,182,212,0.08)'} : {border:'#6b7280',bg:'rgba(107,114,128,0.05)'};
+          const dobCol30  = dobon30Rate>=30 ? {border:'#34d399',bg:'rgba(52,211,153,0.07)'} : dobon30Rate>=15 ? {border:'#fbbf24',bg:'rgba(251,191,36,0.06)'} : {border:'#6b7280',bg:'rgba(107,114,128,0.05)'};
+          const dob30Badge = dobon30Rate>=30 ? 'badge-alert' : dobon30Rate>=15 ? 'badge-warn' : 'badge-ok';
+          const hasTai30 = Object.keys(byTai30).length>0;
+
+          return `
+          <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
+            <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">台別運用パターン${!hasTai30?'<span style="font-size:10px;color:#f87171;margin-left:8px;">※台番データなし</span>':''}</div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
+              <div id="phi30Tile_oki" data-open="false" onclick="toggle30PhiDetail('oki')"
+                style="border:1px solid ${okiCol30.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${okiCol30.bg};user-select:none;">
+                <div style="font-size:56px;font-weight:900;line-height:1;color:${okiCol30.border};letter-spacing:-3px;font-variant-numeric:tabular-nums;">${oki30Events}</div>
+                <div style="font-size:24px;font-weight:900;color:${okiCol30.border};margin-top:5px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">${oki30Pct.toFixed(2)}%</div>
+                <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${okiCol30.border};margin-top:8px;">据え置き検出</div>
+                <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">3日以上連続<br>出玉率100%超の台</div>
+                <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+                  <span class="action-badge ${oki30Events>0?'badge-warn':'badge-ok'}">${oki30Events>0?'設定据え置き疑い':'なし'}</span>
+                  <span style="font-size:10px;color:var(--text2);">▾</span>
+                </div>
+              </div>
+              <div id="phi30Tile_dobon" data-open="false" onclick="toggle30PhiDetail('dobon')"
+                style="border:1px solid ${dobCol30.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${dobCol30.bg};user-select:none;">
+                <div style="font-size:48px;font-weight:900;line-height:1;color:${dobCol30.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${dobon30Rate.toFixed(0)}<span style="font-size:20px;font-weight:700;">%</span></div>
+                <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${dobCol30.border};margin-top:10px;">ドボン台 翌日回収率</div>
+                <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">最低IN台・最低出玉率台（各1台）が<br>翌日に改善した割合</div>
+                <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">
+                  <span class="action-badge ${dob30Badge}">${dobon30Total>0?dobon30Hits+'/'+dobon30Total+'回':'データ不足'}</span>
+                  <span style="font-size:10px;color:var(--text2);">▾</span>
+                </div>
+              </div>
+            </div>
+
+            <div id="phi30Detail_oki" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+              <div style="font-size:11.5px;font-weight:700;color:#06b6d4;margin-bottom:4px;">3日以上連続 出玉率100%超 — 据え置き台リスト（${oki30Detail.length}件）</div>
+              <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">条件: 店舗平均IN以上 かつ 差枚≥0 が3日以上カレンダー連続</div>
+              ${oki30Detail.length===0
+                ? '<div style="font-size:11px;color:var(--text2);">該当なし</div>'
+                : `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+                  <tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+                    <th style="text-align:left;padding:7px 8px;font-weight:700;">機種名</th>
+                    <th style="text-align:center;padding:7px 8px;font-weight:700;">台番</th>
+                    <th style="text-align:center;padding:7px 8px;font-weight:700;">開始日</th>
+                    <th style="text-align:center;padding:7px 8px;font-weight:700;">連続日数</th>
+                  </tr>
+                  ${oki30Detail.sort((a,b)=>b.days-a.days).slice(0,25).map(e=>`
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <td style="padding:6px 8px;color:var(--text);">${e.model}</td>
+                    <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.tai}</td>
+                    <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.startDate}</td>
+                    <td style="padding:6px 8px;color:#06b6d4;text-align:center;font-weight:800;">${e.days}日</td>
+                  </tr>`).join('')}
+                  ${oki30Detail.length>25?`<tr><td colspan="4" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${oki30Detail.length-25} 件</td></tr>`:''}
+                </table></div>`}
+            </div>
+
+            <div id="phi30Detail_dobon" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+              <div style="font-size:11.5px;font-weight:700;color:#34d399;margin-bottom:4px;">ドボン台（最低IN台 + 最低出玉率台）→ 翌日改善の記録</div>
+              <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">出現率 ${dobon30Rate.toFixed(1)}%（${dobon30Hits}/${dobon30Total}件）</div>
+              ${dobon30Detail.length===0
+                ? '<div style="font-size:11px;color:var(--text2);">該当なし（台番データがあり複数台の記録が必要です）</div>'
+                : `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;">
+                  <tr style="color:var(--text2);border-bottom:1px solid var(--border);">
+                    <th style="text-align:left;padding:7px 8px;font-weight:700;">日付</th>
+                    <th style="text-align:left;padding:7px 8px;font-weight:700;">機種名</th>
+                    <th style="text-align:center;padding:7px 8px;font-weight:700;">台番</th>
+                    <th style="text-align:center;padding:7px 8px;font-weight:700;">当日出玉率</th>
+                    <th style="text-align:center;padding:7px 8px;font-weight:700;">翌日出玉率</th>
+                    <th style="text-align:center;padding:7px 8px;font-weight:700;">改善</th>
+                  </tr>
+                  ${dobon30Detail.filter(e=>e.nextPayout!==null).sort((a,b)=>b.hit-a.hit||b.date.localeCompare(a.date)).slice(0,25).map(e=>`
+                  <tr style="border-bottom:1px solid rgba(255,255,255,0.05);${e.hit?'background:rgba(52,211,153,0.05);':''}">
+                    <td style="padding:6px 8px;color:var(--text2);">${e.date}</td>
+                    <td style="padding:6px 8px;color:var(--text);">${e.model}</td>
+                    <td style="padding:6px 8px;color:var(--text2);text-align:center;">${e.tai}</td>
+                    <td style="padding:6px 8px;color:#f87171;text-align:center;">${(e.payout*100).toFixed(1)}%</td>
+                    <td style="padding:6px 8px;color:${e.nextPayout>=1.0?'#34d399':'#f87171'};text-align:center;font-weight:700;">${(e.nextPayout*100).toFixed(1)}%</td>
+                    <td style="padding:6px 8px;text-align:center;">${e.hit?'<span style="color:#34d399;font-weight:800;">◎</span>':'<span style="color:var(--text2);">—</span>'}</td>
+                  </tr>`).join('')}
+                  ${dobon30Detail.filter(e=>e.nextPayout!==null).length>25?`<tr><td colspan="6" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${dobon30Detail.filter(e=>e.nextPayout!==null).length-25} 件</td></tr>`:''}
+                </table></div>`}
+            </div>
+          </div>`;
+        })()}
+        ${(() => {
+          // ── 30Φシリーズ 勝率トレンド（台数上位5機種）──
+          const phi30WinTop5 = [...phi30Models].sort((a,b) => b.estimatedMachines - a.estimatedMachines).slice(0,5);
+          if (!phi30WinTop5.length) return '';
+          const phi30WinRates = {};
+          const phi30WinDaily = {};
+          phi30WinTop5.forEach(m => {
+            const modelRecs = all.filter(r => r['機種名']===m.name);
+            if (!modelRecs.length) { phi30WinRates[m.name]=null; phi30WinDaily[m.name]=[]; return; }
+            const byDT30 = {};
+            modelRecs.forEach(r => {
+              const tai = String(r['台番']||'').trim();
+              if (!tai||!r.date) return;
+              const k = r.date+'\x00'+tai;
+              if (!byDT30[k]) byDT30[k] = {date:r.date,inSum:0,diffSum:0};
+              byDT30[k].inSum   += r['IN枚数']||0;
+              byDT30[k].diffSum += r['差枚']  ||0;
+            });
+            const byDate30 = {};
+            Object.values(byDT30).forEach(e => {
+              if (!byDate30[e.date]) byDate30[e.date]={win:0,total:0};
+              byDate30[e.date].total++;
+              if (e.diffSum>=0) byDate30[e.date].win++;
+            });
+            const days = Object.entries(byDate30)
+              .filter(([,d])=>d.total>0).sort(([a],[b])=>a.localeCompare(b))
+              .map(([date,d])=>({date,win:d.win,total:d.total,rate:d.win/d.total}));
+            phi30WinDaily[m.name]=days;
+            phi30WinRates[m.name]=days.length ? days.reduce((s,d)=>s+d.rate,0)/days.length*100 : null;
+          });
+
+          const tileHtml = phi30WinTop5.map((m,idx) => {
+            const wr  = phi30WinRates[m.name];
+            const wrN = wr!==null&&wr!==undefined ? Math.round(wr) : null;
+            const tc  = wrN===null ? {border:'#6b7280',bg:'rgba(107,114,128,0.05)'}
+                      : wrN>=60   ? {border:'#34d399',bg:'rgba(52,211,153,0.07)'}
+                      : wrN>=40   ? {border:'#06b6d4',bg:'rgba(6,182,212,0.07)'}
+                      :             {border:'#f87171',bg:'rgba(248,113,113,0.07)'};
+            const badge = wrN===null?'badge-ok':wrN>=60?'badge-alert':wrN>=40?'badge-warn':'badge-ok';
+            const shortName = m.name.length>10 ? m.name.slice(0,10)+'…' : m.name;
+            return `<div id="phi30WinTile_${idx}" data-open="false" onclick="toggle30PhiWinDetail(${idx})"
+              style="border:1px solid ${tc.border};border-radius:14px;padding:16px 12px 12px;cursor:pointer;background:${tc.bg};user-select:none;">
+              <div style="font-size:48px;font-weight:900;line-height:1;color:${tc.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${wrN!==null?wrN:'—'}<span style="font-size:18px;font-weight:700;">${wrN!==null?'%':''}</span></div>
+              <div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:${tc.border};margin-top:8px;">平均勝率</div>
+              <div style="font-size:10.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">${shortName}</div>
+              <div style="margin-top:8px;display:flex;align-items:center;justify-content:space-between;">
+                <span class="action-badge ${badge}">${m.estimatedMachines}台設置</span>
+                <span style="font-size:10px;color:var(--text2);">▾</span>
+              </div>
+            </div>`;
+          }).join('');
+
+          const detailHtml = phi30WinTop5.map((m,idx) => {
+            const days = phi30WinDaily[m.name]||[];
+            const n = days.length;
+            if (n===0) return `<div id="phi30WinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;"><div style="font-size:11px;color:var(--text2);">台番データなし</div></div>`;
+            const W=600,H=150,padL=36,padR=12,padT=12,padB=28;
+            const cW=W-padL-padR, cH=H-padT-padB;
+            const barW=Math.max(4,Math.min(22,cW/n*0.72));
+            const grids=[0,25,50,75,100].map(pct=>{
+              const gy=(padT+cH*(1-pct/100)).toFixed(1);
+              const col=pct===50?'rgba(255,255,255,0.15)':'rgba(255,255,255,0.06)';
+              const lw=pct===50?'1':'0.5';
+              return `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="${col}" stroke-width="${lw}"/><text x="${padL-4}" y="${gy}" text-anchor="end" font-size="8" fill="var(--text2)" dominant-baseline="middle">${pct}%</text>`;
+            }).join('');
+            const bars=days.map((d,i)=>{
+              const cx=padL+(n>1?i/(n-1)*cW:cW/2);
+              const x=cx-barW/2;
+              const bH=Math.max(2,d.rate*cH);
+              const y=padT+cH-bH;
+              const col=d.rate>=0.6?'#34d399':d.rate>=0.4?'#06b6d4':'#f87171';
+              const tip=`${d.date}　勝率${Math.round(d.rate*100)}%（${d.win}/${d.total}台）`;
+              return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${bH.toFixed(1)}" fill="${col}" opacity="0.85" rx="2" onmouseenter="showWinTip(event,'${tip}')" onmouseleave="hideWinTip()"/>`;
+            }).join('');
+            const wr=phi30WinRates[m.name];
+            const avgLine=wr!==null?(()=>{
+              const ay=(padT+cH*(1-wr/100)).toFixed(1);
+              return `<line x1="${padL}" y1="${ay}" x2="${W-padR}" y2="${ay}" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.8"/><text x="${W-padR+2}" y="${ay}" font-size="8" fill="#fbbf24" dominant-baseline="middle">${Math.round(wr)}%</text>`;
+            })():'';
+            const lblStep=Math.max(1,Math.ceil(n/8));
+            const lbls=days.map((d,i)=>({d,i})).filter(({i})=>i%lblStep===0||i===n-1)
+              .map(({d,i})=>{const cx=(padL+(n>1?i/(n-1)*cW:cW/2)).toFixed(1);return `<text x="${cx}" y="${H-4}" text-anchor="middle" font-size="8" fill="var(--text2)">${d.date.slice(5,7)}/${d.date.slice(8,10)}</text>`;}).join('');
+            return `<div id="phi30WinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+              <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:10px;">${m.name} — 日別勝率（${n}日分）</div>
+              <div style="overflow-x:auto;"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:320px;height:auto;display:block;">
+                <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
+                ${grids}<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+cH}" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+                ${bars}${avgLine}${lbls}
+              </svg></div>
+              <div style="font-size:10px;color:var(--text2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
+                <span>🟢 60%以上（放出寄り）</span><span style="color:#06b6d4;">🔵 40～60%（均衡）</span>
+                <span>🔴 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
+              </div></div>`;
+          }).join('');
+
+          return `
+          <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
+            <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">機種別 勝率トレンド — 日別平均勝率（台数上位5機種）</div>
+            <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;">${tileHtml}</div>
+            ${detailHtml}
+          </div>`;
+        })()}
+      </div>`;
+    }
+  }
+
+  // ④-c エヴァシリーズ・北斗の拳シリーズ分析（パチンコ時のみ）
   if (_isPachinkoStore()) {
     // ── 共通ヘルパー: シリーズセクション生成 ──
     const _renderPachinkoSeriesSection = (serKeyword, serLabel, serId, serColor, serBg, serBorder) => {
@@ -9451,6 +9795,40 @@ function toggleJagDetail(key) {
   if (!isOpen) {
     el.style.display = 'block';
     const tile = document.getElementById('jagTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
+}
+
+function toggle30PhiDetail(key) {
+  const el = document.getElementById('phi30Detail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  ['oki','dobon'].forEach(k => {
+    const p = document.getElementById('phi30Detail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('phi30Tile_' + k);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('phi30Tile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
+}
+
+function toggle30PhiWinDetail(idx) {
+  const el = document.getElementById('phi30WinDetail_' + idx);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  [0,1,2,3,4].forEach(i => {
+    const p = document.getElementById('phi30WinDetail_' + i);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('phi30WinTile_' + i);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('phi30WinTile_' + idx);
     if (tile) tile.setAttribute('data-open','true');
   }
 }
