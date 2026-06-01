@@ -13082,8 +13082,8 @@ function _renderCmpKippin(keyA, keyB, nameA, nameB) {
             <div style="font-size:11px;color:var(--text2);margin-top:6px;">合計</div>
             <div style="font-size:15px;font-weight:800;color:${grp.totalProfit >= 0 ? 'var(--green)' : 'var(--red)'};">${fmtY(grp.totalProfit)}</div>
             <div style="font-size:10px;color:var(--text2);margin-top:6px;">粗利シェア</div>
-            <div style="font-size:15px;font-weight:800;color:${grp.totalProfit >= 0 ? 'var(--green)' : 'var(--red)'};">${fmtP(Math.abs(grp.profShare))}</div>
-            ${bar(Math.abs(grp.profShare), grp.totalProfit >= 0 ? '#34d399' : '#f87171')}
+            <div style="font-size:15px;font-weight:800;color:${grp.profShare >= 0 ? 'var(--green)' : 'var(--red)'};">${(grp.profShare >= 0 ? '+' : '') + grp.profShare.toFixed(1)}%</div>
+            ${bar(Math.abs(grp.profShare), grp.profShare >= 0 ? '#34d399' : '#f87171')}
           </div>
         </div>
 
