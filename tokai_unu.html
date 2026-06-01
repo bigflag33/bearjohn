@@ -2451,7 +2451,18 @@ function detectStoreNameFromFilename(filename) {
   // → 店舗名のみ返す（isPachinko検出後に（4P）が付与される）
   m = base.match(/^(.+?)_4[円]?[Pp](?:_|$)/);
   if (m) return m[1].trim();
-  // 日付のみ → 店舗名なし（現在の店舗を使用）
+  // ── フォールバック: STORE_WHITELISTまたは登録済み店舗名がファイル名の先頭にあれば一致 ──
+  // 例: 「エスパス古津賀_20S.xlsx」→「エスパス古津賀」を検出
+  const candidates = [
+    ...(STORE_WHITELIST.length > 0 ? STORE_WHITELIST : []),
+    ...getStores().map(s => s.name),
+  ].filter(n => n && n !== '業界ベンチマーク');
+  // 長い店舗名から優先的にマッチ（部分一致を防ぐ）
+  const sorted = [...new Set(candidates)].sort((a, b) => b.length - a.length);
+  for (const name of sorted) {
+    if (normName(base).startsWith(normName(name))) return name;
+  }
+  // 日付のみ or 不明 → 店舗名なし（現在の店舗を使用）
   return null;
 }
 
