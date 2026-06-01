@@ -643,8 +643,18 @@
   /* ── 店舗比較カード ── */
   .store-cmp-card {
     background: var(--card); border: 1px solid var(--border);
-    border-radius: 14px; padding: 20px; margin-bottom: 20px;
-    border-top: 3px solid #06b6d4;
+    border-radius: 14px; padding: 24px; margin-bottom: 20px;
+    border-top: 4px solid #06b6d4;
+  }
+  .cmp-hero-title {
+    font-size: 26px; font-weight: 900; letter-spacing: 2px;
+    background: linear-gradient(90deg, #06b6d4, #a78bfa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text; margin-bottom: 2px; line-height: 1.2;
+  }
+  .cmp-hero-sub {
+    font-size: 11px; font-weight: 600; color: var(--text2);
+    letter-spacing: 3px; text-transform: uppercase; margin-bottom: 4px;
   }
   .store-cmp-controls {
     display: flex; flex-wrap: wrap; gap: 14px;
@@ -732,6 +742,36 @@
   .corr-bar-wrap { margin-top: 6px; height: 5px; background: var(--border); border-radius: 3px; overflow:hidden; }
   .corr-bar { height: 100%; border-radius: 3px; transition: width 0.4s; }
 
+  /* ── PPMフリップアニメーション ── */
+  .ppm-flip-wrap {
+    display: inline-block;
+    position: relative;
+    min-width: 72px;
+    height: 1.6em;
+    perspective: 400px;
+  }
+  .ppm-flip-front, .ppm-flip-back {
+    position: absolute;
+    top: 0; left: 0; width: 100%;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    font-weight: 700;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .ppm-flip-front { animation: ppmFlipFront 5s infinite ease-in-out; }
+  .ppm-flip-back  { animation: ppmFlipBack  5s infinite ease-in-out; }
+  @keyframes ppmFlipFront {
+    0%,35%   { transform: rotateY(0deg);   opacity: 1; }
+    45%,55%  { transform: rotateY(90deg);  opacity: 0; }
+    65%,100% { transform: rotateY(180deg); opacity: 0; }
+  }
+  @keyframes ppmFlipBack {
+    0%,35%   { transform: rotateY(-180deg); opacity: 0; }
+    45%,55%  { transform: rotateY(-90deg);  opacity: 0; }
+    65%,100% { transform: rotateY(0deg);    opacity: 1; }
+  }
+
 </style>
 </head>
 <body>
@@ -784,6 +824,10 @@
     <button onclick="(function(){ const el = document.getElementById('rivalAnalysisCard'); const headerH = (document.querySelector('.header') ? document.querySelector('.header').offsetHeight : 70) + (document.querySelector('.filter-bar') ? document.querySelector('.filter-bar').offsetHeight : 80); const top = el.getBoundingClientRect().top + window.scrollY - headerH - 16; window.scrollTo({top, behavior:'smooth'}); })()"
       style="background:linear-gradient(135deg,#1e293b,#0f172a);color:#e2e8f0;border:1px solid rgba(148,163,184,0.3);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;letter-spacing:1.5px;white-space:nowrap;">
       REPORTへ
+    </button>
+    <button onclick="(function(){ const el = document.getElementById('storeCmpCard'); const headerH = (document.querySelector('.header') ? document.querySelector('.header').offsetHeight : 70) + (document.querySelector('.filter-bar') ? document.querySelector('.filter-bar').offsetHeight : 80); const top = el.getBoundingClientRect().top + window.scrollY - headerH - 16; window.scrollTo({top, behavior:'smooth'}); })()"
+      style="background:linear-gradient(135deg,#06b6d422,#a78bfa22);color:#06b6d4;border:1px solid rgba(6,182,212,0.4);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;letter-spacing:1.5px;white-space:nowrap;">
+      COMPARISON
     </button>
     <div class="header-date-range" id="dataRange"></div>
     <span id="uploadMsg" class="upload-msg-inline"></span>
@@ -1262,9 +1306,9 @@
 
   <!-- ▼ 店舗比較 ▼ -->
   <div class="store-cmp-card" id="storeCmpCard">
-    <div class="chart-title">
-      <div class="dot" style="background:#06b6d4"></div>
-      🏪 店舗比較
+    <div style="margin-bottom:16px;">
+      <div class="cmp-hero-sub">Store Comparison</div>
+      <div class="cmp-hero-title">比較コンパリゾン</div>
     </div>
 
     <div class="store-cmp-controls">
@@ -1291,12 +1335,15 @@
         </div>
       </div>
 
-      <!-- 指標ボタン -->
+      <!-- 指標ボタン（複数選択可） -->
       <div class="store-cmp-metric-btns">
-        <button class="cmp-metric-btn active" id="cmpBtnIn"     onclick="cmpSetMetric('inmai')" >1台平均IN枚数</button>
-        <button class="cmp-metric-btn"        id="cmpBtnProfit" onclick="cmpSetMetric('profit')">台粗利（1台平均）</button>
-        <button class="cmp-metric-btn"        id="cmpBtnSales"  onclick="cmpSetMetric('sales')" >1台平均売上</button>
-        <button class="cmp-metric-btn"        id="cmpBtnRate"   onclick="cmpSetMetric('rate')"  >利益率（%）</button>
+        <span style="font-size:10px;font-weight:700;color:var(--text2);align-self:center;margin-right:2px;">複数選択可▶</span>
+        <button class="cmp-metric-btn active" id="cmpBtn_inmai"   onclick="cmpToggleMetric('inmai')"  >1台平均IN枚数</button>
+        <button class="cmp-metric-btn"        id="cmpBtn_profit"  onclick="cmpToggleMetric('profit')" >台粗利（1台平均）</button>
+        <button class="cmp-metric-btn"        id="cmpBtn_sales"   onclick="cmpToggleMetric('sales')"  >1台平均売上</button>
+        <button class="cmp-metric-btn"        id="cmpBtn_rate"    onclick="cmpToggleMetric('rate')"   >利益率（%）</button>
+        <button class="cmp-metric-btn"        id="cmpBtn_winrate" onclick="cmpToggleMetric('winrate')">勝率（%）</button>
+        <button class="cmp-metric-btn"        id="cmpBtn_payout"  onclick="cmpToggleMetric('payout')" >出玉率（%）</button>
       </div>
     </div>
 
@@ -1314,6 +1361,12 @@
     <div style="position:relative;height:300px;margin-top:10px;">
       <canvas id="storeCmpChart"></canvas>
     </div>
+
+    <!-- 機種別比較テーブル -->
+    <div id="cmpModelTable" style="margin-top:20px;display:none;"></div>
+
+    <!-- PPM × トレンドテーブル -->
+    <div id="cmpPPMTable" style="margin-top:20px;display:none;"></div>
 
     <!-- 疑似AI分析 -->
     <div class="pin-ai-box" id="cmpAIBox" style="margin-top:20px;">
@@ -2969,7 +3022,7 @@ function _refreshInLabels() {
   // 特定IDの要素を直接書き換え
   const idMap = {
     'modelINChartTitle':   isPachi ? '機種別 アウト TOP15'              : '機種別 IN枚数 TOP15',
-    'cmpBtnIn':            isPachi ? '1台平均アウト'                     : '1台平均IN枚数',
+    'cmpBtn_inmai':        isPachi ? '1台平均アウト'                     : '1台平均IN枚数',
   };
   Object.entries(idMap).forEach(([id, text]) => {
     const el = document.getElementById(id); if (el) el.textContent = text;
@@ -3684,14 +3737,6 @@ function renderAlertTiles() {
   const bar = document.getElementById('alertTilesBar');
   if (!bar) return;
 
-  // ── キャッシュチェック ──
-  const _atk = window._currentRenderKey || '';
-  if (_renderCache.alert && _renderCache.alertKey === _atk) {
-    bar.style.display = _renderCache.alertDisplay;
-    bar.innerHTML = _renderCache.alert;
-    return;
-  }
-
   const all = loadAllData();
   if (!all.length) { bar.style.display = 'none'; return; }
 
@@ -4237,10 +4282,6 @@ function renderAlertTiles() {
     });
   }
 
-  // キャッシュに保存
-  _renderCache.alert        = bar.innerHTML;
-  _renderCache.alertDisplay = bar.style.display;
-  _renderCache.alertKey     = window._currentRenderKey || '';
 }
 function wzJumpTo(id) {
   if (!id) return;
@@ -4277,13 +4318,6 @@ let _lastVarietySpiceNew = [];   // 前期比: 新たにスパイス機種入り
 function renderRivalAnalysis() {
   const el = document.getElementById('rivalAnalysisBody');
   if (!el) return;
-
-  // ── キャッシュチェック（フィルター変化なしならスキップ）──
-  const _rak = window._currentRenderKey || '';
-  if (_renderCache.rival && _renderCache.rivalKey === _rak) {
-    el.innerHTML = _renderCache.rival;
-    return;
-  }
 
   // 攻略分析は「日付フィルターのみ」適用した全機種データを使用
   // 機種フィルターは無視する（機種を絞ると店舗平均・前半後半比較が崩れるため）
@@ -8169,10 +8203,6 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   try { renderForecast(); } catch(e) { console.warn('renderForecast', e); }
 
   el.innerHTML = html;
-
-  // キャッシュに保存
-  _renderCache.rival    = html;
-  _renderCache.rivalKey = window._currentRenderKey || '';
 }
 
 function _countUp(el, target, duration, fmt) {
@@ -11804,19 +11834,38 @@ function _checkAdminDataEmpty() {
 // ═══════════════════════════════════════════
 //  店舗比較機能（統合版：全体 / 機種別 を同一グラフで）
 // ═══════════════════════════════════════════
-let _cmpMetric     = 'inmai';
+let _cmpMetrics    = new Set(['inmai']); // 複数選択対応
+let _cmpMetric     = 'inmai';           // 後方互換（AI分析等で使用）
 let _storeCmpChart = null;
+let _cmpTableSort  = { key: 'model', dir: 1 }; // key: 'model'|'cntA'|'cntB'|'inmaiA'|'inmaiB'|'profitA'|'profitB'|'rateA'|'rateB'|'winrateA'|'winrateB'|'payoutA'|'payoutB'
+let _cmpTableData  = { keyA:'', keyB:'', nameA:'', nameB:'' };
 
-// ── 指標ボタン切り替え ──
-function cmpSetMetric(m) {
-  _cmpMetric = m;
-  ['In','Profit','Sales','Rate'].forEach(k => {
-    const btn = document.getElementById('cmpBtn' + k);
-    if (btn) btn.classList.remove('active');
+const _CMP_METRIC_KEYS = ['inmai','profit','sales','rate','winrate','payout'];
+
+// ── 指標ボタン トグル（複数選択可・最低1つ必須）──
+function cmpToggleMetric(m) {
+  if (_cmpMetrics.has(m)) {
+    if (_cmpMetrics.size === 1) return; // 最低1つは必須
+    _cmpMetrics.delete(m);
+  } else {
+    _cmpMetrics.add(m);
+  }
+  _cmpMetric = [..._cmpMetrics][0]; // 後方互換用
+  _CMP_METRIC_KEYS.forEach(k => {
+    const btn = document.getElementById('cmpBtn_' + k);
+    if (btn) btn.classList.toggle('active', _cmpMetrics.has(k));
   });
-  const map = { inmai:'In', profit:'Profit', sales:'Sales', rate:'Rate' };
-  const el = document.getElementById('cmpBtn' + map[m]);
-  if (el) el.classList.add('active');
+  renderStoreCmp();
+}
+
+// 後方互換（旧コードから呼ばれる場合）
+function cmpSetMetric(m) {
+  _cmpMetrics = new Set([m]);
+  _cmpMetric = m;
+  _CMP_METRIC_KEYS.forEach(k => {
+    const btn = document.getElementById('cmpBtn_' + k);
+    if (btn) btn.classList.toggle('active', k === m);
+  });
   renderStoreCmp();
 }
 
@@ -11903,6 +11952,33 @@ function _pearsonCorr(xs, ys) {
 // ── 日別集計（ストアキー + 任意のモデルフィルタ）──
 // 戻り値: { date → { profit, sales, inmai, count } }
 // 指標はすべて「1台平均」＝ sum/count で返す
+// ── 機種別集計（比較テーブル用）──
+function _cmpAggByModel(key) {
+  const from = document.getElementById('cmpFrom')?.value || null;
+  const to   = document.getElementById('cmpTo')?.value   || null;
+  const rows = (DB_CACHE[key] || []).filter(r => {
+    if (!r.date) return false;
+    if (from && r.date < from) return false;
+    if (to   && r.date > to)   return false;
+    return true;
+  });
+  const map = {};
+  rows.forEach(r => {
+    const m = r['機種名'] || '不明';
+    if (!map[m]) map[m] = { profit:0, sales:0, inmai:0, diff:0, wins:0, count:0, dates:new Set(), tais:new Set() };
+    map[m].profit += r['台粗利'] || 0;
+    map[m].sales  += r['台売上'] || 0;
+    map[m].inmai  += r['IN枚数'] || 0;
+    map[m].diff   += r['差枚']   || 0;
+    map[m].wins   += (r['差枚'] || 0) >= 0 ? 1 : 0;
+    map[m].count  += 1;
+    if (r.date) map[m].dates.add(r.date);
+    const tai = String(r['台番'] || '').trim();
+    if (tai) map[m].tais.add(tai);
+  });
+  return map;
+}
+
 function _cmpAggByDate(key, modelFilter) {
   const from = document.getElementById('cmpFrom')?.value || null;
   const to   = document.getElementById('cmpTo')?.value   || null;
@@ -11916,10 +11992,12 @@ function _cmpAggByDate(key, modelFilter) {
   const map = {};
   rows.forEach(r => {
     const d = r.date;
-    if (!map[d]) map[d] = { profit:0, sales:0, inmai:0, count:0 };
+    if (!map[d]) map[d] = { profit:0, sales:0, inmai:0, diff:0, wins:0, count:0 };
     map[d].profit += r['台粗利'] || 0;
     map[d].sales  += r['台売上'] || 0;
     map[d].inmai  += r['IN枚数'] || 0;
+    map[d].diff   += r['差枚']   || 0;
+    map[d].wins   += (r['差枚'] || 0) >= 0 ? 1 : 0;
     map[d].count  += 1;
   });
   return map;
@@ -11929,10 +12007,12 @@ function _cmpAggByDate(key, modelFilter) {
 function _cmpVal(dayData, metric) {
   if (!dayData || dayData.count === 0) return null;
   const c = dayData.count;
-  if (metric === 'inmai')  return dayData.inmai  / c;   // 1台平均IN枚数
-  if (metric === 'profit') return dayData.profit / c;   // 台粗利（1台平均）
-  if (metric === 'sales')  return dayData.sales  / c;   // 1台平均売上
-  if (metric === 'rate')   return dayData.sales > 0 ? dayData.profit / dayData.sales * 100 : 0;
+  if (metric === 'inmai')   return dayData.inmai  / c;
+  if (metric === 'profit')  return dayData.profit / c;
+  if (metric === 'sales')   return dayData.sales  / c;
+  if (metric === 'rate')    return dayData.sales > 0 ? dayData.profit / dayData.sales * 100 : 0;
+  if (metric === 'winrate') return c > 0 ? dayData.wins / c * 100 : null;
+  if (metric === 'payout')  return dayData.inmai > 0 ? (dayData.inmai + dayData.diff) / dayData.inmai * 100 : null;
   return 0;
 }
 
@@ -12044,76 +12124,537 @@ function renderStoreCmp() {
   if (aiArea) aiArea.innerHTML = '<span style="color:var(--text2);font-size:12px;">▶ 「分析する」を押すと機種別の比較レポートを自動生成します。</span>';
   if (aiBtn)  { aiBtn.disabled = false; aiBtn.innerHTML = '✨ 分析する'; }
 
-  const metric = _cmpMetric;
-  const isRate = metric === 'rate';
-  const unit   = isRate ? '%' : metric === 'inmai' ? '枚' : '円';
-  const labels = allDates.map(d => d.slice(5));
-  const dataA  = allDates.map(d => _cmpVal(mapA[d], metric));
-  const dataB  = allDates.map(d => _cmpVal(mapB[d], metric));
-  const yFmt   = v => v == null ? '' : isRate ? v.toFixed(1) + '%' : Math.round(v).toLocaleString() + unit;
+  // ── 複数指標対応グラフ描画 ──
+  const _metaCfg = {
+    inmai:   { label:'1台平均IN枚数',   color:'#06b6d4', pct:false },
+    profit:  { label:'台粗利（1台平均）', color:'#34d399', pct:false },
+    sales:   { label:'1台平均売上',     color:'#60a5fa', pct:false },
+    rate:    { label:'利益率',          color:'#f59e0b', pct:true  },
+    winrate: { label:'勝率',            color:'#a78bfa', pct:true  },
+    payout:  { label:'出玉率',          color:'#fb923c', pct:true  },
+  };
 
-  // チャートタイトル（機種別のとき機種名を表示）
-  const targetLabel = (target && target !== '__all__') ? `  【${target}】` : '';
+  const activeMetrics = [..._cmpMetrics];
+  const hasPct = activeMetrics.some(m => _metaCfg[m].pct);
+  const hasAbs = activeMetrics.some(m => !_metaCfg[m].pct);
+  const labels = allDates.map(d => d.slice(5));
+  const targetLabel = (target && target !== '__all__') ? `【${target}】` : '';
+
+  const datasets = [];
+  activeMetrics.forEach(metric => {
+    const cfg = _metaCfg[metric];
+    const yAxisID = cfg.pct ? 'yPct' : 'yAbs';
+    const unit = cfg.pct ? '%' : metric === 'inmai' ? _inUnit() : '円';
+    const fmtV = v => v == null ? '' : cfg.pct ? v.toFixed(1)+'%' : Math.round(v).toLocaleString()+unit;
+    datasets.push({
+      label: `${nameA}A ${cfg.label}${targetLabel ? ' '+targetLabel : ''}`,
+      data: allDates.map(d => _cmpVal(mapA[d], metric)),
+      borderColor: cfg.color, backgroundColor: cfg.color+'22',
+      borderWidth: 2.5, pointRadius: 3, pointHoverRadius: 5,
+      tension: 0.3, fill: false, spanGaps: true, yAxisID,
+      _unit: unit, _pct: cfg.pct,
+    });
+    datasets.push({
+      label: `${nameB}B ${cfg.label}${targetLabel ? ' '+targetLabel : ''}`,
+      data: allDates.map(d => _cmpVal(mapB[d], metric)),
+      borderColor: cfg.color, backgroundColor: cfg.color+'11',
+      borderWidth: 2.5, borderDash: [5,3],
+      pointRadius: 3, pointHoverRadius: 5,
+      tension: 0.3, fill: false, spanGaps: true, yAxisID,
+      _unit: unit, _pct: cfg.pct,
+    });
+  });
+
+  const scales = {
+    x: { ticks: { color: '#9499b7', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+  };
+  if (hasAbs) scales.yAbs = {
+    position: 'left', display: hasAbs,
+    ticks: { color: '#9499b7', font: { size: 10 },
+      callback: v => v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v },
+    grid: { color: 'rgba(255,255,255,0.05)' }
+  };
+  if (hasPct) scales.yPct = {
+    position: hasAbs ? 'right' : 'left', display: hasPct,
+    ticks: { color: '#f59e0b', font: { size: 10 }, callback: v => v.toFixed(1)+'%' },
+    grid: { display: !hasAbs, color: 'rgba(255,255,255,0.05)' }
+  };
 
   if (_storeCmpChart) _storeCmpChart.destroy();
   _storeCmpChart = new Chart(document.getElementById('storeCmpChart').getContext('2d'), {
     type: 'line',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: `${nameA}（A）${targetLabel}`,
-          data: dataA,
-          borderColor: '#06b6d4',
-          backgroundColor: 'rgba(6,182,212,0.10)',
-          borderWidth: 2.5,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          pointBackgroundColor: '#06b6d4',
-          tension: 0.3,
-          fill: false,
-          spanGaps: true,
-        },
-        {
-          label: `${nameB}（B）${targetLabel}`,
-          data: dataB,
-          borderColor: '#f59e0b',
-          backgroundColor: 'rgba(245,158,11,0.10)',
-          borderWidth: 2.5,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          pointBackgroundColor: '#f59e0b',
-          tension: 0.3,
-          fill: false,
-          spanGaps: true,
-        }
-      ]
-    },
+    data: { labels, datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { labels: { color: '#e8eaf6', font: { size: 12 } } },
+        legend: { labels: { color: '#e8eaf6', font: { size: 11 }, boxWidth: 20 } },
         tooltip: {
-          callbacks: { label: ctx => `${ctx.dataset.label}：${yFmt(ctx.parsed.y)}` }
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              if (v == null) return null;
+              const ds = ctx.dataset;
+              const val = ds._pct ? v.toFixed(1)+'%' : Math.round(v).toLocaleString()+(ds._unit||'');
+              return `${ctx.dataset.label}：${val}`;
+            }
+          }
         }
       },
-      scales: {
-        x: {
-          ticks: { color: '#9499b7', font: { size: 11 } },
-          grid: { color: 'rgba(255,255,255,0.05)' }
-        },
-        y: {
-          ticks: {
-            color: '#9499b7', font: { size: 11 },
-            callback: v => isRate ? v.toFixed(1)+'%' : v >= 1000000 ? (v/1000000).toFixed(1)+'M' : v >= 1000 ? (v/1000).toFixed(0)+'k' : v
-          },
-          grid: { color: 'rgba(255,255,255,0.05)' }
-        }
-      }
+      scales
     }
   });
+
+  // ── 機種別比較テーブル描画 ──
+  _renderCmpModelTable(keyA, keyB, nameA, nameB);
+  _renderCmpPPMTable(keyA, keyB, nameA, nameB);
+}
+
+function _renderCmpModelTable(keyA, keyB, nameA, nameB) {
+  const el = document.getElementById('cmpModelTable');
+  if (!el) return;
+
+  _cmpTableData = { keyA, keyB, nameA, nameB };
+
+  const modA = _cmpAggByModel(keyA);
+  const modB = _cmpAggByModel(keyB);
+  const allModels = [...new Set([...Object.keys(modA), ...Object.keys(modB)])];
+  if (!allModels.length) { el.style.display = 'none'; return; }
+
+  const isPachi = _isPachinkoStore();
+  const calc = (d) => {
+    if (!d || d.count === 0) return null;
+    const c = d.count;
+    const days = d.dates ? d.dates.size : 1;
+    // 設置台数: 台番があればユニーク台番数、なければ1日平均台数
+    const machines = (d.tais && d.tais.size > 0) ? d.tais.size : Math.round(c / Math.max(days, 1));
+    return {
+      inmai:    d.inmai / c,
+      profit:   d.profit / c,
+      rate:     d.sales > 0 ? d.profit / d.sales * 100 : 0,
+      winrate:  d.wins / c * 100,
+      count:    c,
+      machines, // 設置台数
+    };
+  };
+
+  // A÷B 比率フォーマット・色（%表記）
+  const fmtRatio = (vA, vB) => {
+    if (vA == null || vB == null || vB === 0) return { text:'—', style:'' };
+    const r = vA / vB * 100;
+    const col = r >= 105 ? 'color:#06b6d4;font-weight:800;'
+              : r <= 95  ? 'color:#f59e0b;font-weight:800;'
+              : 'color:var(--text2);';
+    return { text: Math.round(r) + '%', style: col };
+  };
+
+  const tableRows = allModels.map(model => {
+    const a = calc(modA[model]);
+    const b = calc(modB[model]);
+    return { model, a, b };
+  });
+
+  // ソート
+  const sk = _cmpTableSort.key, sd = _cmpTableSort.dir;
+  tableRows.sort((x, y) => {
+    let va, vb;
+    if (sk === 'model') { va = x.model; vb = y.model; return sd * va.localeCompare(vb, 'ja'); }
+    if (sk === 'cntA')  { va = x.a?.machines ?? -Infinity; vb = y.a?.machines ?? -Infinity; }
+    else if (sk === 'cntB') { va = x.b?.machines ?? -Infinity; vb = y.b?.machines ?? -Infinity; }
+    else if (sk.endsWith('Ratio')) {
+      const m = sk.replace('Ratio','');
+      const rA = x.a?.[m], rB = x.b?.[m];
+      const rC = y.a?.[m], rD = y.b?.[m];
+      va = (rA != null && rB != null && rB !== 0) ? rA/rB : -Infinity;
+      vb = (rC != null && rD != null && rD !== 0) ? rC/rD : -Infinity;
+    } else {
+      const [metric, side] = sk.endsWith('B') ? [sk.slice(0,-1), 'b'] : [sk.slice(0,-1), 'a'];
+      va = x[side]?.[metric] ?? -Infinity;
+      vb = y[side]?.[metric] ?? -Infinity;
+    }
+    return sd * (va - vb);
+  });
+
+  const fmtN = (v) => v == null ? '—' : Math.round(v).toLocaleString();
+  const fmtP = (v) => v == null ? '—' : v.toFixed(1) + '%';
+  const cellCol = (vA, vB, metric) => {
+    if (vA == null || vB == null) return { a:'', b:'' };
+    const avg = Math.abs(vA + vB) / 2;
+    if (avg === 0 || Math.abs(vA - vB) / avg < 0.05) return { a:'', b:'' };
+    if (metric === 'rate') return { a:'', b:'' };
+    return vA > vB
+      ? { a:'color:#06b6d4;font-weight:800;', b:'color:var(--text2);' }
+      : { a:'color:var(--text2);',            b:'color:#f59e0b;font-weight:800;' };
+  };
+
+  const si = (key) => {
+    if (_cmpTableSort.key !== key) return '<span style="opacity:0.35;margin-left:2px;">⇅</span>';
+    return _cmpTableSort.dir === 1 ? '<span style="color:#06b6d4;margin-left:2px;">▲</span>'
+                                   : '<span style="color:#06b6d4;margin-left:2px;">▼</span>';
+  };
+  const th = (label, key, extra='') =>
+    `<th onclick="cmpSortTable('${key}')" style="cursor:pointer;padding:5px 8px;text-align:right;user-select:none;white-space:nowrap;${extra}">${label}${si(key)}</th>`;
+
+  // 指標定義（出玉率なし）
+  const metrics = [
+    { key:'inmai',   label: isPachi ? 'アウト/台' : 'IN枚数/台', pct:false },
+    { key:'profit',  label:'台粗利',   pct:false },
+    { key:'rate',    label:'利益率',   pct:true  },
+    { key:'winrate', label:'勝率',     pct:true  },
+  ];
+
+  const rowsHtml = tableRows.map(({ model, a, b }) => {
+    const machA = a?.machines ?? 0;
+    const machB = b?.machines ?? 0;
+    const mn = model.replace(/'/g,"\\'");
+    const cols = metrics.map(({ key: m, pct }) => {
+      const vA = a?.[m] ?? null;
+      const vB = b?.[m] ?? null;
+      const cc  = cellCol(vA, vB, m);
+      const rat = fmtRatio(vA, vB);
+      const fA  = pct ? fmtP(vA) : fmtN(vA);
+      const fB  = pct ? fmtP(vB) : fmtN(vB);
+      return `<td style="padding:5px 8px;text-align:right;${cc.a}">${fA}</td>
+              <td style="padding:5px 8px;text-align:right;${cc.b}">${fB}</td>
+              <td style="padding:5px 8px;text-align:center;font-size:10.5px;${rat.style}">${rat.text}</td>`;
+    }).join('');
+    const rowId = 'cmpRow_' + model.replace(/[^a-zA-Z0-9]/g, '_');
+    return `<tr id="${rowId}" style="border-bottom:1px solid var(--border);transition:background 0.2s;">
+      <td onclick="cmpJumpToModel('${mn}')"
+          style="padding:5px 10px;font-size:11px;white-space:nowrap;cursor:pointer;color:#06b6d4;text-decoration:underline dotted;"
+          title="クリックでグラフにこの機種を表示">${model}</td>
+      <td style="padding:5px 8px;text-align:center;font-size:10px;color:#06b6d4;">${machA>0?machA+'台':'—'}</td>
+      <td style="padding:5px 8px;text-align:center;font-size:10px;color:#f59e0b;">${machB>0?machB+'台':'—'}</td>
+      ${cols}
+    </tr>`;
+  }).join('');
+
+  // ヘッダー生成
+  const metricHeaders1 = metrics.map(({ label }) =>
+    `<th style="padding:5px 8px;text-align:center;border-left:1px solid var(--border);" colspan="3">${label}</th>`
+  ).join('');
+  const metricHeaders2 = metrics.map(({ key: m }) =>
+    `${th('A', m+'A', 'color:#06b6d4;border-left:1px solid var(--border);')}${th('B', m+'B', 'color:#f59e0b;')}${th('A÷B', m+'Ratio', 'color:#a78bfa;')}`
+  ).join('');
+
+  el.style.display = '';
+  el.innerHTML = `
+    <div style="font-size:20px;font-weight:900;color:var(--text);margin-bottom:10px;letter-spacing:1px;">
+      ベーシックテーブル
+      <span style="font-size:11px;font-weight:500;color:var(--text2);margin-left:10px;">🔵A優位 / 🟡B優位 / A÷B比率（105%↑=A優位・95%↓=B優位）｜機種名クリックでグラフ反映</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--text2);font-size:10px;font-weight:700;">
+            <th onclick="cmpSortTable('model')" style="cursor:pointer;padding:5px 10px;text-align:left;user-select:none;" rowspan="2">機種名${si('model')}</th>
+            <th onclick="cmpSortTable('cntA')" style="cursor:pointer;padding:5px 8px;text-align:center;color:#06b6d4;user-select:none;" rowspan="2">A 設置台数${si('cntA')}</th>
+            <th onclick="cmpSortTable('cntB')" style="cursor:pointer;padding:5px 8px;text-align:center;color:#f59e0b;user-select:none;" rowspan="2">B 設置台数${si('cntB')}</th>
+            ${metricHeaders1}
+          </tr>
+          <tr style="border-bottom:2px solid var(--border);color:var(--text2);font-size:10px;">
+            ${metricHeaders2}
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── PPM + トレンド テーブル ──
+function _cmpBuildPPMData(key) {
+  const from = document.getElementById('cmpFrom')?.value || null;
+  const to   = document.getElementById('cmpTo')?.value   || null;
+  const rows = (DB_CACHE[key] || []).filter(r => {
+    if (!r.date) return false;
+    if (from && r.date < from) return false;
+    if (to   && r.date > to)   return false;
+    return true;
+  });
+  if (!rows.length) return null;
+
+  // 機種別集計
+  const byModel = {};
+  rows.forEach(r => {
+    const m = r['機種名'] || '不明';
+    if (!byModel[m]) byModel[m] = { inmai:0, profit:0, count:0, dates:new Set(), dateData:{} };
+    byModel[m].inmai   += r['IN枚数'] || 0;
+    byModel[m].profit  += r['台粗利'] || 0;
+    byModel[m].count   += 1;
+    if (r.date) {
+      byModel[m].dates.add(r.date);
+      if (!byModel[m].dateData[r.date]) byModel[m].dateData[r.date] = { inmai:0, profit:0, count:0 };
+      byModel[m].dateData[r.date].inmai   += r['IN枚数'] || 0;
+      byModel[m].dateData[r.date].profit  += r['台粗利'] || 0;
+      byModel[m].dateData[r.date].count   += 1;
+    }
+  });
+
+  // 店舗全体平均
+  const totalIn     = rows.reduce((s,r) => s + (r['IN枚数']||0), 0);
+  const totalProfit = rows.reduce((s,r) => s + (r['台粗利']||0), 0);
+  const totalCount  = rows.length;
+  const storeAvgIn     = totalCount > 0 ? totalIn     / totalCount : 0;
+  const storeAvgProfit = totalCount > 0 ? totalProfit / totalCount : 0;
+
+  // 店舗全体の前半/後半平均（PPMの基準として）
+  const allDates = [...new Set(rows.map(r => r.date).filter(Boolean))].sort();
+  const halfIdx  = Math.floor(allDates.length / 2);
+  const firstDateSet = new Set(allDates.slice(0, halfIdx));
+  const lastDateSet  = new Set(allDates.slice(halfIdx));
+  const calcStoreHalfAvg = (dateSet) => {
+    const half = rows.filter(r => dateSet.has(r.date));
+    if (!half.length) return { inmai: storeAvgIn, profit: storeAvgProfit };
+    return {
+      inmai:  half.reduce((s,r) => s+(r['IN枚数']||0), 0) / half.length,
+      profit: half.reduce((s,r) => s+(r['台粗利']||0), 0) / half.length,
+    };
+  };
+  const storeFirst = calcStoreHalfAvg(firstDateSet);
+  const storeLast  = calcStoreHalfAvg(lastDateSet);
+
+  // PPM判定ヘルパー
+  const _ppm = (avgIn, avgProfit, avgRef) => {
+    const hi = avgIn >= avgRef.inmai, hp = avgProfit >= avgRef.profit;
+    if ( hi &&  hp) return { label:'金のなる木', rank:4, color:'#34d399' };
+    if ( hi && !hp) return { label:'花形',       rank:3, color:'#60a5fa' };
+    if (!hi &&  hp) return { label:'負け犬',     rank:2, color:'#f59e0b' };
+    return              { label:'問題児',       rank:1, color:'#f87171' };
+  };
+
+  // 機種ごとのPPM + トレンド
+  const models = {};
+  Object.entries(byModel).forEach(([name, v]) => {
+    if (v.count < 3) return;
+    const avgIn     = v.inmai   / v.count;
+    const avgProfit = v.profit  / v.count;
+
+    // 全期間PPM
+    const ppm = _ppm(avgIn, avgProfit, { inmai: storeAvgIn, profit: storeAvgProfit });
+
+    // 前半後半トレンド計算（5日以上必要）
+    const sortedDates = [...v.dates].sort();
+    const calcTrend = (metric) => {
+      if (sortedDates.length < 5) return null;
+      const half      = Math.floor(sortedDates.length / 2);
+      const firstDates = sortedDates.slice(0, half);
+      const lastDates  = sortedDates.slice(sortedDates.length - half);
+      const avg = (dates) => {
+        const vals = dates.map(d => {
+          const dd = v.dateData[d];
+          return dd && dd.count > 0 ? dd[metric] / dd.count : 0;
+        });
+        return vals.reduce((s,x) => s+x, 0) / vals.length;
+      };
+      const fAvg = avg(firstDates);
+      const lAvg = avg(lastDates);
+      if (fAvg === 0) return null;
+      return (lAvg - fAvg) / Math.abs(fAvg) * 100; // %変化
+    };
+
+    // 前半/後半 PPM
+    let ppmFirst = null, ppmLast = null;
+    if (sortedDates.length >= 5) {
+      const half = Math.floor(sortedDates.length / 2);
+      const fDates = sortedDates.slice(0, half);
+      const lDates = sortedDates.slice(sortedDates.length - half);
+      const halfAvg = (dates, metric) => {
+        const vals = dates.map(d => { const dd = v.dateData[d]; return dd && dd.count > 0 ? dd[metric] / dd.count : 0; });
+        return vals.reduce((s,x) => s+x, 0) / vals.length;
+      };
+      ppmFirst = _ppm(halfAvg(fDates,'inmai'), halfAvg(fDates,'profit'), storeFirst);
+      ppmLast  = _ppm(halfAvg(lDates,'inmai'), halfAvg(lDates,'profit'), storeLast);
+    }
+
+    const inTrendPct     = calcTrend('inmai');
+    const profitTrendPct = calcTrend('profit');
+
+    const trendLabel = (pct) => {
+      if (pct === null) return { html:`<span style="color:var(--text2);font-size:13px;letter-spacing:1px;">—</span>`, val:null };
+      const abs  = Math.abs(pct);
+      const up   = pct >= 0;
+      const arrow = up ? '▲' : '▼';
+      const sign  = up ? '+' : '';
+      const str   = `${sign}${Math.round(pct)}%`;
+      let html;
+      if (abs < 5) {
+        const col = up ? 'var(--green)' : 'var(--text2)';
+        html = `<span style="color:${col};font-size:11px;font-weight:700;letter-spacing:-.3px;">-- ${str}</span>`;
+      } else if (abs < 15) {
+        const col = up ? '#34d399' : '#f87171';
+        const bg  = up ? 'rgba(52,211,153,0.10)' : 'rgba(248,113,113,0.10)';
+        const brd = up ? 'rgba(52,211,153,0.35)' : 'rgba(248,113,113,0.35)';
+        html = `<span style="background:${bg};border:1px solid ${brd};color:${col};border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;white-space:nowrap;">${arrow}&nbsp;${str}</span>`;
+      } else {
+        const bg = up ? '#16a34a' : '#dc2626';
+        html = `<span style="background:${bg};color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:800;white-space:nowrap;">${arrow}&nbsp;${str}</span>`;
+      }
+      return { html, val:pct };
+    };
+
+    models[name] = {
+      ppm, ppmFirst, ppmLast,
+      inTrend:     trendLabel(inTrendPct),
+      profitTrend: trendLabel(profitTrendPct),
+    };
+  });
+
+  return { models, storeAvgIn, storeAvgProfit };
+}
+
+let _cmpPPMSort = { key:'model', dir:1 };
+let _cmpPPMData = { keyA:'', keyB:'', nameA:'', nameB:'' };
+
+function _renderCmpPPMTable(keyA, keyB, nameA, nameB) {
+  const el = document.getElementById('cmpPPMTable');
+  if (!el) return;
+
+  _cmpPPMData = { keyA, keyB, nameA, nameB };
+
+  const dataA = _cmpBuildPPMData(keyA);
+  const dataB = _cmpBuildPPMData(keyB);
+  if (!dataA && !dataB) { el.style.display = 'none'; return; }
+
+  const modelsA = dataA?.models || {};
+  const modelsB = dataB?.models || {};
+  const allModels = [...new Set([...Object.keys(modelsA), ...Object.keys(modelsB)])];
+  const _emptyTrend = { html:`<span style="color:var(--text2);font-size:13px;">—</span>`, val:null };
+  const empty = { ppm:null, inTrend:_emptyTrend, profitTrend:_emptyTrend };
+
+  // ソート
+  const sk = _cmpPPMSort.key, sd = _cmpPPMSort.dir;
+  allModels.sort((x, y) => {
+    const ax = modelsA[x] || empty, bx = modelsB[x] || empty;
+    const ay = modelsA[y] || empty, by = modelsB[y] || empty;
+    let va, vb;
+    if      (sk === 'model')       { return sd * x.localeCompare(y, 'ja'); }
+    else if (sk === 'ppmA')        { va = ax.ppm?.rank ?? 0;          vb = ay.ppm?.rank ?? 0; }
+    else if (sk === 'ppmB')        { va = bx.ppm?.rank ?? 0;          vb = by.ppm?.rank ?? 0; }
+    else if (sk === 'inTrendA')    { va = ax.inTrend?.val ?? -Infinity;    vb = ay.inTrend?.val ?? -Infinity; }
+    else if (sk === 'inTrendB')    { va = bx.inTrend?.val ?? -Infinity;    vb = by.inTrend?.val ?? -Infinity; }
+    else if (sk === 'profitTrendA'){ va = ax.profitTrend?.val ?? -Infinity; vb = ay.profitTrend?.val ?? -Infinity; }
+    else if (sk === 'profitTrendB'){ va = bx.profitTrend?.val ?? -Infinity; vb = by.profitTrend?.val ?? -Infinity; }
+    else { va = 0; vb = 0; }
+    return sd * (va - vb);
+  });
+
+  const si = (key) => {
+    if (_cmpPPMSort.key !== key) return '<span style="opacity:0.35;margin-left:2px;">⇅</span>';
+    return _cmpPPMSort.dir === 1 ? '<span style="color:#06b6d4;margin-left:2px;">▲</span>'
+                                 : '<span style="color:#06b6d4;margin-left:2px;">▼</span>';
+  };
+  const th = (label, key, extra='') =>
+    `<th onclick="cmpPPMSort('${key}')" style="cursor:pointer;padding:5px 8px;text-align:center;user-select:none;white-space:nowrap;${extra}">${label}${si(key)}</th>`;
+
+  const rowsHtml = allModels.map(model => {
+    const a = modelsA[model] || empty;
+    const b = modelsB[model] || empty;
+    const mn = model.replace(/'/g,"\\'");
+    const _ppmHtml = (d) => {
+      if (!d.ppm) return '<span style="color:var(--text2);">—</span>';
+      // 前半→後半でPPMが変化した場合: フリップアニメーション
+      if (d.ppmFirst && d.ppmLast && d.ppmFirst.label !== d.ppmLast.label) {
+        const improved = d.ppmLast.rank > d.ppmFirst.rank;
+        const glowCol  = improved ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.1)';
+        return `<div class="ppm-flip-wrap" title="前半:${d.ppmFirst.label} → 後半:${d.ppmLast.label}" style="background:${glowCol};border-radius:6px;padding:1px 4px;">
+          <span class="ppm-flip-front" style="color:${d.ppmFirst.color};">
+            <span style="font-size:8px;opacity:.7;margin-right:2px;">前</span>${d.ppmFirst.label}
+          </span>
+          <span class="ppm-flip-back" style="color:${d.ppmLast.color};">
+            <span style="font-size:8px;opacity:.7;margin-right:2px;">後</span>${d.ppmLast.label}
+          </span>
+        </div>`;
+      }
+      // 変化なし: 全期間ラベルをそのまま表示
+      return `<span style="color:${d.ppm.color};font-weight:700;font-size:11px;">${d.ppm.label}</span>`;
+    };
+    const ppmA = _ppmHtml(a);
+    const ppmB = _ppmHtml(b);
+    return `<tr style="border-bottom:1px solid var(--border);">
+      <td onclick="cmpJumpToModelRow('${mn}')"
+          style="padding:5px 10px;font-size:11px;white-space:nowrap;cursor:pointer;color:#a78bfa;text-decoration:underline dotted;"
+          title="クリックで上のテーブルの同機種へ移動">${model}</td>
+      <td style="padding:5px 10px;text-align:center;">${ppmA}</td>
+      <td style="padding:5px 10px;text-align:center;">${ppmB}</td>
+      <td style="padding:5px 10px;text-align:center;">${a.inTrend.html}</td>
+      <td style="padding:5px 10px;text-align:center;">${b.inTrend.html}</td>
+      <td style="padding:5px 10px;text-align:center;">${a.profitTrend.html}</td>
+      <td style="padding:5px 10px;text-align:center;">${b.profitTrend.html}</td>
+    </tr>`;
+  }).join('');
+
+  el.style.display = '';
+  el.innerHTML = `
+    <div style="font-size:20px;font-weight:900;color:var(--text);margin-bottom:10px;letter-spacing:1px;">
+      PPMトレンドテーブル
+      <span style="font-size:11px;font-weight:500;color:var(--text2);margin-left:10px;">金のなる木＝アウト↑粗利↑ / 花形＝アウト↑粗利↓ / 負け犬＝アウト↓粗利↑ / 問題児＝アウト↓粗利↓ ／ 前半後半比（5日以上）</span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border);color:var(--text2);font-size:10px;font-weight:700;">
+            <th onclick="cmpPPMSort('model')" style="cursor:pointer;padding:5px 10px;text-align:left;user-select:none;" rowspan="2">機種名${si('model')}</th>
+            <th style="padding:5px 8px;text-align:center;border-left:1px solid var(--border);" colspan="2">PPMポジション</th>
+            <th style="padding:5px 8px;text-align:center;border-left:1px solid var(--border);" colspan="2">アウト傾向（前半→後半）</th>
+            <th style="padding:5px 8px;text-align:center;border-left:1px solid var(--border);" colspan="2">台粗利傾向（前半→後半）</th>
+          </tr>
+          <tr style="border-bottom:2px solid var(--border);color:var(--text2);font-size:10px;">
+            ${th('A店','ppmA','color:#06b6d4;border-left:1px solid var(--border);')}
+            ${th('B店','ppmB','color:#f59e0b;')}
+            ${th('A店','inTrendA','color:#06b6d4;border-left:1px solid var(--border);')}
+            ${th('B店','inTrendB','color:#f59e0b;')}
+            ${th('A店','profitTrendA','color:#06b6d4;border-left:1px solid var(--border);')}
+            ${th('B店','profitTrendB','color:#f59e0b;')}
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+}
+
+function cmpPPMSort(key) {
+  if (_cmpPPMSort.key === key) { _cmpPPMSort.dir *= -1; }
+  else { _cmpPPMSort.key = key; _cmpPPMSort.dir = key === 'model' ? 1 : -1; }
+  const { keyA, keyB, nameA, nameB } = _cmpPPMData;
+  _renderCmpPPMTable(keyA, keyB, nameA, nameB);
+}
+
+// PPMテーブルの機種名クリック → 1つ目のテーブルの該当行にスクロール＆ハイライト
+function cmpJumpToModelRow(modelName) {
+  const rowId = 'cmpRow_' + modelName.replace(/[^a-zA-Z0-9]/g, '_');
+  const row = document.getElementById(rowId);
+  if (!row) return;
+  row.scrollIntoView({ behavior:'smooth', block:'center' });
+  row.style.transition = 'background 0.2s';
+  row.style.background = 'rgba(167,139,250,0.2)';
+  setTimeout(() => { row.style.background = ''; }, 1500);
+}
+
+function cmpSortTable(key) {
+  if (_cmpTableSort.key === key) {
+    _cmpTableSort.dir *= -1;
+  } else {
+    _cmpTableSort.key = key;
+    _cmpTableSort.dir = key === 'model' ? 1 : -1;
+  }
+  const { keyA, keyB, nameA, nameB } = _cmpTableData;
+  _renderCmpModelTable(keyA, keyB, nameA, nameB);
+}
+
+// 機種名クリック → 比較対象セレクトをその機種にセットしてグラフ再描画
+function cmpJumpToModel(modelName) {
+  const selT = document.getElementById('cmpTarget');
+  if (!selT) return;
+  // セレクトの選択肢にある場合はセット、なければ全体に戻す
+  const opt = [...selT.options].find(o => o.value === modelName);
+  if (opt) {
+    selT.value = modelName;
+  } else {
+    selT.value = '__all__';
+  }
+  renderStoreCmp();
+  // グラフまでスクロール
+  document.getElementById('storeCmpChart')?.scrollIntoView({ behavior:'smooth', block:'center' });
 }
 
 // ── セレクトボックスを全店舗で埋める ──
