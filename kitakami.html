@@ -3758,7 +3758,9 @@ function render() {
   const maC = document.getElementById('modelAggViewChart');
   if(maT) maT.classList.add('active');
   if(maC) maC.classList.remove('active');
+  window._bjInRender = true;   // 遅延描画判定用：render()ループ中フラグ
   fns.forEach(fn => { try { fn(); } catch(e) { console.error(fn.name, e); } });
+  window._bjInRender = false;
   try { if (typeof dayViewMode !== 'undefined' && dayViewMode === 'chart') renderDayCharts(); } catch(e) { console.error('renderDayCharts', e); }
   // 全分析終了後にインサイトフィードを描画
   // renderInsightFeed 削除済み
@@ -3770,6 +3772,8 @@ function sum(arr, key) { return arr.reduce((a,b) => a + (b[key]||0), 0); }
 //  直近3日イベントアラートタイル
 // ══════════════════════════════════════
 function renderAlertTiles() {
+  // 遅延描画：render()ループ中はポストイット表示時のみ（renderRivalAnalysisのキャッシュ依存。show('post')で直接呼ぶ）
+  if (window._bjInRender && (window._bjRoom || 'basic') !== 'post') { return; }
   const bar = document.getElementById('alertTilesBar');
   if (!bar) return;
 
@@ -4352,6 +4356,9 @@ let _lastVarietySpiceNew = [];   // 前期比: 新たにスパイス機種入り
 
 // ══════════════════════════════════════
 function renderRivalAnalysis() {
+  // 遅延描画：render()ループ中かつレポート/ポストイット非表示なら後回し（重い429走査を毎アップロードで回さない）
+  if (window._bjInRender && typeof window._bjNeedsReport === 'function' && !window._bjNeedsReport()) { window._bjReportDirty = true; return; }
+  window._bjReportDirty = false;
   const el = document.getElementById('rivalAnalysisBody');
   if (!el) return;
 
@@ -13654,9 +13661,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     window._bjRoom=room;
     try{ _bjUpdateContext(); }catch(e){}
     if(room==='basic'){ setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); },80); }
-    if(room==='report'){ setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); }
+    if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); }
+    if(room==='post'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } try{ renderAlertTiles(); }catch(e){} }   // ポストイットはrival依存→先にrival描画してキャッシュ確保
   }
   window.bjShow=show;
+  window._bjReportDirty=true;                                            // レポート/ポストイット：未描画フラグ（遅延描画）
+  window._bjNeedsReport=function(){ var r=window._bjRoom||'basic'; return r==='report'||r==='post'; };
+  try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(e){}   // リロード時のスクロール位置復元を無効化（非同期描画で"変な位置スタート"になるのを防ぐ）
   function build(){
     if(document.getElementById('bjTabsNav'))return true;
     var anchor=document.getElementById('dateDots')||document.querySelector('.kpi-grid');
@@ -14270,6 +14281,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     });
   }
   function start(){
+    try{ window.scrollTo(0,0); }catch(e){}
+    // 非同期描画で位置がズレるのを先頭へ補正（初回ロードのみ）。ユーザーが操作したら以降は補正しない。
+    var _bjUserScrolled=false, _cancel=function(){ _bjUserScrolled=true; };
+    window.addEventListener('wheel',_cancel,{passive:true,once:true});
+    window.addEventListener('touchstart',_cancel,{passive:true,once:true});
+    window.addEventListener('keydown',_cancel,{once:true});
+    [120,500,1300].forEach(function(d){ setTimeout(function(){ if(!_bjUserScrolled){ try{ window.scrollTo(0,0); }catch(e){} } }, d); });
     applyDefaultTheme(); setWordmark(); tryBuild(20);
     var t=0,iv=setInterval(function(){ setWordmark(); if(++t>20)clearInterval(iv); },300);
     // 初回ドーナツ描画（ベーシックが既定表示）
