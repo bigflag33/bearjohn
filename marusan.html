@@ -14054,7 +14054,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     setTimeout(_bjSyncHeaderH, 0);
   }
   window.bjUpdateContext=_bjUpdateContext;
-  function _bjScroll(ctx){ var log=ctx.log; if(log&&log.lastElementChild){ try{ log.lastElementChild.scrollIntoView({block:'nearest'}); }catch(e){} } }
+  var _bjUserInit=false;   // ユーザーが実際にチャットを操作したか（初回挨拶の自動表示ではページを動かさない）
+  function _bjScroll(ctx){ if(!_bjUserInit) return; var log=ctx.log; if(log&&log.lastElementChild){ try{ log.lastElementChild.scrollIntoView({block:'nearest'}); }catch(e){} } }
   function _revealBubble(ctx, html, done){
     var log=ctx.log; if(!log){ if(done)done(); return; }
     if(!/class="bjc-li"/.test(html)){ log.insertAdjacentHTML('beforeend', _bjBubble(html,false)); _bjScroll(ctx); setTimeout(done,180); return; }
@@ -14079,10 +14080,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     log.insertAdjacentHTML('beforeend','<div class="bjc-cont">'+(prompt?_bjBubble(prompt,false):'')+'<div class="bjc-chips">'+chipsHtml+'</div></div>');
     var cont=log.querySelector('.bjc-cont');
     cont.querySelectorAll('.bjc-chip').forEach(function(b){ b.addEventListener('click',function(){ _bjAsk(ctx, ctx.questions[+b.getAttribute('data-qi')]); }); });
-    try{ cont.scrollIntoView({block:'nearest'}); }catch(e){}
+    if(_bjUserInit){ try{ cont.scrollIntoView({block:'nearest'}); }catch(e){} }
   }
   function _bjAsk(ctx, q){
     var log=ctx.log; if(!log) return;
+    _bjUserInit=true;   // ここからはユーザー操作なので追従スクロールOK
     var old=log.querySelector('.bjc-cont'); if(old) old.remove();
     log.insertAdjacentHTML('beforeend', _bjBubble(_bjEsc(q), true)); _bjScroll(ctx);
     var bubbles; try{ var FF=ctx.data(); bubbles=ctx.answer(q, FF); if(bubbles.length>=2 && ctx.comment){ var c=ctx.comment(q, FF); if(c) bubbles=bubbles.concat(['<span class="bjc-think">'+c+'</span>']); } }catch(e){ bubbles=['うまく集計できませんでした。']; }
@@ -14259,7 +14261,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
   window.bjDrawComp=bjDrawComp;
 
-  function tryBuild(n){ if(build())return; if(n>0)setTimeout(function(){tryBuild(n-1);},300); }
+  function tryBuild(n){ if(build()){ _bjSyncHeaderH(); setTimeout(_bjSyncHeaderH,200); setTimeout(_bjSyncHeaderH,800); setTimeout(_bjSyncHeaderH,1600); return; } if(n>0)setTimeout(function(){tryBuild(n-1);},300); }
   function applyDefaultTheme(){ try{ if(typeof setTheme==='function') setTheme('light'); else document.documentElement.setAttribute('data-theme','light'); }catch(e){} }
   function setWordmark(){
     [].slice.call(document.querySelectorAll('.header h1 span, .auth-title')).forEach(function(el){
@@ -14271,10 +14273,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     applyDefaultTheme(); setWordmark(); tryBuild(20);
     var t=0,iv=setInterval(function(){ setWordmark(); if(++t>20)clearInterval(iv); },300);
     // 初回ドーナツ描画（ベーシックが既定表示）
-    setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); }, 1200);
-    setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); }, 2500);
-    // リサイズ時に再描画（デバウンス・非レスポンシブなので手動）
-    var rz; window.addEventListener('resize', function(){ clearTimeout(rz); rz=setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); }, 400); });
+    setTimeout(function(){ _bjSyncHeaderH(); if(window.bjDrawComp) window.bjDrawComp(); }, 1200);
+    setTimeout(function(){ _bjSyncHeaderH(); if(window.bjDrawComp) window.bjDrawComp(); }, 2500);
+    // リサイズ時にヘッダー高さ再計算＋ドーナツ再描画（デバウンス・非レスポンシブなので手動）
+    var rz; window.addEventListener('resize', function(){ _bjSyncHeaderH(); clearTimeout(rz); rz=setTimeout(function(){ _bjSyncHeaderH(); if(window.bjDrawComp) window.bjDrawComp(); }, 400); });
   }
   if(document.readyState!=='loading')start();
   else window.addEventListener('load',start);
