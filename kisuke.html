@@ -13560,6 +13560,45 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 
   /* タブを上部固定（ヘッダー直下にスクロール追従） */
   #bjTabsNav{ position:sticky; top:var(--header-h,60px); z-index:120; background:var(--bg); margin-top:0; padding-top:8px; box-shadow:0 6px 10px -8px rgba(15,23,42,.12); }
+  /* ===== ⑥ 出玉配分の答合せ（β） ===== */
+  .bjp-head{ margin:4px 0 14px; }
+  .bjp-sub{ font-size:13px; color:var(--text2); font-weight:600; margin-top:4px; }
+  .bjp-sub b{ color:var(--accent); }
+  .bjp-bar{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin:6px 0; }
+  .bjp-bar label{ font-size:12px; color:var(--text2); font-weight:700; }
+  .bjp-bar select{ font-family:inherit; font-size:13px; padding:7px 11px; border:1px solid var(--border); border-radius:9px; background:var(--card); color:var(--text); }
+  .bjp-info{ margin-left:auto; font-size:12px; font-weight:700; color:var(--accent); background:rgba(0,152,212,.10); border:1px solid rgba(0,152,212,.30); border-radius:9px; padding:8px 14px; cursor:pointer; font-family:inherit; }
+  .bjp-info:hover{ background:rgba(0,152,212,.18); }
+  .bjp-dates{ font-size:12.5px; color:var(--text2); background:rgba(0,152,212,.06); border:1px solid rgba(0,152,212,.18); border-radius:9px; padding:9px 13px; margin:2px 0 10px; }
+  .bjp-dates b{ color:var(--accent); font-weight:800; }
+  .bjp-status{ font-size:12px; color:var(--text2); margin:4px 0 14px; }
+  .bjp-card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:18px 20px; margin-bottom:18px; }
+  .bjp-ch{ font-size:14px; font-weight:800; color:var(--text); margin-bottom:2px; }
+  .bjp-ch.up{ color:#0f7a4f; } .bjp-ch.dn{ color:#b3261e; }
+  .bjp-csub{ font-size:11.5px; color:var(--text2); margin-bottom:10px; }
+  .bjp-cbox{ display:flex; justify-content:center; overflow-x:auto; }
+  .bjp-diag{ display:flex; flex-direction:column; gap:9px; }
+  .bjp-row{ display:flex; align-items:center; gap:14px; border:1px solid var(--border); border-radius:11px; padding:11px 15px; flex-wrap:wrap; }
+  .bjp-nm{ flex:1; min-width:160px; font-weight:700; font-size:13.5px; color:var(--text); }
+  .bjp-nm small{ display:block; color:var(--text2); font-weight:500; font-size:11px; margin-top:2px; }
+  .bjp-metrics{ display:flex; gap:15px; font-size:12px; color:var(--text2); }
+  .bjp-metrics b.bjpu{ color:#15a36e; } .bjp-metrics b.bjpd{ color:#e1483c; }
+  .bjp-badge{ font-size:11px; font-weight:800; padding:5px 10px; border-radius:18px; white-space:nowrap; }
+  .bjp-badge.b-red{ background:#fdecea; color:#b3261e; } .bjp-badge.b-red2{ background:#fbe0dd; color:#8c1d14; }
+  .bjp-badge.b-blue{ background:#e6f6fc; color:#0079a8; } .bjp-badge.b-green{ background:#e7f6ef; color:#0f7a4f; }
+  .bjp-badge.b-orange{ background:#fdf0db; color:#9a5b00; } .bjp-badge.b-teal{ background:#e0f5f1; color:#0f766e; }
+  .bjp-modalbg{ display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:200; align-items:flex-start; justify-content:center; padding:40px 20px; overflow:auto; }
+  .bjp-modalbg.on{ display:flex; }
+  .bjp-modal{ background:var(--card); border-radius:16px; max-width:720px; width:100%; padding:28px 32px 32px; box-shadow:0 20px 60px rgba(15,23,42,.3); position:relative; }
+  .bjp-modal h2{ font-size:18px; font-weight:800; color:var(--text); margin-bottom:2px; } .bjp-modal h2 small{ font-size:12px; color:var(--text2); font-weight:600; }
+  .bjp-modal h3{ font-size:13px; font-weight:800; color:var(--accent); margin:18px 0 8px; }
+  .bjp-modal p,.bjp-modal li{ font-size:12.5px; color:var(--text2); line-height:1.7; }
+  .bjp-modal ul{ margin:2px 0 0 18px; } .bjp-modal b{ color:var(--text); }
+  .bjp-modal table{ width:100%; border-collapse:collapse; font-size:11.5px; margin-top:6px; }
+  .bjp-modal th,.bjp-modal td{ border:1px solid var(--border); padding:5px 8px; text-align:center; color:var(--text2); }
+  .bjp-modal th{ background:rgba(0,0,0,.03); color:var(--text); font-weight:700; }
+  .bjp-modalx{ position:absolute; top:14px; right:16px; width:32px; height:32px; border:0; background:transparent; font-size:24px; color:var(--text2); cursor:pointer; border-radius:8px; }
+  .bjp-modalx:hover{ background:rgba(0,0,0,.05); color:var(--text); }
 
   /* ベーシック先頭セクション見出し */
   .bj-section-h{ font-size:17px; font-weight:800; color:var(--text); margin:2px 0 16px; letter-spacing:.5px; }
@@ -13651,7 +13690,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 </style>
 <script>
 (function(){
-  var ROOMS=[['basic','ベーシック'],['week','曜日＆特定日'],['post','ポストイットほか'],['report','レポート'],['comp','コンパリゾン']];
+  var ROOMS=[['basic','ベーシック'],['week','曜日＆特定日'],['post','ポストイットほか'],['report','レポート'],['comp','コンパリゾン'],['payout','出玉配分の答合せ β']];
   var panels={};
   function show(room){
     document.querySelectorAll('#bjTabsNav a').forEach(function(a){a.classList.toggle('on',a.dataset.r===room);});
@@ -13663,10 +13702,202 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(room==='basic'){ setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); },80); }
     if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); }
     if(room==='post'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } try{ renderAlertTiles(); }catch(e){} }   // ポストイットはrival依存→先にrival描画してキャッシュ確保
+    if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
   }
   window.bjShow=show;
   window._bjReportDirty=true;                                            // レポート/ポストイット：未描画フラグ（遅延描画）
   window._bjNeedsReport=function(){ var r=window._bjRoom||'basic'; return r==='report'||r==='post'; };
+
+  // ===== ⑥ 出玉配分の答合せ（β）＝ 変化マップ（Δ） =====
+  window._bjPayoutDirty=true;
+  var _bjpCharts={}, _bjpMemo=null, _bjpMemoKey='', _bjpRetry=0;
+  function _bjpTrail(a,k){var o=[];for(var i=0;i<a.length;i++){var s=0,c=0;for(var j=Math.max(0,i-k+1);j<=i;j++){if(a[j]!=null){s+=a[j];c++;}}o.push(c?s/c:null);}return o;}
+  function _bjpBuild(recs,minTaiDay,minDays){
+    var byM={};
+    recs.forEach(function(r){var m=r['機種名'];if(!m||!r.date)return;var tai=String(r['台番']||'').trim()||'_';
+      (byM[m]=byM[m]||{})[r.date]=byM[m][r.date]||{u:{}};
+      var u=byM[m][r.date].u[tai]||(byM[m][r.date].u[tai]={in:0,diff:0});
+      u.in+=(+r['IN枚数']||0);u.diff+=(+r['差枚']||0);});
+    var res=[],st={total:0,fewDays:0,fewTai:0,fewPath:0};
+    Object.keys(byM).forEach(function(m){st.total++;
+      var dts=Object.keys(byM[m]).sort();if(dts.length<minDays){st.fewDays++;return;}
+      var oA=[],pA=[],wA=[],taiDays=0;
+      dts.forEach(function(d){var us=Object.values(byM[m][d].u),n=us.length;taiDays+=n;
+        var inS=us.reduce(function(a,b){return a+b.in;},0),dfS=us.reduce(function(a,b){return a+b.diff;},0);
+        oA.push(n?inS/n:null);pA.push(inS>0?(inS+dfS)/inS*100:null);wA.push(n?us.filter(function(u){return u.diff>=0;}).length/n*100:null);});
+      if(taiDays/dts.length<minTaiDay){st.fewTai++;return;}
+      var to=_bjpTrail(oA,7),tp=_bjpTrail(pA,7),tw=_bjpTrail(wA,7),L=dts.length,s=Math.max(0,L-14);
+      var path=[];for(var i=s;i<L;i++){if(to[i]!=null&&tp[i]!=null)path.push({o:to[i],p:tp[i]});}
+      if(path.length<5){st.fewPath++;return;}
+      var nowO=path[path.length-1].o,prevO=path[0].o,nowP=path[path.length-1].p,prevP=path[0].p;
+      var wN=null;for(var k=L-1;k>=0;k--){if(tw[k]!=null){wN=tw[k];break;}}
+      var wP=null;for(var k2=s;k2<L;k2++){if(tw[k2]!=null){wP=tw[k2];break;}}
+      if(wN==null)wN=50;if(wP==null)wP=wN;
+      res.push({n:m,win:wN,dOutPct:(nowO-prevO)/(prevO||1),dPay:nowP-prevP,dWin:wN-wP});});
+    res._stats=st;return res;
+  }
+  function _bjpDiag(arr){arr.forEach(function(m){
+    var aUp=m.dOutPct>0.04,aDn=m.dOutPct<-0.04,pUp=m.dPay>0.4,pDn=m.dPay<-0.4,wUp=m.dWin>3,wDn=m.dWin<-3,d='',t='',v='';
+    if(aUp&&pDn&&wUp){d='ideal';t='理想形 ◎';v='締めて(量↓)・広く配り直し(勝率↑)→稼働UP。放出効率の改善';}
+    else if(aUp&&pDn){d='strong';t='強い台';v='出さずに(量↓)稼働UP。絞って正解・さらに絞り余地';}
+    else if(aUp&&pUp&&wDn){d='spectacle';t='万枚型';v='出してる(量↑)が1台集中(勝率↓)で稼働。看板向き・客は大半負け';}
+    else if(aUp&&pUp){d='invest';t='集客投資 ↗';v='出して(量↑)広げて稼働UP。効くが利益コスト要確認';}
+    else if(aDn&&pUp){d='waste';t='無駄放出 ↘';v='出してる(量↑)のに稼働DOWN。'+(m.win<25?'集中配分も一因。':'')+'締め候補';}
+    else if(aDn&&pDn){d='collapse';t='崩壊注意 ↙';v='締めて(量↓)稼働も低下。下限割れの可能性。緩めるか入替';}
+    else if(aUp){d='up';t='稼働上昇';v='配分ほぼ変えずに稼働UP。人気/トレンド上昇';}
+    else if(aDn){d='down';t='稼働低下';v='配分ほぼ変えずに稼働DOWN。人気減退・要観察';}
+    m.d=d;m.t=t;m.verdict=v;});}
+  var _BJPDCOL={ideal:'#15a36e',strong:'#0f766e',invest:'#e08a00',spectacle:'#e08a00',waste:'#e1483c',collapse:'#b3261e',up:'#0098d4',down:'#94a3b8','':'#cbd5e1'};
+  function _bjpQuad(cfg){return {id:'q',beforeDatasetsDraw:function(ch){
+    var ctx=ch.ctx,a=ch.chartArea,X=ch.scales.x,Y=ch.scales.y,x0=X.getPixelForValue(0),y0=Y.getPixelForValue(0);
+    function R(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h);}
+    R(a.left,a.top,x0-a.left,y0-a.top,cfg.tl.c);R(x0,a.top,a.right-x0,y0-a.top,cfg.tr.c);
+    R(a.left,y0,x0-a.left,a.bottom-y0,cfg.bl.c);R(x0,y0,a.right-x0,a.bottom-y0,cfg.br.c);
+    ctx.strokeStyle='rgba(100,116,139,.35)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(x0,a.top);ctx.lineTo(x0,a.bottom);ctx.moveTo(a.left,y0);ctx.lineTo(a.right,y0);ctx.stroke();ctx.setLineDash([]);
+    ctx.font='700 11px Hiragino Sans, sans-serif';
+    ctx.fillStyle=cfg.tl.t;ctx.textAlign='left';ctx.fillText(cfg.tl.l,a.left+8,a.top+16);
+    ctx.fillStyle=cfg.tr.t;ctx.textAlign='right';ctx.fillText(cfg.tr.l,a.right-8,a.top+16);
+    ctx.fillStyle=cfg.bl.t;ctx.textAlign='left';ctx.fillText(cfg.bl.l,a.left+8,a.bottom-8);
+    ctx.fillStyle=cfg.br.t;ctx.textAlign='right';ctx.fillText(cfg.br.l,a.right-8,a.bottom-8);}};}
+  function _bjpLabel(list){return {id:'l',afterDatasetsDraw:function(ch){
+    var ctx=ch.ctx,X=ch.scales.x,Y=ch.scales.y;ctx.save();ctx.font='700 10.5px Hiragino Sans, sans-serif';
+    list.forEach(function(m){if(!m.show)return;var px=X.getPixelForValue(m.dPay),py=Y.getPixelForValue(m.dWin);
+      var nm=(m.n.length>10?m.n.slice(0,9)+'…':m.n)+' '+(m.dOutPct>=0?'+':'')+(m.dOutPct*100).toFixed(0)+'%';
+      var right=px>ch.chartArea.right-150;ctx.textAlign=right?'right':'left';ctx.fillStyle='#0f172a';
+      ctx.fillText(nm,px+(right?-9:9),py+3.5);});ctx.restore();}};}
+  var _BJPQA={tl:{c:'rgba(21,163,110,.07)',t:'#0f7a4f',l:'理想形（締めて広げた）'},tr:{c:'rgba(224,138,0,.07)',t:'#9a5b00',l:'集客投資（出して広げた）'},bl:{c:'rgba(15,118,110,.07)',t:'#0f766e',l:'強い台（締めて集中）'},br:{c:'rgba(224,138,0,.05)',t:'#9a5b00',l:'万枚型（出して集中）'}};
+  var _BJPQB={tl:{c:'rgba(148,163,184,.07)',t:'#64748b',l:'締め過ぎ？'},tr:{c:'rgba(225,72,60,.08)',t:'#b3261e',l:'量の無駄（出して広げた）'},bl:{c:'rgba(225,72,60,.06)',t:'#b3261e',l:'崩壊（締めて集中）'},br:{c:'rgba(179,38,30,.11)',t:'#8c1d14',l:'配り方の無駄（出して集中）'}};
+  function _bjpChart(canvasId,list,cfg){
+    if(_bjpCharts[canvasId]){_bjpCharts[canvasId].destroy();}
+    var el=document.getElementById(canvasId);if(!el)return;
+    if(!list.length){var c=el.getContext('2d');c.clearRect(0,0,el.width,el.height);c.fillStyle='#94a3b8';c.font='13px Hiragino Sans';c.textAlign='center';c.fillText('該当機種なし',el.width/2,el.height/2);return;}
+    var maxP=Math.max(2,Math.max.apply(null,list.map(function(m){return Math.abs(m.dPay);})))*1.15;
+    var maxW=Math.max(8,Math.max.apply(null,list.map(function(m){return Math.abs(m.dWin);})))*1.15;
+    _bjpCharts[canvasId]=new Chart(el.getContext('2d'),{data:{datasets:[{type:'scatter',data:list.map(function(m){return {x:m.dPay,y:m.dWin,_m:m};}),
+      pointBackgroundColor:list.map(function(m){return _BJPDCOL[m.d]||'#cbd5e1';}),pointBorderColor:'#fff',pointBorderWidth:1.3,
+      pointRadius:list.map(function(m){return Math.min(17,Math.max(4,Math.abs(m.dOutPct)*55));}),pointHoverRadius:list.map(function(m){return Math.min(19,Math.max(6,Math.abs(m.dOutPct)*55+3));})}]},
+      options:{responsive:false,animation:false,layout:{padding:8},
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){var m=c.raw._m;
+          return [m.n,'アウト '+(m.dOutPct>=0?'+':'')+(m.dOutPct*100).toFixed(0)+'% ／ 出玉率 '+(m.dPay>=0?'+':'')+m.dPay.toFixed(1)+'pt ／ 勝率 '+(m.dWin>=0?'+':'')+m.dWin.toFixed(0)+'pt',m.t?('▶ '+m.t):''];}}}},
+        scales:{x:{type:'linear',min:-maxP,max:maxP,title:{display:true,text:'← 締めた  Δ出玉率(量)  出した →',color:'#64748b',font:{size:11,weight:'700'}},grid:{display:false},ticks:{color:'#94a3b8'}},
+          y:{type:'linear',min:-maxW,max:maxW,title:{display:true,text:'↓集中  Δ勝率(配り方)  広げた↑',color:'#64748b',font:{size:11,weight:'700'}},grid:{display:false},ticks:{color:'#94a3b8'}}}},
+      plugins:[_bjpQuad(cfg),_bjpLabel(list)]});
+  }
+  function _bjpRender(){
+    var panel=panels.payout;if(!panel||!document.getElementById('bjpCA'))return;
+    var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
+    if(!recs.length){   // 初回/リロード直後はデータ未ロードのことがある→「読み込み中」でリトライ
+      var de=document.getElementById('bjpDates'), ss=document.getElementById('bjpStatus');
+      _bjpRetry++;
+      if(_bjpRetry<=15){
+        if(de)de.textContent='データ読み込み中…'; if(ss)ss.textContent='データ読み込み中…';
+        window._bjPayoutDirty=true;
+        setTimeout(function(){ if(window._bjRoom==='payout'){ try{ _bjpRender(); }catch(e){} } }, 400);
+      } else {
+        if(de)de.textContent='この店舗にデータがありません'; if(ss)ss.textContent='この店舗にデータがありません';
+        window._bjPayoutDirty=false;
+      }
+      return;
+    }
+    _bjpRetry=0;
+    var st=(typeof getActiveStore==='function')?getActiveStore():null;
+    var sName=(st&&st.name)?st.name:'';
+    var minTai=+((document.getElementById('bjpMin')||{}).value)||1;
+    var minDays=21;   // 内部固定の足切り（履歴21日以上）。UIから出さない＝期間との混同を防ぐ
+    var topN=+((document.getElementById('bjpTop')||{}).value)||12;
+    // 具体的な分析期間（店舗全体のユニーク日付から）
+    var datesEl=document.getElementById('bjpDates');
+    if(datesEl){ var ad=[],sn={}; for(var di=0;di<recs.length;di++){var dd=recs[di]&&recs[di].date; if(dd&&!sn[dd]){sn[dd]=1;ad.push(dd);}} ad.sort(); var dl=ad.length;
+      if(dl>=8){ var md=function(s){return s?s.slice(5).replace('-','/'):'';};
+        datesEl.innerHTML='分析期間（自動・直近2週間）：<b>今 '+md(ad[Math.max(0,dl-7)])+'〜'+md(ad[dl-1])+'</b> ⟷ <b>2週間前 '+md(ad[Math.max(0,dl-20)])+'〜'+md(ad[Math.max(0,dl-14)])+'</b>'; }
+      else { datesEl.textContent='直近データが少なく分析できません（'+dl+'日）'; } }
+    var key=((st&&st.key)||'')+'|'+recs.length+'|'+minTai+'|'+minDays;
+    var M;
+    if(_bjpMemoKey===key&&_bjpMemo){M=_bjpMemo;}else{M=_bjpBuild(recs,minTai,minDays);_bjpMemo=M;_bjpMemoKey=key;}
+    var stt=M._stats||{total:0,fewDays:0,fewTai:0,fewPath:0};
+    var statusEl=document.getElementById('bjpStatus'), dg=document.getElementById('bjpDiag');
+    if(!M.length){ if(statusEl)statusEl.textContent='対象機種なし（全'+stt.total+'：日数不足'+stt.fewDays+'／台数不足'+stt.fewTai+'／軌跡不足'+stt.fewPath+'）。「対象機種」を全機種にしてみてください'; ['bjpCA','bjpCB'].forEach(function(c){if(_bjpCharts[c]){_bjpCharts[c].destroy();}}); if(dg)dg.innerHTML=''; window._bjPayoutDirty=false; return; }
+    _bjpDiag(M);
+    var A=M.filter(function(m){return m.dOutPct>0;}),B=M.filter(function(m){return m.dOutPct<=0;});
+    [A,B].forEach(function(g){g.slice().sort(function(a,b){return Math.abs(b.dOutPct)-Math.abs(a.dOutPct);}).forEach(function(m,i){m.show=i<topN;});});
+    _bjpChart('bjpCA',A,_BJPQA);_bjpChart('bjpCB',B,_BJPQB);
+    var order={waste:0,collapse:1,ideal:2,spectacle:3,invest:4,strong:5,down:6,up:7};
+    var badge={ideal:'b-green',strong:'b-teal',invest:'b-orange',spectacle:'b-orange',waste:'b-red',collapse:'b-red2',up:'b-blue',down:'b-red'};
+    function dlt(v,dp,u){var up=v>=0;return '<b class="'+(up?'bjpu':'bjpd')+'">'+(up?'↑ +':'↓ −')+Math.abs(v).toFixed(dp)+u+'</b>';}
+    var cards=M.filter(function(m){return m.d;}).sort(function(a,b){return (order[a.d]-order[b.d])||(Math.abs(b.dOutPct)-Math.abs(a.dOutPct));});
+    if(dg)dg.innerHTML=cards.length?cards.map(function(m){return '<div class="bjp-row"><div class="bjp-nm">'+_bjEsc(m.n)+'<small>'+m.verdict+'</small></div><div class="bjp-metrics"><div>稼働 '+dlt(m.dOutPct*100,0,'%')+'</div><div>出玉率 '+dlt(m.dPay,1,'pt')+'</div><div>勝率 '+dlt(m.dWin,0,'pt')+'</div></div><span class="bjp-badge '+(badge[m.d]||'')+'">'+m.t+'</span></div>';}).join(''):'<div style="font-size:12px;color:var(--text2);">大きな動きなし（安定）</div>';
+    if(statusEl)statusEl.textContent='店舗「'+sName+'」／対象'+M.length+'機種（稼働↑'+A.length+'／↓'+B.length+'）／全'+stt.total+'機種中（除外:日数'+stt.fewDays+'・台数'+stt.fewTai+'・軌跡'+stt.fewPath+'）';
+    window._bjPayoutDirty=false;
+  }
+  window._bjpRender=_bjpRender;
+  function _bjpModal2HTML(){ return '<div class="bjp-modalbg" id="bjpInfoBg2"><div class="bjp-modal"><button class="bjp-modalx" id="bjpInfoX2" title="閉じる">×</button>'
+    +'<h2>日付と足切りの考え方 <small>（出玉配分の答合せ β）</small></h2>'
+    +'<h3>① 期間は「指定」ではなく自動で"直近2週間の動き"</h3>'
+    +'<p>ヘッダーの期間フィルターは使いません。店舗の<b>全履歴</b>を読んで、各機種ごとに：</p><ul>'
+    +'<li><b>今</b>＝ データの最新日を含む<b>直近7日トレイリング</b></li>'
+    +'<li><b>2週間前</b>＝ その機種の<b>約14日前の7日トレイリング</b></li>'
+    +'<li><b>Δ（変化）</b>＝ 今 − 2週間前</li></ul>'
+    +'<p>常に「最新データの直近≒2週間でどう動いたか」を見ます。<b>"最新日"＝今日ではなく、アップ済みデータの一番新しい日</b>（例：6/3まで入っていれば6/3基準で2週間前と比較）。</p>'
+    +'<h3>② 「対象機種」は期間じゃなく"絞り込み"</h3>'
+    +'<ul><li><b>対象機種（◯台以上）</b>：ノイズの多い少台数機種を除き、主力だけで見るための絞り込み。<b>期間とは無関係</b>です。</li>'
+    +'<li>※ 履歴が極端に短い機種（21日未満）は、トレンドがブレるため<b>自動的に除外</b>しています（内部固定・操作不要）。</li></ul>'
+    +'<h3>③ まとめ</h3><table>'
+    +'<tr><th>項目</th><th>意味</th></tr>'
+    +'<tr><td>分析する期間</td><td>固定：直近≒2週間の動き（自動・最新データ基準）</td></tr>'
+    +'<tr><td>対象機種</td><td>絞り込み：◯台以上の機種だけ表示（ノイズ除外）</td></tr>'
+    +'<tr><td>ヘッダーの期間</td><td>使っていない（このタブは独自に直近を見る）</td></tr></table>'
+    +'</div></div>'; }
+  function _bjpModalHTML(){ return '<div class="bjp-modalbg" id="bjpInfoBg"><div class="bjp-modal"><button class="bjp-modalx" id="bjpInfoX" title="閉じる">×</button>'
+    +'<h2>数値の計算方法と考え方 <small>（出玉配分の答合せ β）</small></h2>'
+    +'<h3>① 計算方法（本番と同じ式）</h3><ul>'
+    +'<li><b>アウト（稼働）</b>＝ 全台の IN枚数 合計 ÷ 台数 ＝ 1台あたり平均</li>'
+    +'<li><b>出玉率（量）</b>＝ (Σアウト＋Σ差枚) ÷ Σアウト ×100。差枚プラス＝放出＝100%超</li>'
+    +'<li><b>勝率（配り方）</b>＝ 差枚≥0の台 ÷ 全台 ×100。広く薄く＝高／1台集中＝低</li>'
+    +'<li><b>7日トレイリング</b>＝ 各日を直近7日平均に置換。週の波を打ち消しトレンドだけ見る</li>'
+    +'<li><b>Δ（変化）</b>＝ 直近の7日トレイリング − 約2週間前の7日トレイリング</li></ul>'
+    +'<h3>② 考え方</h3><ul>'
+    +'<li>目的は<b>アウト（稼働）を上げること</b>。出玉率・勝率はそのためのレバー。</li>'
+    +'<li>出玉率＝放出の<b>量</b>、勝率＝放出の<b>配り方</b>（広く薄く↔集中）。別物。</li>'
+    +'<li>結果（アウト↑/↓）で2枚に分け、各グラフで「量×配り方をどう動かしたか」を見る。</li></ul>'
+    +'<h3>③ 自動診断（3方向の組み合わせ）</h3><table><tr><th>稼働</th><th>出玉率</th><th>勝率</th><th>診断</th></tr>'
+    +'<tr><td>↑</td><td>↓</td><td>↑</td><td>理想形（締めて広げて稼働UP）</td></tr>'
+    +'<tr><td>↑</td><td>↓</td><td>–</td><td>強い台（絞って正解）</td></tr>'
+    +'<tr><td>↑</td><td>↑</td><td>↓</td><td>万枚型</td></tr>'
+    +'<tr><td>↑</td><td>↑</td><td>↑</td><td>集客投資</td></tr>'
+    +'<tr><td>↓</td><td>↑</td><td>–</td><td>無駄放出（締め候補）</td></tr>'
+    +'<tr><td>↓</td><td>↓</td><td>–</td><td>崩壊注意</td></tr></table>'
+    +'<p style="margin-top:6px;font-size:12px;color:var(--text2);">しきい値：稼働±4%／出玉率±0.4pt／勝率±3pt（仮）</p>'
+    +'<h3>④ 注意・限界</h3><ul>'
+    +'<li>対象は<b>21日以上＆一定台数</b>の機種のみ（薄いとノイズ）。</li>'
+    +'<li>特定日の意図的放出は"無駄"でない。最終判断は人。</li>'
+    +'<li>データは<b>今ヘッダーで選んでいる店舗</b>。期間フィルターは使わず直近を自動で見ます。</li></ul>'
+    +'</div></div>'; }
+  function buildPayoutTab(panel){
+    if(!panel||document.getElementById('bjpCA'))return;
+    panel.innerHTML=''
+      +'<div class="bjp-head"><div class="bj-wordmark" style="font-size:21px;">PAYOUT ALLOCATION CHECK</div></div>'
+      +'<div class="bjp-bar"><label>対象機種：<select id="bjpMin"><option value="1">全機種</option><option value="2">2台以上</option><option value="4" selected>4台以上（主力）</option></select></label>'
+      +'<label>ラベル表示 <select id="bjpTop"><option value="8">上位8</option><option value="12" selected>上位12</option><option value="999">全部</option></select></label>'
+      +'<button class="bjp-info" id="bjpInfoBtn2">日付と足切りの考え方</button>'
+      +'<button class="bjp-info" id="bjpInfoBtn" style="margin-left:8px;">数値の計算方法と考え方</button></div>'
+      +'<div class="bjp-dates" id="bjpDates"></div>'
+      +'<div class="bjp-status" id="bjpStatus">タブを開くと計算します…</div>'
+      +'<div class="bjp-card"><div class="bjp-ch up">A. OUT ↑ ／ 稼働が伸びた機種</div><div class="bjp-csub">横＝Δ出玉率（←締めた／出した→） 縦＝Δ勝率（↓集中／広げた↑） 点の大きさ＝アウト増加幅。名前横＝Δアウト%。</div><div class="bjp-cbox"><canvas id="bjpCA" width="860" height="430"></canvas></div></div>'
+      +'<div class="bjp-card"><div class="bjp-ch dn">B. OUT ↓ ／ 稼働が落ちた機種</div><div class="bjp-csub">右側＝出してるのに稼働DOWN＝無駄放出。右下＝配り方の無駄。点の大きさ＝アウト減少幅。</div><div class="bjp-cbox"><canvas id="bjpCB" width="860" height="430"></canvas></div></div>'
+      +'<div class="bjp-card"><div class="bjp-ch">DIAGNOSIS ／ 動きの内訳＋診断</div><div class="bjp-csub">稼働・出玉率(量)・勝率(配り方)の2週間の変化＋組み合わせ診断（↑↓は7日トレイリング）。</div><div class="bjp-diag" id="bjpDiag"></div></div>'
+      +_bjpModal2HTML()+_bjpModalHTML();
+    ['bjpMin','bjpTop'].forEach(function(id){var e=document.getElementById(id);if(e)e.addEventListener('change',function(){ if(id!=='bjpTop'){_bjpMemoKey='';} _bjpRender(); });});
+    var bg=document.getElementById('bjpInfoBg');
+    var ib=document.getElementById('bjpInfoBtn'); if(ib)ib.addEventListener('click',function(){bg.classList.add('on');});
+    var ix=document.getElementById('bjpInfoX'); if(ix)ix.addEventListener('click',function(){bg.classList.remove('on');});
+    if(bg)bg.addEventListener('click',function(e){if(e.target===bg)bg.classList.remove('on');});
+    var bg2=document.getElementById('bjpInfoBg2');
+    var ib2=document.getElementById('bjpInfoBtn2'); if(ib2)ib2.addEventListener('click',function(){bg2.classList.add('on');});
+    var ix2=document.getElementById('bjpInfoX2'); if(ix2)ix2.addEventListener('click',function(){bg2.classList.remove('on');});
+    if(bg2)bg2.addEventListener('click',function(e){if(e.target===bg2)bg2.classList.remove('on');});
+  }
+
   try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(e){}   // リロード時のスクロール位置復元を無効化（非同期描画で"変な位置スタート"になるのを防ぐ）
   function build(){
     if(document.getElementById('bjTabsNav'))return true;
@@ -13708,6 +13939,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // ⑤ コンパリゾン（ピンポイント分析・濃いダーク帯は撤去、この日×この日は残す）
     mv(byId('storeCmpCard'),'comp');
     mv(byId('dateCompCard'),'comp');   // 「この日×この日」を救出してcompへ
+    // ⑥ 出玉配分の答合せ（β）＝ 変化マップ（新規生成・遅延描画）
+    try{ buildPayoutTab(panels.payout); }catch(e){ console.error('buildPayoutTab', e); }
     var _psw=document.querySelector('.pin-section-wrapper'); if(_psw&&_psw.parentNode) _psw.parentNode.removeChild(_psw);  // ピンポイント分析＋ダーク帯を削除
     try{ window.navigateToPinpoint=function(){}; }catch(e){}   // 削除に伴いクリック連携を無効化（事故防止）
     // 並び替え：比較期間を店舗A/B選択の上へ、指標チップをグラフの下へ
@@ -14046,7 +14279,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function _bjUpdateContext(){
     var el=document.getElementById('bjHeaderCtx'); if(!el) { _bjSyncHeaderH(); return; }
     var room=window._bjRoom||(function(){var a=document.querySelector('#bjTabsNav a.on');return a?a.dataset.r:'basic';})();
-    if(room==='comp'){ el.innerHTML=''; el.style.display='none'; return; }   // コンパリゾンは独自指定
+    if(room==='comp'||room==='payout'){ el.innerHTML=''; el.style.display='none'; return; }   // コンパリゾン/出玉配分は独自UI
     el.style.display='';
     function fmt(v){ return v?v.replace(/-/g,'/'):''; }
     var mf=document.getElementById('modelFilter');
@@ -14199,6 +14432,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     _bjChats.forEach(function(ctx){ try{ bjResetChatCtx(ctx); }catch(e){} });
     try{ _bjUpdateContext(); }catch(e){}
     if(window.bjDrawComp) setTimeout(window.bjDrawComp,120);
+    window._bjPayoutDirty=true; _bjpMemoKey='';                          // 出玉配分：店舗変更で再計算
+    if(window._bjRoom==='payout'){ try{ _bjpRender(); }catch(e){} }
   };
 
   // ===== 構成ドーナツ（非レスポンシブ・ベーシック表示時のみ描画・render非依存）=====
