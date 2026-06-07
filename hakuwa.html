@@ -4127,7 +4127,7 @@ function renderAlertTiles() {
                 text:'30Φ据え置き疑い', abbr:'HOLD',
                 sub:`${entry.model} 台${entry.tai}が${run.length}日連続で出玉率100%超です（4日以上）`,
                 color:'#06b6d4', bg:'rgba(6,182,212,0.12)', border:'rgba(6,182,212,0.35)',
-                jumpTo:'rival30PhiSection',
+                jumpTo:'rivalPhiHanaSection',
               });
             }
             run = [eligDays[i]];
@@ -4139,7 +4139,7 @@ function renderAlertTiles() {
             text:'30Φ据え置き疑い', abbr:'HOLD',
             sub:`${entry.model} 台${entry.tai}が${run.length}日連続で出玉率100%超です（4日以上）`,
             color:'#06b6d4', bg:'rgba(6,182,212,0.12)', border:'rgba(6,182,212,0.35)',
-            jumpTo:'rival30PhiSection',
+            jumpTo:'rivalPhiHanaSection',
           });
         }
       });
@@ -4152,7 +4152,7 @@ function renderAlertTiles() {
     // ジャグラー + 30Φ まとめて処理
     const seriesGroups = [
       { keyword: _seriesKeyword(), label: 'ジャグラー', color:'#f59e0b', bg:'rgba(245,158,11,0.12)', border:'rgba(245,158,11,0.35)', jumpTo:'rivalJugglerSection' },
-      { keywords: phi30Keywords,   label: '30Φ',        color:'#06b6d4', bg:'rgba(6,182,212,0.12)',  border:'rgba(6,182,212,0.35)',  jumpTo:'rival30PhiSection'  },
+      { keywords: phi30Keywords,   label: '30Φ',        color:'#06b6d4', bg:'rgba(6,182,212,0.12)',  border:'rgba(6,182,212,0.35)',  jumpTo:'rivalPhiHanaSection'  },
     ];
     seriesGroups.forEach(grp => {
       const serRaw = grp.keywords
@@ -6665,9 +6665,13 @@ function renderRivalAnalysis() {
     </div>`;
   }
 
-  // ④-b 30Φシリーズ分析（20スロのみ）
+  // ④-b ハナハナ / 沖ドキ シリーズ分析（20スロのみ・旧30Φを分割）
   if (!_isPachinkoStore()) {
-    const phi30Keywords = ['ハナハナ','沖ドキ','オキドキ'];
+    renderPhiSeries('PhiHana',['ハナハナ'],'ハナハナシリーズ分析','ハナハナ','#e84d8a');
+    renderPhiSeries('PhiOki',['沖ドキ','オキドキ'],'沖ドキシリーズ分析','沖ドキ','#06b6d4');
+  }
+  function renderPhiSeries(_pfx,_kw,_label,_short,_color){
+    const phi30Keywords = _kw;
     const phi30Models   = modelList.filter(m => phi30Keywords.some(kw => m.name.includes(kw)));
     const phi30Machines = phi30Models.reduce((a,m) => a + m.estimatedMachines, 0);
     const phi30Profit   = phi30Models.reduce((a,m) => a + m.totalProfit, 0);
@@ -6677,16 +6681,16 @@ function renderRivalAnalysis() {
     const phi30InRate      = allTotalIn > 0        ? phi30In      / allTotalIn * 100 : 0;
 
     if (phi30Models.length > 0) {
-      const phi30Color = '#06b6d4';
+      const phi30Color = _color;
       const phi30Comment = phi30ProfitRate > phi30InstallRate + 10
-        ? '30Φが設置比率を超えた利益貢献 — 収益の主力として運用している'
+        ? _short+'が設置比率を超えた利益貢献 — 収益の主力として運用している'
         : phi30ProfitRate < phi30InstallRate - 10
-        ? '30Φの利益比率が設置比率を下回る — 集客・放出枠として使っている可能性'
-        : '30Φの利益貢献は設置比率とほぼ同水準';
+        ? _short+'の利益比率が設置比率を下回る — 集客・放出枠として使っている可能性'
+        : _short+'の利益貢献は設置比率とほぼ同水準';
       const phi30InComment = phi30InRate > phi30InstallRate + 8
-        ? `アウト比率が設置比率より高く、30Φに客が集まっている（稼働効率◎）`
+        ? `アウト比率が設置比率より高く、${_short}に客が集まっている（稼働効率◎）`
         : phi30InRate < phi30InstallRate - 8
-        ? `アウト比率が設置比率より低く、30Φの稼働が上がっていない`
+        ? `アウト比率が設置比率より低く、${_short}の稼働が上がっていない`
         : `稼働はほぼ設置比率通り`;
       const phi30Sorted = [...phi30Models].sort((a,b) => b.avgProfit - a.avgProfit);
 
@@ -6695,14 +6699,14 @@ function renderRivalAnalysis() {
         ['設置','利益','アウト'],
         ['#06b6d4', phi30ProfitRate > phi30InstallRate ? '#34d399' : '#f87171', '#67e8f9'],
         84, 44);
-      _pushInsight('juggler','🐚',`30Φ ${phi30Machines}台（${phi30InstallRate.toFixed(0)}%）— ${phi30Comment.split('—')[0].trim()}`,
+      _pushInsight('juggler','🐚',`${_short} ${phi30Machines}台（${phi30InstallRate.toFixed(0)}%）— ${phi30Comment.split('—')[0].trim()}`,
         `設置比率${phi30InstallRate.toFixed(1)}%に対し利益比率${phi30ProfitRate.toFixed(1)}%・アウト比率${phi30InRate.toFixed(1)}%。${phi30InComment}`, 3.5, phi30Vis, 'rivalAnalysisCard');
 
-      html += `<div class="rival-section" id="rival30PhiSection">
-        <div class="rival-section-title" style="color:${phi30Color};"><span class="rst-en">SERIES</span> 30Φシリーズ分析</div>
+      html += `<div class="rival-section" id="rival${_pfx}Section">
+        <div class="rival-section-title" style="color:${phi30Color};"><span class="rst-en">SERIES</span> ${_label}</div>
         <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
           <div style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
-            <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">30Φ総台数</div>
+            <div style="font-size:10.5px;color:var(--text2);font-weight:700;margin-bottom:4px;">${_short}総台数</div>
             <div style="font-size:18px;font-weight:800;color:${phi30Color};">${phi30Machines}<span style="font-size:11px;color:var(--text2);"> / ${allTotalMachines}台</span></div>
           </div>
           <div style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:12px;padding:12px 18px;min-width:130px;">
@@ -6736,7 +6740,7 @@ function renderRivalAnalysis() {
           }).join('')}
         </div>
         ${(() => {
-          // ── 30Φ台別運用パターン (据え置き率 & ドボン台設定上げ) ──
+          // ── ${_short}台別運用パターン (据え置き率 & ドボン台設定上げ) ──
           const phi30Raw = all.filter(r => r['機種名'] && phi30Keywords.some(kw => r['機種名'].includes(kw)));
           if (!phi30Raw.length) return '';
 
@@ -6829,7 +6833,7 @@ function renderRivalAnalysis() {
           <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
             <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:12px;letter-spacing:.4px;">台別運用パターン${!hasTai30?'<span style="font-size:10px;color:#f87171;margin-left:8px;">※台番データなし</span>':''}</div>
             <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;">
-              <div id="phi30Tile_oki" data-open="false" onclick="toggle30PhiDetail('oki')"
+              <div id="${_pfx}Tile_oki" data-open="false" onclick="toggle30PhiDetail('${_pfx}','oki')"
                 style="border:1px solid ${okiCol30.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${okiCol30.bg};user-select:none;">
                 <div style="font-size:56px;font-weight:900;line-height:1;color:${okiCol30.border};letter-spacing:-3px;font-variant-numeric:tabular-nums;">${oki30Events}</div>
                 <div style="font-size:24px;font-weight:900;color:${okiCol30.border};margin-top:5px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">${oki30Pct.toFixed(2)}%</div>
@@ -6840,7 +6844,7 @@ function renderRivalAnalysis() {
                   <span style="font-size:10px;color:var(--text2);">▾</span>
                 </div>
               </div>
-              <div id="phi30Tile_dobon" data-open="false" onclick="toggle30PhiDetail('dobon')"
+              <div id="${_pfx}Tile_dobon" data-open="false" onclick="toggle30PhiDetail('${_pfx}','dobon')"
                 style="border:1px solid ${dobCol30.border};border-radius:14px;padding:18px 16px 14px;cursor:pointer;background:${dobCol30.bg};user-select:none;">
                 <div style="font-size:48px;font-weight:900;line-height:1;color:${dobCol30.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${dobon30Rate.toFixed(0)}<span style="font-size:20px;font-weight:700;">%</span></div>
                 <div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:${dobCol30.border};margin-top:10px;">ドボン台 翌日回収率</div>
@@ -6852,7 +6856,7 @@ function renderRivalAnalysis() {
               </div>
             </div>
 
-            <div id="phi30Detail_oki" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div id="${_pfx}Detail_oki" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
               <div style="font-size:11.5px;font-weight:700;color:#06b6d4;margin-bottom:4px;">3日以上連続 出玉率100%超 — 据え置き台リスト（${oki30Detail.length}件）</div>
               <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">条件: 店舗平均IN以上 かつ 差枚≥0 が3日以上カレンダー連続</div>
               ${oki30Detail.length===0
@@ -6875,7 +6879,7 @@ function renderRivalAnalysis() {
                 </table></div>`}
             </div>
 
-            <div id="phi30Detail_dobon" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
+            <div id="${_pfx}Detail_dobon" style="display:none;margin-top:14px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;">
               <div style="font-size:11.5px;font-weight:700;color:#34d399;margin-bottom:4px;">ドボン台（最低IN台 + 最低出玉率台）→ 翌日改善の記録</div>
               <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">出現率 ${dobon30Rate.toFixed(1)}%（${dobon30Hits}/${dobon30Total}件）</div>
               ${dobon30Detail.length===0
@@ -6904,7 +6908,7 @@ function renderRivalAnalysis() {
           </div>`;
         })()}
         ${(() => {
-          // ── 30Φシリーズ 勝率トレンド（台数上位5機種）──
+          // ── ${_short}シリーズ 勝率トレンド（台数上位5機種）──
           const phi30WinTop5 = [...phi30Models].sort((a,b) => b.estimatedMachines - a.estimatedMachines).slice(0,5);
           if (!phi30WinTop5.length) return '';
           const phi30WinRates = {};
@@ -6943,7 +6947,7 @@ function renderRivalAnalysis() {
                       :             {border:'#f87171',bg:'rgba(248,113,113,0.07)'};
             const badge = wrN===null?'badge-ok':wrN>=60?'badge-alert':wrN>=40?'badge-warn':'badge-ok';
             const shortName = m.name.length>10 ? m.name.slice(0,10)+'…' : m.name;
-            return `<div id="phi30WinTile_${idx}" data-open="false" onclick="toggle30PhiWinDetail(${idx})"
+            return `<div id="${_pfx}WinTile_${idx}" data-open="false" onclick="toggle30PhiWinDetail('${_pfx}',${idx})"
               style="border:1px solid ${tc.border};border-radius:14px;padding:16px 12px 12px;cursor:pointer;background:${tc.bg};user-select:none;">
               <div style="font-size:48px;font-weight:900;line-height:1;color:${tc.border};letter-spacing:-2px;font-variant-numeric:tabular-nums;">${wrN!==null?wrN:'—'}<span style="font-size:18px;font-weight:700;">${wrN!==null?'%':''}</span></div>
               <div style="font-size:9px;font-weight:800;letter-spacing:.5px;color:${tc.border};margin-top:8px;">平均勝率</div>
@@ -6958,7 +6962,7 @@ function renderRivalAnalysis() {
           const detailHtml = phi30WinTop5.map((m,idx) => {
             const days = phi30WinDaily[m.name]||[];
             const n = days.length;
-            if (n===0) return `<div id="phi30WinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;"><div style="font-size:11px;color:var(--text2);">台番データなし</div></div>`;
+            if (n===0) return `<div id="${_pfx}WinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;"><div style="font-size:11px;color:var(--text2);">台番データなし</div></div>`;
             const W=600,H=150,padL=36,padR=12,padT=12,padB=28;
             const cW=W-padL-padR, cH=H-padT-padB;
             const barW=Math.max(4,Math.min(22,cW/n*0.72));
@@ -6985,7 +6989,7 @@ function renderRivalAnalysis() {
             const lblStep=Math.max(1,Math.ceil(n/8));
             const lbls=days.map((d,i)=>({d,i})).filter(({i})=>i%lblStep===0||i===n-1)
               .map(({d,i})=>{const cx=(padL+(n>1?i/(n-1)*cW:cW/2)).toFixed(1);return `<text x="${cx}" y="${H-4}" text-anchor="middle" font-size="8" fill="var(--text2)">${d.date.slice(5,7)}/${d.date.slice(8,10)}</text>`;}).join('');
-            return `<div id="phi30WinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+            return `<div id="${_pfx}WinDetail_${idx}" style="display:none;margin-top:10px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
               <div style="font-size:11.5px;font-weight:700;color:var(--text);margin-bottom:10px;">${m.name} — 日別勝率（${n}日分）</div>
               <div style="overflow-x:auto;"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:320px;height:auto;display:block;">
                 <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/>
@@ -10099,36 +10103,36 @@ function toggleJagDetail(key) {
   }
 }
 
-function toggle30PhiDetail(key) {
-  const el = document.getElementById('phi30Detail_' + key);
+function toggle30PhiDetail(pfx, key) {
+  const el = document.getElementById(pfx+'Detail_' + key);
   if (!el) return;
   const isOpen = el.style.display !== 'none';
   ['oki','dobon'].forEach(k => {
-    const p = document.getElementById('phi30Detail_' + k);
+    const p = document.getElementById(pfx+'Detail_' + k);
     if (p) p.style.display = 'none';
-    const t = document.getElementById('phi30Tile_' + k);
+    const t = document.getElementById(pfx+'Tile_' + k);
     if (t) t.setAttribute('data-open','false');
   });
   if (!isOpen) {
     el.style.display = 'block';
-    const tile = document.getElementById('phi30Tile_' + key);
+    const tile = document.getElementById(pfx+'Tile_' + key);
     if (tile) tile.setAttribute('data-open','true');
   }
 }
 
-function toggle30PhiWinDetail(idx) {
-  const el = document.getElementById('phi30WinDetail_' + idx);
+function toggle30PhiWinDetail(pfx, idx) {
+  const el = document.getElementById(pfx+'WinDetail_' + idx);
   if (!el) return;
   const isOpen = el.style.display !== 'none';
   [0,1,2,3,4].forEach(i => {
-    const p = document.getElementById('phi30WinDetail_' + i);
+    const p = document.getElementById(pfx+'WinDetail_' + i);
     if (p) p.style.display = 'none';
-    const t = document.getElementById('phi30WinTile_' + i);
+    const t = document.getElementById(pfx+'WinTile_' + i);
     if (t) t.setAttribute('data-open','false');
   });
   if (!isOpen) {
     el.style.display = 'block';
-    const tile = document.getElementById('phi30WinTile_' + idx);
+    const tile = document.getElementById(pfx+'WinTile_' + idx);
     if (tile) tile.setAttribute('data-open','true');
   }
 }
