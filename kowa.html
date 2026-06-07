@@ -8322,18 +8322,23 @@ function renderKPIs() {
     coinEl.style.color = coinProfit >= 0 ? 'var(--green)' : 'var(--red)';
   }
 
-  // 総設置台数（台番があればユニーク台番数、なければ1日平均台数）
+  // 総設置台数（指定期間の「最新日」時点の台数）
   const taiEl    = document.getElementById('kpi-tai');
   const taiSubEl = document.getElementById('kpi-tai-sub');
   const taiLblEl = document.getElementById('kpi-tai-label');
   if (taiEl) {
-    const uniqueTai = new Set(
-      filtered.filter(r => r['台番'] != null && String(r['台番']).trim() !== '')
-              .map(r => String(r['台番']).trim())
+    const _fDates = [...new Set(filtered.map(r => r.date))].filter(Boolean).sort();
+    const _lastDate = _fDates.length ? _fDates[_fDates.length - 1] : '';
+    const _lastRecs = _lastDate ? filtered.filter(r => r.date === _lastDate) : [];
+    const _uniqTaiLast = new Set(
+      _lastRecs.filter(r => r['台番'] != null && String(r['台番']).trim() !== '')
+               .map(r => String(r['台番']).trim())
     ).size;
-    const taiCount = uniqueTai > 0 ? uniqueTai : Math.round(avgMachines);
+    const taiCount = _uniqTaiLast > 0 ? _uniqTaiLast : _lastRecs.length;
     if (taiLblEl) taiLblEl.textContent = '総設置台数';
-    if (taiSubEl) taiSubEl.textContent  = uniqueTai > 0 ? '台（台番集計）' : '台（1日平均）';
+    if (taiSubEl) taiSubEl.textContent  = _lastDate
+      ? '台（最新日 ' + _lastDate.slice(5).replace('-','/') + ' 時点）'
+      : '台';
     taiEl.textContent = taiCount.toLocaleString();
   }
 }
