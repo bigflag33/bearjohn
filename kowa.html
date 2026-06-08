@@ -132,6 +132,13 @@
   .table-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 20px; }
   .table-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
   .table-wrapper { overflow-x: auto; }
+  .rival-modeltable { width:100%; border-collapse:collapse; font-size:12px; white-space:nowrap; }
+  .rival-modeltable th { text-align:left; font-weight:700; color:var(--text2); padding:7px 10px; border-bottom:2px solid var(--border); background:var(--card); font-size:11px; }
+  .rival-modeltable td { padding:7px 10px; border-bottom:1px solid var(--border); color:var(--text); }
+  .rival-modeltable td.highlight { font-weight:800; color:var(--accent); }
+  .rival-modeltable td.positive { color:var(--green); font-weight:700; }
+  .rival-modeltable td.negative { color:var(--red); font-weight:700; }
+  .rival-modeltable tr:hover td { background:rgba(0,152,212,0.05); }
   table { width: 100%; border-collapse: collapse; font-size: 12px; }
   th { background: var(--card2); color: var(--text2); font-weight: 600; padding: 10px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); }
   th.sortable { cursor: pointer; user-select: none; }
@@ -6225,6 +6232,7 @@ function renderRivalAnalysis() {
         ${varietySpice.length > 12 ? `<span style="color:var(--text2);font-size:10.5px;align-self:center;">他${varietySpice.length-12}機種</span>` : ''}
       </div>
     </div>
+  ${modelTableHTML((function(){ const ms = new Set(varietyModels.map(x=>x.name)); return all.filter(r => r['機種名'] && ms.has(r['機種名'])); })(), { title: 'バラエティ 機種別集計' })}
   </div>`;
 
   // ④ ジャグラー/海物語シリーズ分析
@@ -6610,6 +6618,7 @@ function renderRivalAnalysis() {
           ${detailHtml}
         </div>`;
       })()}
+    ${modelTableHTML(all.filter(r => r['機種名'] && r['機種名'].includes(_seriesKeyword())), { title: _seriesLabel() + ' 機種別集計' })}
     </div>`;
   }
 
@@ -6957,6 +6966,7 @@ function renderRivalAnalysis() {
             ${detailHtml}
           </div>`;
         })()}
+      ${modelTableHTML(all.filter(r => r['機種名'] && _kw.some(kw => r['機種名'].includes(kw))), { title: _short + 'シリーズ 機種別集計' })}
       </div>`;
     }
   }
@@ -7096,6 +7106,7 @@ function renderRivalAnalysis() {
           ${okiDetailSer.length>25?`<tr><td colspan="4" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${okiDetailSer.length-25} 件</td></tr>`:''}
         </table></div>
       </div>` : ''}
+    ${modelTableHTML(all.filter(r => r['機種名'] && r['機種名'].includes(serKeyword)), { title: serLabel + ' 機種別集計' })}
     </div>`;
     };
 
@@ -7484,6 +7495,7 @@ function renderRivalAnalysis() {
 
         ${mainPatternHtml}
 
+      ${modelTableHTML((function(){ const ms = new Set(mainModels.map(x=>x.name)); return all.filter(r => r['機種名'] && ms.has(r['機種名'])); })(), { title: 'メイン機種 機種別集計' })}
       </div>`;
     }
   }
@@ -10922,6 +10934,83 @@ function renderModelTable() {
   </tr>`).join('');
 }
 
+
+
+// ── 機種別集計テーブル（ベーシック＝renderModelTableと同じ式・レポート埋め込み用に再利用）──
+function buildModelRows(records){
+  const agg = {};
+  (records||[]).forEach(d => {
+    const k = d['機種名']; if (!k) return;
+    if (!agg[k]) agg[k] = { name:k, profit:0, sales:0, inmai:0, diff:0, games:0, bb:0, rb:0, art:0, count:0, days:new Set(), dateData:{} };
+    agg[k].profit += d['台粗利']||0; agg[k].sales += d['台売上']||0;
+    agg[k].inmai += d['IN枚数']||0; agg[k].diff += d['差枚']||0;
+    agg[k].games += d['G数']||0; agg[k].bb += d['BB']||0;
+    agg[k].rb += d['RB']||0; agg[k].art += d['ART']||0;
+    agg[k].count++; agg[k].days.add(d.date);
+    if (!agg[k].dateData[d.date]) agg[k].dateData[d.date] = { inmai:0, count:0 };
+    agg[k].dateData[d.date].inmai += d['IN枚数']||0;
+    agg[k].dateData[d.date].count++;
+  });
+  return Object.values(agg).map(r => {
+    const days = r.days.size;
+    const avgMachines = days > 0 ? r.count / days : 0;
+    const avgIn = r.count > 0 ? r.inmai / r.count : 0;
+    const avgProfit = r.count > 0 ? r.profit / r.count : 0;
+    const profitRate = r.sales !== 0 ? r.profit / r.sales * 100 : 0;
+    const coinTanka = r.inmai > 0 ? r.sales / r.inmai : 0;
+    const coinProfit = r.inmai > 0 ? r.profit / r.inmai : 0;
+    let trend = null;
+    const sortedDates = Object.keys(r.dateData).sort();
+    if (sortedDates.length >= 5) {
+      const half = Math.floor(sortedDates.length / 2);
+      const firstDates = sortedDates.slice(0, half);
+      const lastDates  = sortedDates.slice(sortedDates.length - half);
+      const avgF = firstDates.reduce((s, dt) => { const dd=r.dateData[dt]; return s + (dd.count>0?dd.inmai/dd.count:0); },0)/firstDates.length;
+      const avgL = lastDates.reduce((s, dt) => { const dd=r.dateData[dt]; return s + (dd.count>0?dd.inmai/dd.count:0); },0)/lastDates.length;
+      if (avgF > 0) trend = (avgL - avgF) / avgF * 100;
+    }
+    return Object.assign({}, r, { days, avgMachines, avgIn, avgProfit, profitRate, coinTanka, coinProfit, trend });
+  });
+}
+function _modelTrendBadge(trend){
+  if (trend === null) return `<span style="color:var(--text2);font-size:13px;letter-spacing:1px;">—</span>`;
+  const abs = Math.abs(trend), up = trend >= 0, sign = up ? '+' : '', pct = `${sign}${trend.toFixed(0)}%`;
+  if (abs < 5){ const col = up ? 'var(--green)' : 'var(--text2)'; return `<span style="color:${col};font-size:11px;font-weight:700;letter-spacing:-.3px;">-- ${pct}</span>`; }
+  if (abs < 15){ const col = up?'#34d399':'#f87171', bg = up?'rgba(52,211,153,0.10)':'rgba(248,113,113,0.10)', brd = up?'rgba(52,211,153,0.35)':'rgba(248,113,113,0.35)'; return `<span style="background:${bg};border:1px solid ${brd};color:${col};border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;white-space:nowrap;">${up?'▲':'▼'} ${pct}</span>`; }
+  const bg = up ? '#16a34a' : '#dc2626'; return `<span style="background:${bg};color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:800;white-space:nowrap;">${up?'▲':'▼'} ${pct}</span>`;
+}
+function modelTableHTML(records, opts){
+  opts = opts || {};
+  const sortKey = opts.sortKey || 'avgProfit';
+  const title = opts.title || '機種別集計';
+  let rows = buildModelRows(records || []);
+  if (!rows.length) return '';
+  rows.sort((a,b)=> (b[sortKey]||0) - (a[sortKey]||0));
+  const coinLabel = (typeof _isPachinkoStore==='function' && _isPachinkoStore()) ? '玉' : 'コイン';
+  const inLbl = (typeof _inLabel==='function') ? _inLabel(true) : 'アウト';
+  const head = `<thead><tr>
+    <th>機種名</th><th>営業日数</th><th>平均台数</th><th>1台平均${inLbl}</th>
+    <th style="text-align:center;">傾向</th><th>推定粗利合計</th><th>1台平均粗利</th>
+    <th>推定売上合計</th><th>利益率</th><th>${coinLabel}単価</th><th>${coinLabel}粗利</th>
+  </tr></thead>`;
+  const body = '<tbody>' + rows.map(r => `<tr>
+    <td>${r.name}</td>
+    <td>${r.days}日</td>
+    <td>${r.avgMachines.toFixed(1)}台</td>
+    <td class="highlight">${fmtAbs(Math.round(r.avgIn))}</td>
+    <td style="text-align:center;">${_modelTrendBadge(r.trend)}</td>
+    <td class="${colorClass(r.profit)}">${fmt(r.profit)}円</td>
+    <td class="${colorClass(r.avgProfit)}">${fmt(r.avgProfit)}円</td>
+    <td>${fmtAbs(r.sales)}円</td>
+    <td class="${colorClass(r.profitRate)}">${r.profitRate.toFixed(1)}%</td>
+    <td>${r.coinTanka.toFixed(2)}円</td>
+    <td>${r.coinProfit.toFixed(2)}円</td>
+  </tr>`).join('') + '</tbody>';
+  return `<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
+    <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:10px;letter-spacing:.4px;">${title}（台粗利順・${rows.length}機種）</div>
+    <div class="table-wrapper"><table class="rival-modeltable">${head}${body}</table></div>
+  </div>`;
+}
 
 // ─── 特定日分析（末尾数字別）───
 let digitProfitChart, digitINChart, digitRateChart, digitRadarChart;
