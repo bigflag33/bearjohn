@@ -13981,6 +13981,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjp-csub{ font-size:11.5px; color:var(--text2); margin-bottom:10px; }
   .bjp-cbox{ display:flex; justify-content:center; overflow-x:auto; }
   .bjp-diag{ display:flex; flex-direction:column; gap:9px; }
+  .bjp-segchips{ display:flex; gap:7px; flex-wrap:wrap; margin-bottom:12px; }
+  .bjp-chip{ font-family:inherit; font-size:12px; font-weight:800; padding:6px 13px; border-radius:18px; border:1.5px solid var(--border); background:#fff; color:var(--text2); cursor:pointer; transition:all .12s; }
+  .bjp-chip:hover{ border-color:#0098d4; color:#0098d4; }
+  .bjp-chip.on{ background:#0098d4; border-color:#0098d4; color:#fff; }
+  .bjp-seg{ display:inline-block; min-width:20px; text-align:center; font-weight:800; font-size:11px; color:#fff; background:#0098d4; border-radius:6px; padding:1px 5px; margin-right:7px; vertical-align:1px; }
+  .bjp-now{ color:var(--text); font-weight:700; font-size:11px; background:var(--bg2,#f1f5f9); border-radius:5px; padding:1px 6px; margin-left:3px; }
   .bjp-row{ display:flex; align-items:center; gap:14px; border:1px solid var(--border); border-radius:11px; padding:11px 15px; flex-wrap:wrap; }
   .bjp-nm{ flex:1; min-width:160px; font-weight:700; font-size:13.5px; color:var(--text); }
   .bjp-nm small{ display:block; color:var(--text2); font-weight:500; font-size:11px; margin-top:2px; }
@@ -14149,7 +14155,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var wN=null;for(var k=L-1;k>=0;k--){if(tw[k]!=null){wN=tw[k];break;}}
       var wP=null;for(var k2=s;k2<L;k2++){if(tw[k2]!=null){wP=tw[k2];break;}}
       if(wN==null)wN=50;if(wP==null)wP=wN;
-      res.push({n:m,win:wN,dOutPct:(nowO-prevO)/(prevO||1),dPay:nowP-prevP,dWin:wN-wP});});
+      res.push({n:m,win:wN,o:nowO,p:nowP,dOutPct:(nowO-prevO)/(prevO||1),dPay:nowP-prevP,dWin:wN-wP});});
     res._stats=st;return res;
   }
   function _bjpDiag(arr){arr.forEach(function(m){
@@ -14175,15 +14181,21 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     ctx.fillStyle=cfg.tl.t;ctx.textAlign='left';ctx.fillText(cfg.tl.l,a.left+8,a.top+16);
     ctx.fillStyle=cfg.tr.t;ctx.textAlign='right';ctx.fillText(cfg.tr.l,a.right-8,a.top+16);
     ctx.fillStyle=cfg.bl.t;ctx.textAlign='left';ctx.fillText(cfg.bl.l,a.left+8,a.bottom-8);
-    ctx.fillStyle=cfg.br.t;ctx.textAlign='right';ctx.fillText(cfg.br.l,a.right-8,a.bottom-8);}};}
+    ctx.fillStyle=cfg.br.t;ctx.textAlign='right';ctx.fillText(cfg.br.l,a.right-8,a.bottom-8);
+    // 大きな半透明セグメント文字（A〜D / E〜H）を各象限の中央に
+    ctx.save();ctx.globalAlpha=0.12;ctx.font='800 66px Hiragino Sans, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    function _K(o,cx,cy){if(!o.k)return;ctx.fillStyle=o.t;ctx.fillText(o.k,cx,cy);}
+    _K(cfg.tl,(a.left+x0)/2,(a.top+y0)/2);_K(cfg.tr,(x0+a.right)/2,(a.top+y0)/2);
+    _K(cfg.bl,(a.left+x0)/2,(y0+a.bottom)/2);_K(cfg.br,(x0+a.right)/2,(y0+a.bottom)/2);
+    ctx.restore();}};}
   function _bjpLabel(list){return {id:'l',afterDatasetsDraw:function(ch){
     var ctx=ch.ctx,X=ch.scales.x,Y=ch.scales.y;ctx.save();ctx.font='700 10.5px Hiragino Sans, sans-serif';
     list.forEach(function(m){if(!m.show)return;var px=X.getPixelForValue(m.dPay),py=Y.getPixelForValue(m.dWin);
       var nm=(m.n.length>10?m.n.slice(0,9)+'…':m.n)+' '+(m.dOutPct>=0?'+':'')+(m.dOutPct*100).toFixed(0)+'%';
       var right=px>ch.chartArea.right-150;ctx.textAlign=right?'right':'left';ctx.fillStyle='#0f172a';
       ctx.fillText(nm,px+(right?-9:9),py+3.5);});ctx.restore();}};}
-  var _BJPQA={tl:{c:'rgba(21,163,110,.07)',t:'#0f7a4f',l:'理想形（締めて広げた）'},tr:{c:'rgba(224,138,0,.07)',t:'#9a5b00',l:'集客投資（出して広げた）'},bl:{c:'rgba(15,118,110,.07)',t:'#0f766e',l:'強い台（締めて集中）'},br:{c:'rgba(224,138,0,.05)',t:'#9a5b00',l:'万枚型（出して集中）'}};
-  var _BJPQB={tl:{c:'rgba(148,163,184,.07)',t:'#64748b',l:'締め過ぎ？'},tr:{c:'rgba(225,72,60,.08)',t:'#b3261e',l:'量の無駄（出して広げた）'},bl:{c:'rgba(225,72,60,.06)',t:'#b3261e',l:'崩壊（締めて集中）'},br:{c:'rgba(179,38,30,.11)',t:'#8c1d14',l:'配り方の無駄（出して集中）'}};
+  var _BJPQA={tl:{k:'A',c:'rgba(21,163,110,.07)',t:'#0f7a4f',l:'出玉率はダウンしたが勝率はアップした機種'},tr:{k:'B',c:'rgba(224,138,0,.07)',t:'#9a5b00',l:'出玉率も勝率もアップした集客投資機種'},bl:{k:'C',c:'rgba(15,118,110,.07)',t:'#0f766e',l:'出玉率も勝率もダウンしたのに稼働アップ'},br:{k:'D',c:'rgba(224,138,0,.05)',t:'#9a5b00',l:'勝率はダウンしたが出玉率は増加（差枚アピール）'}};
+  var _BJPQB={tl:{k:'E',c:'rgba(148,163,184,.07)',t:'#64748b',l:'出玉率はダウン・勝率はアップしたが稼働ダウン'},tr:{k:'F',c:'rgba(225,72,60,.08)',t:'#b3261e',l:'出玉率も勝率もアップしたのに稼働ダウン'},bl:{k:'G',c:'rgba(225,72,60,.06)',t:'#b3261e',l:'出玉率も勝率もダウンで稼働もダウン'},br:{k:'H',c:'rgba(179,38,30,.11)',t:'#8c1d14',l:'勝率はダウン・出玉率は増加したが稼働ダウン'}};
   function _bjpChart(canvasId,list,cfg){
     if(_bjpCharts[canvasId]){_bjpCharts[canvasId].destroy();}
     var el=document.getElementById(canvasId);if(!el)return;
@@ -14200,6 +14212,27 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           y:{type:'linear',min:-maxW,max:maxW,title:{display:true,text:'↓集中  Δ勝率(配り方)  広げた↑',color:'#64748b',font:{size:11,weight:'700'}},grid:{display:false},ticks:{color:'#94a3b8'}}}},
       plugins:[_bjpQuad(cfg),_bjpLabel(list)]});
   }
+  function _bjpSeg(m){var quad=(m.dWin>=0)?(m.dPay<0?0:1):(m.dPay<0?2:3);return 'ABCDEFGH'[(m.dOutPct>0?0:4)+quad];}
+  var _BJPBADGE={ideal:'b-green',strong:'b-teal',invest:'b-orange',spectacle:'b-orange',waste:'b-red',collapse:'b-red2',up:'b-blue',down:'b-red'};
+  function _bjpRenderCards(seg){
+    var dg=document.getElementById('bjpDiag');if(!dg)return;
+    var cards=window._bjpCards||[];
+    var counts={};cards.forEach(function(m){counts[m.seg]=(counts[m.seg]||0)+1;});
+    var allSeg='ABCDEFGH'.split('').filter(function(s){return counts[s];});
+    var chips='<div class="bjp-segchips"><button class="bjp-chip'+((!seg||seg==='all')?' on':'')+'" onclick="_bjpFilterSeg(\'all\')">全部 '+cards.length+'</button>'
+      +allSeg.map(function(s){return '<button class="bjp-chip'+(seg===s?' on':'')+'" onclick="_bjpFilterSeg(\''+s+'\')">'+s+' '+counts[s]+'</button>';}).join('')+'</div>';
+    var list=(seg&&seg!=='all')?cards.filter(function(m){return m.seg===seg;}):cards;
+    function dlt(v,dp,u){var up=v>=0;return '<b class="'+(up?'bjpu':'bjpd')+'">'+(up?'↑ +':'↓ −')+Math.abs(v).toFixed(dp)+u+'</b>';}
+    var rows=list.map(function(m){return '<div class="bjp-row">'
+      +'<div class="bjp-nm"><span class="bjp-seg">'+m.seg+'</span>'+_bjEsc(m.n)+'<small>'+m.verdict+'</small></div>'
+      +'<div class="bjp-metrics">'
+      +'<div>稼働 '+dlt(m.dOutPct*100,0,'%')+' <span class="bjp-now">今 '+Math.round(m.o).toLocaleString()+'</span></div>'
+      +'<div>出玉率 '+dlt(m.dPay,1,'pt')+' <span class="bjp-now">今 '+(m.p!=null?m.p.toFixed(1):'–')+'%</span></div>'
+      +'<div>勝率 '+dlt(m.dWin,0,'pt')+' <span class="bjp-now">今 '+Math.round(m.win)+'%</span></div>'
+      +'</div><span class="bjp-badge '+(_BJPBADGE[m.d]||'')+'">'+m.t+'</span></div>';}).join('');
+    dg.innerHTML=chips+(rows||'<div style="font-size:12px;color:var(--text2);padding:10px 2px;">このセグメントに該当機種なし</div>');
+  }
+  window._bjpFilterSeg=function(seg){_bjpRenderCards(seg);};
   function _bjpRender(){
     var panel=panels.payout;if(!panel||!document.getElementById('bjpCA'))return;
     var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
@@ -14239,10 +14272,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     [A,B].forEach(function(g){g.slice().sort(function(a,b){return Math.abs(b.dOutPct)-Math.abs(a.dOutPct);}).forEach(function(m,i){m.show=i<topN;});});
     _bjpChart('bjpCA',A,_BJPQA);_bjpChart('bjpCB',B,_BJPQB);
     var order={waste:0,collapse:1,ideal:2,spectacle:3,invest:4,strong:5,down:6,up:7};
-    var badge={ideal:'b-green',strong:'b-teal',invest:'b-orange',spectacle:'b-orange',waste:'b-red',collapse:'b-red2',up:'b-blue',down:'b-red'};
-    function dlt(v,dp,u){var up=v>=0;return '<b class="'+(up?'bjpu':'bjpd')+'">'+(up?'↑ +':'↓ −')+Math.abs(v).toFixed(dp)+u+'</b>';}
     var cards=M.filter(function(m){return m.d;}).sort(function(a,b){return (order[a.d]-order[b.d])||(Math.abs(b.dOutPct)-Math.abs(a.dOutPct));});
-    if(dg)dg.innerHTML=cards.length?cards.map(function(m){return '<div class="bjp-row"><div class="bjp-nm">'+_bjEsc(m.n)+'<small>'+m.verdict+'</small></div><div class="bjp-metrics"><div>稼働 '+dlt(m.dOutPct*100,0,'%')+'</div><div>出玉率 '+dlt(m.dPay,1,'pt')+'</div><div>勝率 '+dlt(m.dWin,0,'pt')+'</div></div><span class="bjp-badge '+(badge[m.d]||'')+'">'+m.t+'</span></div>';}).join(''):'<div style="font-size:12px;color:var(--text2);">大きな動きなし（安定）</div>';
+    cards.forEach(function(m){m.seg=_bjpSeg(m);});
+    window._bjpCards=cards;
+    if(cards.length){ _bjpRenderCards('all'); }
+    else if(dg){ dg.innerHTML='<div style="font-size:12px;color:var(--text2);">大きな動きなし（安定）</div>'; }
     if(statusEl)statusEl.textContent='店舗「'+sName+'」／対象'+M.length+'機種（稼働↑'+A.length+'／↓'+B.length+'）／全'+stt.total+'機種中（除外:日数'+stt.fewDays+'・台数'+stt.fewTai+'・軌跡'+stt.fewPath+'）';
     window._bjPayoutDirty=false;
   }
