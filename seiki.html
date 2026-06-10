@@ -517,6 +517,21 @@
     font-size: 11px; cursor: pointer;
     transition: background .15s;
   }
+  /* ローディング（ベアジョン熊＋吹き出し） */
+  #bjLoadingOverlay{ display:none; position:fixed; inset:0; z-index:6000; background:rgba(245,247,250,0.82); align-items:center; justify-content:center; }
+  #bjLoadingOverlay.on{ display:flex; }
+  .bjl-box{ display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .bjl-bear{ width:74px; height:74px; animation:bjlBob 0.85s ease-in-out infinite; transform-origin:center bottom; }
+  @keyframes bjlBob{ 0%,100%{ transform:translateY(0) rotate(-3deg) } 50%{ transform:translateY(-12px) rotate(3deg) } }
+  .bjl-bubble{ position:relative; background:#fff; border:1px solid #e6ebf1; border-radius:16px; padding:11px 20px; font-size:15px; font-weight:800; color:#0098d4; text-align:center; box-shadow:0 8px 24px rgba(15,23,42,0.12); }
+  .bjl-bubble .bjl-sub{ font-size:10px; font-weight:600; color:#94a3b8; margin-top:2px; }
+  .bjl-bubble::after{ content:''; position:absolute; bottom:-9px; left:50%; transform:translateX(-50%); border-left:9px solid transparent; border-right:9px solid transparent; border-top:9px solid #fff; }
+  /* エッジ強度スライダー（目立つ・触りたくなる） */
+  .fc-edge-slider{ -webkit-appearance:none; appearance:none; width:210px; height:9px; border-radius:6px; background:linear-gradient(90deg,#cbd5e1,#7c3aed); outline:none; cursor:pointer; }
+  .fc-edge-slider::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none; width:26px; height:26px; border-radius:50%; background:#7c3aed; border:3px solid #fff; box-shadow:0 2px 9px rgba(124,58,237,0.55); cursor:grab; transition:transform .1s; }
+  .fc-edge-slider::-webkit-slider-thumb:hover{ transform:scale(1.12); }
+  .fc-edge-slider::-webkit-slider-thumb:active{ transform:scale(1.2); cursor:grabbing; }
+  .fc-edge-slider::-moz-range-thumb{ width:26px; height:26px; border-radius:50%; background:#7c3aed; border:3px solid #fff; box-shadow:0 2px 9px rgba(124,58,237,0.55); cursor:grab; }
   /* 予測グラフ */
   #forecastCard { border: 1px solid rgba(96,165,250,0.25); }
   #forecastCard .chart-title { color: #93c5fd; }
@@ -799,6 +814,12 @@
        onmouseover="this.style.background='rgba(0,152,212,0.08)'" onmouseout="this.style.background='transparent'">お問い合わせはこちら</a>
   </div>
 </div>
+<div id="bjLoadingOverlay">
+  <div class="bjl-box">
+    <div class="bjl-bubble">お待ちください…<div class="bjl-sub">ベアジョンが集計中</div></div>
+    <img id="bjLoadBear" class="bjl-bear" src="" alt="">
+  </div>
+</div>
 
 <!-- 店舗追加モーダル -->
 <div class="store-modal-overlay" id="storeModal">
@@ -1041,6 +1062,15 @@
       <div id="forecastDataRange" style="padding:2px 12px 6px;"></div>
       <div class="chart-wrapper" style="height:340px;"><canvas id="forecastChart"></canvas></div>
       <div id="forecastLegend" style="display:flex;gap:14px;flex-wrap:wrap;padding:8px 12px 4px;font-size:11px;color:var(--text2);"></div>
+      <div id="forecastEdgeCtrl" style="display:none;align-items:center;gap:15px;flex-wrap:wrap;margin:9px 12px 4px;padding:12px 16px;background:linear-gradient(135deg,rgba(124,58,237,0.07),rgba(0,152,212,0.05));border:1.5px solid rgba(124,58,237,0.32);border-radius:13px;">
+        <div style="display:flex;flex-direction:column;line-height:1.25;">
+          <span style="font-size:12px;font-weight:800;color:#7c3aed;">▶ 予想のメリハリ（エッジ）を動かす</span>
+          <span style="font-size:9.5px;color:var(--text2);" id="fcEdgeMode">この店に自動最適化</span>
+        </div>
+        <input id="fcEdgeSlider" type="range" min="1" max="2.4" step="0.1" value="1" oninput="_bjSetEdge(this.value)" class="fc-edge-slider">
+        <b id="fcEdgeVal" style="color:#7c3aed;font-size:23px;font-weight:800;min-width:56px;text-align:center;">1.0×</b>
+        <a id="fcEdgeReset" href="javascript:void(0)" onclick="_bjEdgeAuto()" style="display:none;font-size:11px;color:#0098d4;text-decoration:none;font-weight:700;border:1px solid rgba(0,152,212,0.4);border-radius:8px;padding:6px 12px;">自動に戻す</a>
+      </div>
       <div id="forecastRadar" style="padding:4px 12px 8px;"></div>
       <div id="forecastDetail" style="padding:6px 12px 12px;font-size:11.5px;line-height:1.75;color:var(--text);display:none;"></div>
     </div>
@@ -1703,38 +1733,38 @@ function _bjRenderForecastScore(metricKey, recentDev, hitRate, pita, unit, expAv
       ? `<div style="display:flex;gap:18px;flex-wrap:wrap;padding-left:14px;border-left:1px solid var(--border);">
            ${stat('今後'+horizon+'日 予想平均', fcAvg, '#0098d4')}
          </div>` : '';
-    const edgeBlock = `<div style="display:flex;gap:18px;flex-wrap:wrap;padding-left:14px;border-left:1px solid var(--border);">
-        <div style="line-height:1.2;"><span style="font-size:10px;color:var(--text2);">エッジ強度（自動）</span><br>
-          <span style="font-size:16px;font-weight:800;color:#7c3aed;">${(edge||1).toFixed(1)}×</span>
-          <span style="font-size:9.5px;color:var(--text2);"> ${(edge&&edge>1)?'振れ幅を強調':'標準'}</span></div>
-      </div>`;
     html += `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:2px 0 12px;padding:13px 16px;background:rgba(0,152,212,0.07);border:1px solid rgba(0,152,212,0.22);border-radius:12px;">
       <div style="line-height:1.08;">
         <div style="font-size:11px;color:var(--text2);font-weight:700;">この予想の的中度 <span style="font-weight:500;">（直近${recentDev.length}日）</span></div>
         <div style="font-size:34px;font-weight:800;color:${hc};letter-spacing:.5px;">約${hitRate}<span style="font-size:20px;">%</span></div>
         ${pita!=null?`<div style="font-size:10.5px;color:var(--text2);">ピタリ率（±10%以内）：<b style="color:var(--text);">${pita}%</b></div>`:''}
       </div>
-      ${pastBlock}${futBlock}${edgeBlock}</div>`;
+      ${pastBlock}${futBlock}</div>`;
   }
-  // ② 乖離レーダー（フラグ日リスト）
-  const flagged = (recentDev||[]).filter(r=>r.flag).sort((a,b)=>Math.abs(b.dev)-Math.abs(a.dev));
-  html += `<div style="font-size:11px;font-weight:800;color:#0098d4;margin:2px 0 7px;letter-spacing:.3px;">EVENT RADAR ／ 直近の予想 vs 実績（普段とのズレ${isIn?'＝競合シグナル':''}）</div>`;
+  // ② 振り返ってチェックするべき営業日（予想から大きくズレた日をタイル表示）
+  const flagged = (recentDev||[]).filter(r=>r.flag).sort((a,b)=>(b.d<a.d?-1:1));
+  const _wd = ['日','月','火','水','木','金','土'];
+  html += `<div style="font-size:12px;font-weight:800;color:#0098d4;margin:4px 0 9px;letter-spacing:.3px;">振り返ってチェックするべき営業日</div>`;
   if(flagged.length){
-    html += `<div style="display:flex;flex-direction:column;gap:5px;">`;
+    html += `<div style="display:flex;flex-wrap:wrap;gap:10px;">`;
     flagged.forEach(r=>{
       const up = r.dev>0, col = up?'#e1483c':'#15a36e';
-      const head = up ? '▲ 予想超え（普段より高め）' : '▼ 予想割れ（普段より低め）';
+      const bg = up?'rgba(225,72,60,0.07)':'rgba(21,163,110,0.07)';
+      const head = up ? '▲ 予想超え' : '▼ 予想割れ';
       const note = isIn
-        ? (up ? '競合店なら"動いた"サイン＝要分析／自店なら成功施策' : '競合店なら"スキ"＝攻めどき／自店なら客が流れた可能性')
-        : (up ? '普段より高かった日' : '普段より低かった日');
-      html += `<div style="font-size:11px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
-        <span style="font-weight:800;color:${col};min-width:96px;">${r.d.slice(5).replace('-','/')} ${r.dev>=0?'+':''}${Math.round(r.dev)}%</span>
-        <span style="color:var(--text);">${head}</span>
-        <span style="color:var(--text2);font-size:10.5px;">${note}</span></div>`;
+        ? (up ? '競合が動いた？要分析' : '競合のスキ・攻めどき')
+        : (up ? '普段より高い日' : '普段より低い日');
+      const dd = new Date(r.d+'T00:00:00');
+      html += `<div title="${r.d} 実績${Math.round(r.actual).toLocaleString()} / 普段${Math.round(r.exp).toLocaleString()}"
+        style="flex:0 1 158px;min-width:140px;border:1.6px solid ${col};background:${bg};border-radius:13px;padding:11px 14px;">
+        <div style="font-size:23px;font-weight:800;color:${col};line-height:1;">${r.d.slice(5).replace('-','/')}<span style="font-size:12px;font-weight:700;"> (${_wd[dd.getDay()]})</span></div>
+        <div style="font-size:13px;font-weight:800;color:${col};margin-top:6px;">${head} ${r.dev>=0?'+':''}${Math.round(r.dev)}%</div>
+        <div style="font-size:10.5px;color:var(--text2);margin-top:3px;line-height:1.4;">${note}</div>
+      </div>`;
     });
     html += `</div>`;
   } else {
-    html += `<div style="font-size:10.5px;color:var(--text2);">直近${recentDev.length}日は予想どおり（±30%以内）＝普段通りの動き。特別な動きは検出されず。</div>`;
+    html += `<div style="font-size:11px;color:var(--text2);">直近${recentDev.length}日は予想どおり（±30%以内）＝普段通りの動き。特にチェックすべき日はありません。</div>`;
   }
   // ③ ボタン3つを1列に（詳細トグル＋説明2つ）
   html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
@@ -1767,7 +1797,8 @@ function _bjForecastInfoModalHTML(){
     + '<h3>③ 的中度</h3><ul>'
     + '<li><b>的中度</b>＝100％ − 平均誤差。直近の「予想 vs 実績」がどれだけ近かったか。</li>'
     + '<li><b>ピタリ率</b>＝予想の±10％以内に収まった日の割合（厳しめの当たり判定）。</li></ul>'
-    + '<h3>④ 予想vs実績＝競合シグナル（稼働のとき）</h3><ul>'
+    + '<h3>④ 振り返ってチェックするべき営業日（予想vs実績＝競合シグナル）</h3><ul>'
+    + '<li><b>「振り返ってチェックするべき営業日」</b>＝予想（普段の基準）から<b>±30％超ズレた日</b>。「実績 vs 普段」の差が大きい＝<b>何かが起きた日</b>（稼働のときは競合の動き・施策のサイン）。</li>'
     + '<li><b>予想超え（▲）</b>＝普段より客が多い。競合店なら"動いた"＝要分析／自店なら成功施策。</li>'
     + '<li><b>予想割れ（▼）</b>＝普段より少ない。競合店なら"スキ"＝攻めどき／自店なら客が流れた可能性。</li>'
     + '<li>しきい値：予想から<b>±30％超</b>でフラグ。</li></ul>'
@@ -7712,15 +7743,18 @@ function renderForecast() {
   const actualData   = trendData.slice(-actualWindow);
 
   // ── エッジ強度を店ごとに自動選定（的中度が最大になる振れ幅。1.0より0.3pt以上良い時だけ採用）──
-  let _EDGE = 1;
+  let _autoEdge = 1;
   (function(){
     if (mean <= 0 || !actualData.length) return;
     const mulFull = actualDates.map(ds => _expRaw(ds) / mean);
     const mapeFor = E => { let s=0,c=0; for (let i=0;i<actualData.length;i++){ const a=actualData[i]; if(a>0){ const p=mean*Math.max(0.2,1+(mulFull[i]-1)*E); s+=Math.abs(p-a)/a; c++; } } return c?s/c*100:1e9; };
     const baseM = mapeFor(1); let best=1, bestM=baseM;
     for (let E=1.0; E<=2.4001; E+=0.1){ const m=mapeFor(E); if(m<bestM-1e-6){ bestM=m; best=Math.round(E*10)/10; } }
-    if (baseM - bestM >= 0.3) _EDGE = best;   // 明確に改善する時だけエッジON
+    if (baseM - bestM >= 0.3) _autoEdge = best;   // 明確に改善する時だけエッジON
   })();
+  // 手動上書き（スライダー・探索用／保存なし）があればそれを、無ければ自動値
+  const _edgeOverridden = (window._bjEdgeOverride != null);
+  const _EDGE = _edgeOverridden ? window._bjEdgeOverride : _autoEdge;
   // エッジ適用後の「普段ならこれくらい」基準線
   const _expBaseline = ds => { const mf = _expRaw(ds) / (mean || 1); return mean * Math.max(0.2, 1 + (mf - 1) * _EDGE); };
 
@@ -7991,8 +8025,26 @@ function renderForecast() {
   document.getElementById('forecastDetail').innerHTML = detailHtml;
 
   // 的中度＋乖離レーダー（直近の予想vs実績・競合シグナル）＋説明ボタン
-  try { _bjRenderForecastScore(metricKey, recentDev, _hitRate, _pita, metricUnit, _expAvg, _actAvg, _fcAvg, horizon, _EDGE); } catch(e) { console.warn('forecastScore', e); }
+  try { _bjRenderForecastScore(metricKey, recentDev, _hitRate, _pita, metricUnit, _expAvg, _actAvg, _fcAvg, horizon, _EDGE, _edgeOverridden, _autoEdge); } catch(e) { console.warn('forecastScore', e); }
+
+  // エッジ強度スライダー（探索用・保存なし）— 静的要素なのでドラッグ中も途切れない
+  try {
+    const _ec = document.getElementById('forecastEdgeCtrl');
+    if (_ec) {
+      _ec.style.display = 'flex';
+      const _sl = document.getElementById('fcEdgeSlider');
+      const _vl = document.getElementById('fcEdgeVal');
+      const _md = document.getElementById('fcEdgeMode');
+      const _rs = document.getElementById('fcEdgeReset');
+      if (_sl) _sl.value = String(_EDGE);
+      if (_vl) _vl.textContent = (_EDGE||1).toFixed(1) + '×';
+      if (_md) _md.textContent = _edgeOverridden ? ('手動上書き中（自動値 '+(_autoEdge||1).toFixed(1)+'×）') : 'この店に自動最適化';
+      if (_rs) _rs.style.display = _edgeOverridden ? 'inline' : 'none';
+    }
+  } catch(e) {}
 }
+function _bjSetEdge(v){ window._bjEdgeOverride = parseFloat(v); try { renderForecast(); } catch(e){} }
+function _bjEdgeAuto(){ window._bjEdgeOverride = null; try { renderForecast(); } catch(e){} }
 
 function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   const el = document.getElementById('trendAnalysisBody');
@@ -14043,6 +14095,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 (function(){
   var ROOMS=[['basic','ベーシック'],['week','曜日＆特定日'],['post','ポストイット＆未来予測β'],['report','レポート'],['comp','コンパリゾン'],['payout','出玉配分の答合せ β']];
   var panels={};
+  function _bjShowLoading(){
+    var ov=document.getElementById('bjLoadingOverlay'); if(!ov) return;
+    var bear=document.getElementById('bjLoadBear');
+    if(bear && !bear.getAttribute('src')){ var s=document.querySelector('#authLogoArea img'); if(s) bear.src=s.src; }
+    ov.classList.add('on');
+  }
+  function _bjHideLoading(){ var ov=document.getElementById('bjLoadingOverlay'); if(ov) ov.classList.remove('on'); }
   function show(room){
     document.querySelectorAll('#bjTabsNav a').forEach(function(a){a.classList.toggle('on',a.dataset.r===room);});
     document.querySelectorAll('.bj-panel').forEach(function(p){p.classList.toggle('on',p.id==='bj-'+room);});
@@ -14050,10 +14109,16 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     window.scrollTo(0,0);
     window._bjRoom=room;
     try{ _bjUpdateContext(); }catch(e){}
-    if(room==='basic'){ setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); },80); }
-    if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); }
-    if(room==='post'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } try{ renderAlertTiles(); }catch(e){} }   // ポストイットはrival依存→先にrival描画してキャッシュ確保
-    if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
+    if(room==='basic'){ setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); },80); return; }
+    // 重い描画はローディング（熊）を挟んで1フレーム後に実行＝スピナーが必ず見える
+    var needHeavy = (room==='report'&&window._bjReportDirty) || (room==='post'&&window._bjReportDirty) || (room==='payout'&&window._bjPayoutDirty);
+    var work=function(){
+      if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); }
+      if(room==='post'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } try{ renderAlertTiles(); }catch(e){} }   // ポストイットはrival依存→先にrival描画してキャッシュ確保
+      if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
+    };
+    if(needHeavy){ _bjShowLoading(); requestAnimationFrame(function(){ setTimeout(function(){ try{ work(); } finally { _bjHideLoading(); } }, 0); }); }
+    else { work(); }
   }
   window.bjShow=show;
   window._bjReportDirty=true;                                            // レポート/ポストイット：未描画フラグ（遅延描画）
@@ -14283,6 +14348,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     setupWeekChat(panels.week);   // 曜日・特定日チャットを最下部に
     // ③ ポストイットほか
     mv(byId('alertTilesBar'),'post');
+    mv(byId('forecastTitleBar'),'post');   // 白枠の上に出すタイトル（カードの直前に移動）
     mv(byId('forecastCard'),'post');
     mv(byId('trendAnalysisCard'),'post');
     // ④ レポート
@@ -14306,9 +14372,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     document.querySelectorAll('.charts-grid').forEach(function(g){
       if(!g.querySelector('.chart-card,canvas'))g.style.display='none';
     });
-    // 復元
-    var saved;try{saved=localStorage.getItem('bjRoom');}catch(e){}
-    if(saved&&panels[saved])show(saved);
+    // ログイン直後は必ずベーシックから開始（前回タブの自動復元はしない）
+    show('basic');
     setupPeriodPill();
     setupReportSubtabs();
     // リニューアルで不要になった機能を非表示（REPORTへ / COMPARISON ジャンプボタン）
