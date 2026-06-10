@@ -787,12 +787,16 @@
   <div class="auth-box">
     <div class="auth-logo" id="authLogoArea"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjIwIiBmaWxsPSJub25lIj4KICA8IS0tIOW3puOCouODvOODoO+8iOe/vOWei++8iSAtLT4KICA8cGF0aCBkPSJNIDU4LDEwOCBDIDQ4LDkwIDIyLDcyIDIsODAgQyAtNiw5NSAxOCwxMTYgNTgsMTE4IFoiIGZpbGw9IiMwMEFFRUYiLz4KICA8IS0tIOWPs+OCouODvOODoO+8iOe/vOWei++8iSAtLT4KICA8cGF0aCBkPSJNIDE0MiwxMDggQyAxNTIsOTAgMTc4LDcyIDE5OCw4MCBDIDIwNiw5NSAxODIsMTE2IDE0MiwxMTggWiIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g6aaWL+iCqeOBpOOBquOBjiAtLT4KICA8ZWxsaXBzZSBjeD0iMTAwIiBjeT0iMTEyIiByeD0iMjYiIHJ5PSIxMiIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g6aCtIC0tPgogIDxjaXJjbGUgY3g9IjEwMCIgY3k9IjgyIiByPSIzNyIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g5bem6ICzIC0tPgogIDxjaXJjbGUgY3g9IjcxIiBjeT0iNTEiIHI9IjE1IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDlj7PogLMgLS0+CiAgPGNpcmNsZSBjeD0iMTI5IiBjeT0iNTEiIHI9IjE1IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDpvLsgKOm7kuOBhOWwj+WGhikgLS0+CiAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iNjUiIHI9IjkiIGZpbGw9IiMxMTEiLz4KICA8IS0tIOiDtOS9kyAtLT4KICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSIxNTAiIHI9IjQ3IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDog7TkvZPjga7jgY/jgormipzjgY0gKOWkp+OBjeOBquWGhikgLS0+CiAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iMTUyIiByPSIzMCIgZmlsbD0iIzExMSIvPgogIDwhLS0g5bem6ISaIC0tPgogIDxlbGxpcHNlIGN4PSI4NyIgY3k9IjE5NSIgcng9IjEzIiByeT0iOSIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g5Y+z6ISaIC0tPgogIDxlbGxpcHNlIGN4PSIxMTMiIGN5PSIxOTUiIHJ4PSIxMyIgcnk9IjkiIGZpbGw9IiMwMEFFRUYiLz4KPC9zdmc+" alt="ベアジョン"></div>
     <div class="auth-title">ベアジョン</div>
-    <div class="auth-sub">パチンコ店 BI ダッシュボード</div>
+    <div class="auth-sub">競合分析AI ｜ ベアジョン</div>
     <input class="auth-input" type="password" id="authInput"
       placeholder="パスワード" onkeydown="if(event.key==='Enter')checkAuth()">
     <button class="auth-btn" onclick="checkAuth()">ログイン</button>
     <div class="auth-err" id="authErr"></div>
+    <div class="auth-hint">※ パスワードは毎月変更します</div>
     <div class="auth-hint">※ パスワードは管理者にお問い合わせください</div>
+    <a href="https://p-media.info/company/contact" target="_blank" rel="noopener noreferrer"
+       style="display:inline-block;margin-top:14px;font-size:12px;font-weight:700;color:#0098d4;text-decoration:none;border:1px solid rgba(0,152,212,0.4);border-radius:8px;padding:8px 18px;transition:background .15s;"
+       onmouseover="this.style.background='rgba(0,152,212,0.08)'" onmouseout="this.style.background='transparent'">お問い合わせはこちら</a>
   </div>
 </div>
 
@@ -1221,9 +1225,13 @@
         <div class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent2)"></div>
         機種別集計
       </div>
-      <div class="view-toggle">
-        <button class="vtab active" id="modelAggViewTable" onclick="setModelAggView('table')">テーブル</button>
-        <button class="vtab" id="modelAggViewChart" onclick="setModelAggView('chart')">ビジュアル</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <div class="view-toggle">
+          <button class="vtab active" id="modelAggViewTable" onclick="setModelAggView('table')">テーブル</button>
+          <button class="vtab" id="modelAggViewChart" onclick="setModelAggView('chart')">ビジュアル</button>
+        </div>
+        <button onclick="exportModelExcel()" title="機種別集計をExcelでダウンロード" style="font-size:11px;font-weight:700;background:rgba(21,163,110,0.12);color:#15a36e;border:1px solid rgba(21,163,110,0.35);border-radius:8px;padding:6px 13px;cursor:pointer;font-family:inherit;">Excel</button>
+        <button onclick="exportModelPDF()" title="機種別集計をPDFで保存（印刷→PDFで保存）" style="font-size:11px;font-weight:700;background:rgba(225,72,60,0.10);color:#e1483c;border:1px solid rgba(225,72,60,0.3);border-radius:8px;padding:6px 13px;cursor:pointer;font-family:inherit;">PDF</button>
       </div>
     </div>
     <!-- テーブルビュー -->
@@ -11055,6 +11063,56 @@ function sortModelTable(key) {
     _modelSortDir = 'desc';
   }
   renderModelTable();
+}
+
+// ── 機種別集計 ダウンロード（Excel / PDF）──
+function _modelExportData(){
+  const rows = (typeof buildModelRows==='function') ? buildModelRows(filtered) : [];
+  if(!rows.length) return null;
+  rows.sort((a,b)=>(b.avgProfit||0)-(a.avgProfit||0));
+  const coinLabel = (typeof _isPachinkoStore==='function' && _isPachinkoStore()) ? '玉' : 'コイン';
+  const inLbl = (typeof _inLabel==='function') ? _inLabel(true) : 'アウト';
+  const header = ['機種名','営業日数','平均台数','1台平均'+inLbl,'傾向(%)','推定粗利合計(円)','1台平均粗利(円)','推定売上合計(円)','利益率(%)',coinLabel+'単価(円)',coinLabel+'粗利(円)'];
+  const dates = [...new Set(filtered.map(r=>r.date))].sort();
+  const range = dates.length ? (dates[0]+' 〜 '+dates[dates.length-1]) : '';
+  const storeName = ((typeof _activeStore==='function' && _activeStore()) || {}).name || '';
+  return { rows, header, range, storeName, coinLabel, inLbl };
+}
+function exportModelExcel(){
+  const d = _modelExportData();
+  if(!d){ alert('機種別集計のデータがありません。'); return; }
+  if(typeof XLSX==='undefined'){ alert('Excelライブラリが読み込めていません。'); return; }
+  const aoa = [d.header];
+  d.rows.forEach(r=>{
+    aoa.push([ r.name, r.days, Number(r.avgMachines.toFixed(1)), Math.round(r.avgIn),
+      r.trend==null?'':Number(r.trend.toFixed(0)), Math.round(r.profit), Math.round(r.avgProfit),
+      Math.round(r.sales), Number(r.profitRate.toFixed(1)), Number(r.coinTanka.toFixed(2)), Number(r.coinProfit.toFixed(2)) ]);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '機種別集計');
+  const fname = '機種別集計' + (d.storeName?('_'+d.storeName):'') + (d.range?('_'+d.range.replace(/[^0-9]/g,'').slice(0,8)):'') + '.xlsx';
+  XLSX.writeFile(wb, fname);
+}
+function exportModelPDF(){
+  const d = _modelExportData();
+  if(!d){ alert('機種別集計のデータがありません。'); return; }
+  const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const num = (v,dec)=> v==null?'—':(dec!=null?Number(v).toFixed(dec):Math.round(v).toLocaleString());
+  const body = d.rows.map(r=>`<tr><td class="l">${esc(r.name)}</td><td>${r.days}日</td><td>${r.avgMachines.toFixed(1)}台</td><td>${num(r.avgIn)}</td><td>${r.trend==null?'—':((r.trend>=0?'+':'')+r.trend.toFixed(0)+'%')}</td><td>${num(r.profit)}</td><td>${num(r.avgProfit)}</td><td>${num(r.sales)}</td><td>${r.profitRate.toFixed(1)}%</td><td>${r.coinTanka.toFixed(2)}</td><td>${r.coinProfit.toFixed(2)}</td></tr>`).join('');
+  const head = d.header.map(h=>'<th>'+esc(h)+'</th>').join('');
+  const title = '機種別集計' + (d.storeName?('　'+esc(d.storeName)):'') + (d.range?('　（'+esc(d.range)+'）'):'');
+  const w = window.open('', '_blank');
+  if(!w){ alert('ポップアップがブロックされました。許可してください。'); return; }
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>機種別集計</title>'
+    + '<style>body{font-family:\'Hiragino Sans\',\'Yu Gothic\',sans-serif;color:#111;padding:18px;}'
+    + 'h1{font-size:16px;margin:0 0 12px;}table{border-collapse:collapse;width:100%;font-size:9.5px;}'
+    + 'th,td{border:1px solid #ccc;padding:3px 5px;text-align:right;}td.l,th:first-child{text-align:left;}'
+    + 'th{background:#0098d4;color:#fff;font-weight:700;}tbody tr:nth-child(even){background:#f5f9fc;}'
+    + '@page{size:A4 landscape;margin:9mm;}</style></head><body>'
+    + '<h1>'+title+'</h1><table><thead><tr>'+head+'</tr></thead><tbody>'+body+'</tbody></table>'
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},250);};<\/script></body></html>');
+  w.document.close();
 }
 
 function renderModelTable() {
