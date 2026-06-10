@@ -1025,17 +1025,17 @@
     <!-- 直近3日間ポストイットコーナー -->
     <div id="alertTilesBar" style="display:none;grid-column:1 / -1;margin:4px 0;"></div>
 
-    <div class="chart-card full" id="forecastCard" style="display:none;">
-      <div class="chart-title">
-        <div class="dot" style="background:linear-gradient(135deg,#60a5fa,#a78bfa)"></div>
-        <div style="display:flex;flex-direction:column;line-height:1.18;">
-          <span style="font-family:'Hiragino Mincho ProN','Yu Mincho','YuMincho','Noto Serif JP',Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;letter-spacing:1.5px;color:var(--text);">FORECAST &amp; EVENT RADAR</span>
-          <span style="font-size:10px;color:var(--text2);font-weight:600;">未来予測 ＆ 直近の予想vs実績</span>
-        </div>
-        <span id="forecastMeta" style="margin-left:auto;font-size:10px;color:var(--text2);font-weight:600;"></span>
+    <div id="forecastTitleBar" style="display:none;align-items:center;gap:11px;margin:10px 4px 10px;">
+      <div class="dot" style="background:linear-gradient(135deg,#60a5fa,#7c3aed)"></div>
+      <div style="display:flex;flex-direction:column;line-height:1.18;">
+        <span style="font-family:'Hiragino Mincho ProN','Yu Mincho','YuMincho','Noto Serif JP',Georgia,'Times New Roman',serif;font-size:17px;font-weight:700;letter-spacing:1.5px;color:var(--text);">FORECAST &amp; EVENT RADAR</span>
+        <span style="font-size:10.5px;color:var(--text2);font-weight:600;">未来予測 ＆ 直近の予想vs実績</span>
       </div>
+      <span id="forecastMeta" style="margin-left:auto;font-size:10px;color:var(--text2);font-weight:600;"></span>
+    </div>
+    <div class="chart-card full" id="forecastCard" style="display:none;">
       <div id="forecastDataRange" style="padding:2px 12px 6px;"></div>
-      <div class="chart-wrapper" style="height:220px;"><canvas id="forecastChart"></canvas></div>
+      <div class="chart-wrapper" style="height:340px;"><canvas id="forecastChart"></canvas></div>
       <div id="forecastLegend" style="display:flex;gap:14px;flex-wrap:wrap;padding:8px 12px 4px;font-size:11px;color:var(--text2);"></div>
       <div id="forecastRadar" style="padding:4px 12px 8px;"></div>
       <div id="forecastDetail" style="padding:6px 12px 12px;font-size:11.5px;line-height:1.75;color:var(--text);display:none;"></div>
@@ -1682,7 +1682,6 @@ function _bjRenderForecastScore(metricKey, recentDev, hitRate, pita, unit, expAv
   if(!host) return;
   const isIn = metricKey === 'IN枚数';
   let html = '';
-  const edgeTxt = (edge && edge > 1) ? `エッジ ${edge.toFixed(1)}×（この店に自動最適化）` : '標準（エッジ補正なし）';
   // ① 的中度バッジ（目立つ・過去30日の予想/実績＋今後の予想平均）
   if(hitRate != null){
     const hc = hitRate>=80?'#15a36e':hitRate>=70?'#e08a00':'#e1483c';
@@ -1696,14 +1695,18 @@ function _bjRenderForecastScore(metricKey, recentDev, hitRate, pita, unit, expAv
       ? `<div style="display:flex;gap:18px;flex-wrap:wrap;padding-left:14px;border-left:1px solid var(--border);">
            ${stat('今後'+horizon+'日 予想平均', fcAvg, '#0098d4')}
          </div>` : '';
+    const edgeBlock = `<div style="display:flex;gap:18px;flex-wrap:wrap;padding-left:14px;border-left:1px solid var(--border);">
+        <div style="line-height:1.2;"><span style="font-size:10px;color:var(--text2);">エッジ強度（自動）</span><br>
+          <span style="font-size:16px;font-weight:800;color:#7c3aed;">${(edge||1).toFixed(1)}×</span>
+          <span style="font-size:9.5px;color:var(--text2);"> ${(edge&&edge>1)?'振れ幅を強調':'標準'}</span></div>
+      </div>`;
     html += `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:2px 0 12px;padding:13px 16px;background:rgba(0,152,212,0.07);border:1px solid rgba(0,152,212,0.22);border-radius:12px;">
       <div style="line-height:1.08;">
         <div style="font-size:11px;color:var(--text2);font-weight:700;">この予想の的中度 <span style="font-weight:500;">（直近${recentDev.length}日）</span></div>
         <div style="font-size:34px;font-weight:800;color:${hc};letter-spacing:.5px;">約${hitRate}<span style="font-size:20px;">%</span></div>
         ${pita!=null?`<div style="font-size:10.5px;color:var(--text2);">ピタリ率（±10%以内）：<b style="color:var(--text);">${pita}%</b></div>`:''}
-        <div style="font-size:10px;color:var(--text3,#94a3b8);margin-top:1px;">${edgeTxt}</div>
       </div>
-      ${pastBlock}${futBlock}</div>`;
+      ${pastBlock}${futBlock}${edgeBlock}</div>`;
   }
   // ② 乖離レーダー（フラグ日リスト）
   const flagged = (recentDev||[]).filter(r=>r.flag).sort((a,b)=>Math.abs(b.dev)-Math.abs(a.dev));
@@ -1723,7 +1726,7 @@ function _bjRenderForecastScore(metricKey, recentDev, hitRate, pita, unit, expAv
     });
     html += `</div>`;
   } else {
-    html += `<div style="font-size:10.5px;color:var(--text2);">直近${recentDev.length}日は予想どおり（±15%以内）＝普段通りの動き。特別な動きは検出されず。</div>`;
+    html += `<div style="font-size:10.5px;color:var(--text2);">直近${recentDev.length}日は予想どおり（±30%以内）＝普段通りの動き。特別な動きは検出されず。</div>`;
   }
   // ③ ボタン3つを1列に（詳細トグル＋説明2つ）
   html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
@@ -1745,17 +1748,22 @@ function _bjForecastInfoModalHTML(){
     + '<h2>計算方法と考え方 <small>（未来予想）</small></h2>'
     + '<h3>① 予想の作り方</h3><ul>'
     + '<li>その店の<b>過去実績だけ</b>から計算（他店の影響なし）。アウトは台あたり平均。</li>'
-    + '<li>予想 ＝ <b>基準水準</b> ×（月内35％ ＋ 給料日25％ ＋ 曜日40％）× <b>特定日乗数</b>。</li>'
+    + '<li>予想 ＝ <b>基準水準</b> ×（月内35％ ＋ 給料日25％ ＋ 曜日40％）× <b>特定日乗数</b> × <b>エッジ強度</b>。</li>'
     + '<li>基準水準 ＝ 直近トレンド（線形回帰）と全体平均のブレンド。</li>'
     + '<li><b>特定日</b>＝末尾数字／ゾロ目(11・22)／月日一致(3/3等)を、曜日・給料日で補正しても高い日だけ自動採用（控えめ適用・バックテスト検証済）。</li></ul>'
-    + '<h3>② 的中度</h3><ul>'
+    + '<h3>② エッジ強度（店ごと自動）</h3><ul>'
+    + '<li><b>エッジ強度</b>＝予想の<b>振れ幅（ヤマ／タニの強さ）</b>。1.0×なら平均寄りでなだらか、上げるほど曜日・特定日のヤマ／タニを強調。</li>'
+    + '<li>計算式：エッジ後の乗数 ＝ 1 ＋（その日らしさの乗数 − 1）× エッジ強度。</li>'
+    + '<li><b>店ごとに自動選定</b>：1.0〜2.4を試し、<b>直近30日の的中度が最大</b>になる値を採用。1.0より<b>0.3pt以上</b>良くならなければエッジOFF（むやみに振らさない）。</li>'
+    + '<li>店によって最適な振れ幅が違うため、各店が自分のデータから自動で決める（法人ページでも自動）。</li></ul>'
+    + '<h3>③ 的中度</h3><ul>'
     + '<li><b>的中度</b>＝100％ − 平均誤差。直近の「予想 vs 実績」がどれだけ近かったか。</li>'
     + '<li><b>ピタリ率</b>＝予想の±10％以内に収まった日の割合（厳しめの当たり判定）。</li></ul>'
-    + '<h3>③ 予想vs実績＝競合シグナル（稼働のとき）</h3><ul>'
+    + '<h3>④ 予想vs実績＝競合シグナル（稼働のとき）</h3><ul>'
     + '<li><b>予想超え（▲）</b>＝普段より客が多い。競合店なら"動いた"＝要分析／自店なら成功施策。</li>'
     + '<li><b>予想割れ（▼）</b>＝普段より少ない。競合店なら"スキ"＝攻めどき／自店なら客が流れた可能性。</li>'
-    + '<li>しきい値：予想から<b>±15％超</b>でフラグ。</li></ul>'
-    + '<h3>④ 注意・限界</h3><ul>'
+    + '<li>しきい値：予想から<b>±30％超</b>でフラグ。</li></ul>'
+    + '<h3>⑤ 注意・限界</h3><ul>'
     + '<li>未来の新台・突発イベントは織り込めない（予定が分かれば別途反映可）。</li>'
     + '<li>先の日ほど精度は落ちる。半月先までの目安。</li></ul>'
     + '</div></div>';
@@ -7667,12 +7675,15 @@ let forecastChart = null;
 function renderForecast() {
   const card = document.getElementById('forecastCard');
   if (!card) return;
+  const titleBar = document.getElementById('forecastTitleBar');
 
   const fs = window._forecastStats;
   if (!fs || !fs.filteredDates || fs.filteredDates.length < 7) {
     card.style.display = 'none';
+    if (titleBar) titleBar.style.display = 'none';
     return;
   }
+  if (titleBar) titleBar.style.display = 'flex';
 
   const { mean, std, filteredDates, trendData, metricKey,
           avgJou, avgChu, avgKa, avgMonthInit, avgSalary, avgPension,
@@ -7792,7 +7803,7 @@ function renderForecast() {
   const recentDev = actualDates.map((ds, i) => {
     const a = actualData[i], e = pastExpected[i];
     const dev = (e > 0 && a > 0) ? (a / e - 1) * 100 : null;
-    return { d: ds, actual: a, exp: e, dev, flag: dev != null && Math.abs(dev) > 15 };
+    return { d: ds, actual: a, exp: e, dev, flag: dev != null && Math.abs(dev) > 30 };
   });
   const _devValid = recentDev.filter(r => r.dev != null);
   const _mape    = _devValid.length ? _devValid.reduce((s,r)=>s+Math.abs(r.dev),0)/_devValid.length : null;
@@ -7841,21 +7852,21 @@ function renderForecast() {
   const forecastDataset = {
     label: `予測 ${metricLabel}`,
     data: [...new Array(actualWindow).fill(null), ...forecastValues],
-    borderColor: '#a78bfa',
-    backgroundColor: 'rgba(167,139,250,0.10)',
+    borderColor: '#7c3aed',
+    backgroundColor: 'rgba(124,58,237,0.12)',
     fill: false,
     tension: 0.3,
-    borderDash: [5, 4],
+    borderDash: [6, 3],
     pointRadius: 3,
-    pointBackgroundColor: '#a78bfa',
-    borderWidth: 2,
+    pointBackgroundColor: '#7c3aed',
+    borderWidth: 2.8,
   };
   // 信頼帯（上限 / 下限）
   const confUpper = {
     label: '信頼帯（+1σ）',
     data: [...new Array(actualWindow).fill(null), ...forecastValues.map(v => v + std)],
     borderColor: 'transparent',
-    backgroundColor: 'rgba(167,139,250,0.10)',
+    backgroundColor: 'rgba(124,58,237,0.12)',
     fill: '+1', // 下限との間を塗る
     pointRadius: 0, tension: 0.3, borderWidth: 0,
   };
@@ -7863,7 +7874,7 @@ function renderForecast() {
     label: '信頼帯（−1σ）',
     data: [...new Array(actualWindow).fill(null), ...forecastValues.map(v => Math.max(0, v - std))],
     borderColor: 'transparent',
-    backgroundColor: 'rgba(167,139,250,0.10)',
+    backgroundColor: 'rgba(124,58,237,0.12)',
     fill: false,
     pointRadius: 0, tension: 0.3, borderWidth: 0,
   };
@@ -7920,7 +7931,7 @@ function renderForecast() {
   document.getElementById('forecastLegend').innerHTML = `
     <span><span class="forecast-legend-dot" style="background:#60a5fa;"></span>実績</span>
     <span><span class="forecast-legend-dot" style="background:transparent;border:1px dashed #94a3b8;"></span>予想だった（普段の基準線）</span>
-    <span><span class="forecast-legend-dot" style="background:#a78bfa;border:2px dashed #a78bfa;background:transparent;"></span>未来予測</span>
+    <span><span class="forecast-legend-dot" style="background:#7c3aed;"></span>未来予測</span>
     <span><span class="forecast-legend-dot" style="background:#e1483c;"></span>予想超え</span>
     <span><span class="forecast-legend-dot" style="background:#15a36e;"></span>予想割れ</span>
   `;
@@ -13972,7 +13983,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 </style>
 <script>
 (function(){
-  var ROOMS=[['basic','ベーシック'],['week','曜日＆特定日'],['post','ポストイットほか'],['report','レポート'],['comp','コンパリゾン'],['payout','出玉配分の答合せ β']];
+  var ROOMS=[['basic','ベーシック'],['week','曜日＆特定日'],['post','ポストイット＆未来予測β'],['report','レポート'],['comp','コンパリゾン'],['payout','出玉配分の答合せ β']];
   var panels={};
   function show(room){
     document.querySelectorAll('#bjTabsNav a').forEach(function(a){a.classList.toggle('on',a.dataset.r===room);});
