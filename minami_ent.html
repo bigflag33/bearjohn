@@ -799,13 +799,13 @@
 <!-- 店舗追加モーダル -->
 <div class="store-modal-overlay" id="storeModal">
   <div class="store-modal">
-    <h3>🏪 店舗を追加</h3>
+    <h3>店舗を追加</h3>
     <!-- ホワイトリストなし → 自由入力 -->
     <input type="text" id="storeNameInput" placeholder="店舗名を入力" maxlength="30">
     <!-- ホワイトリストあり → ドロップダウン選択 -->
     <select id="storeNameSelect" style="display:none;width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;"></select>
     <div class="store-modal-btns">
-      <button class="sm-del" id="storeDelBtn" onclick="deleteCurrentStore()" style="display:none">🗑 この店舗を削除</button>
+      <button class="sm-del" id="storeDelBtn" onclick="deleteCurrentStore()" style="display:none">この店舗を削除</button>
       <button class="sm-cancel" onclick="closeStoreModal()">キャンセル</button>
       <button class="sm-ok" onclick="saveNewStore()">追加</button>
     </div>
@@ -897,7 +897,7 @@
       </div>
       <!-- 検索 -->
       <div style="position:relative;margin-bottom:10px;">
-        <input id="wz_search" type="text" placeholder="🔍 店舗名で絞り込み..." onInput="wzFilter()" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;">
+        <input id="wz_search" type="text" placeholder="店舗名で絞り込み..." onInput="wzFilter()" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 12px;font-size:13px;">
       </div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <span id="wz_count" style="font-size:12px;color:var(--text2);">店舗を選択してください</span>
@@ -914,7 +914,7 @@
     <!-- 生成ボタン -->
     <div style="padding:16px 24px;border-top:1px solid var(--border);flex-shrink:0;">
       <button onclick="wzGenerate()" style="width:100%;background:linear-gradient(135deg,#06b6d4,#0891b2);color:#fff;border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">
-        ✨ 設定コードを生成する
+        設定コードを生成する
       </button>
     </div>
   </div>
@@ -924,7 +924,7 @@
 <div id="userWizardResultOverlay" style="display:none;position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;padding:20px;">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:16px;width:100%;max-width:660px;margin:auto;max-height:90vh;display:flex;flex-direction:column;">
     <div style="padding:18px 24px 14px;border-bottom:1px solid var(--border);flex-shrink:0;display:flex;justify-content:space-between;align-items:center;">
-      <h2 style="font-size:15px;font-weight:700;">✅ 生成完了 — 以下をコピーして貼り付け</h2>
+      <h2 style="font-size:15px;font-weight:700;">✓ 生成完了 — 以下をコピーして貼り付け</h2>
       <button onclick="closeWizardResult()" style="background:none;border:none;color:var(--text2);font-size:20px;cursor:pointer;">✕</button>
     </div>
     <div style="padding:20px 24px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:16px;">
@@ -945,7 +945,7 @@
         <textarea id="wz_jsconf" readonly style="width:100%;height:80px;background:#0d1117;border:1px solid var(--border);color:#e2e8f0;border-radius:8px;padding:12px;font-size:12px;font-family:monospace;resize:none;line-height:1.6;"></textarea>
       </div>
       <div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:12px;font-size:12px;color:#fbbf24;line-height:1.6;">
-        ⚠️ コピー後の手順：① Claudeに両方貼り付けて更新を依頼 → ② generate_users.py を実行 → ③ dist/HTML + bi_dashboard.html をGitHubにアップ → ④ 管理画面でデータ配信
+        コピー後の手順：① Claudeに両方貼り付けて更新を依頼 → ② generate_users.py を実行 → ③ dist/HTML + bi_dashboard.html をGitHubにアップ → ④ 管理画面でデータ配信
       </div>
     </div>
   </div>
@@ -973,7 +973,7 @@
     <button class="filter-btn reset" onclick="resetFilter()">リセット</button>
     <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);white-space:nowrap;padding:4px 0;" title="IN枚数=0かつ翌日から稼働の台を集計から除外します">
       <input type="checkbox" id="excludeSettingDay" onchange="applyFilter()" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;">
-      🆕 新台セッティング日を除外
+      新台セッティング日を除外
     </label>
   </div>
 
@@ -981,7 +981,7 @@
 
   <div id="dateDots" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center;">
     <span style="font-size:11px;color:var(--text2);font-weight:600;margin-right:4px;">読込済み日付:</span>
-    <button onclick="clearAdded()" title="追加データをリセット" style="margin-left:auto;font-size:11px;background:rgba(197,48,48,0.15);color:#fc8181;border:1px solid rgba(197,48,48,0.3);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">🗑 追加分リセット</button>
+    <button onclick="clearAdded()" title="追加データをリセット" style="margin-left:auto;font-size:11px;background:rgba(197,48,48,0.15);color:#fc8181;border:1px solid rgba(197,48,48,0.3);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">追加分リセット</button>
   </div>
   <div class="kpi-grid">
     <div class="kpi-card">
@@ -1019,7 +1019,7 @@
       <div class="chart-wrapper"><canvas id="trendChart"></canvas></div>
     </div>
     <div class="chart-card full" id="trendAnalysisCard">
-      <div class="chart-title"><div class="dot" style="background:#a78bfa"></div>📊 日次トレンド分析</div>
+      <div class="chart-title"><div class="dot" style="background:#a78bfa"></div>日次トレンド分析</div>
       <div id="trendAnalysisBody" style="padding:4px 4px 8px;"></div>
     </div>
     <!-- 直近3日間ポストイットコーナー -->
@@ -1028,12 +1028,17 @@
     <div class="chart-card full" id="forecastCard" style="display:none;">
       <div class="chart-title">
         <div class="dot" style="background:linear-gradient(135deg,#60a5fa,#a78bfa)"></div>
-        🔮 未来予測グラフ
+        <div style="display:flex;flex-direction:column;line-height:1.18;">
+          <span style="font-family:'Hiragino Mincho ProN','Yu Mincho','YuMincho','Noto Serif JP',Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;letter-spacing:1.5px;color:var(--text);">FORECAST &amp; EVENT RADAR</span>
+          <span style="font-size:10px;color:var(--text2);font-weight:600;">未来予測 ＆ 直近の予想vs実績</span>
+        </div>
         <span id="forecastMeta" style="margin-left:auto;font-size:10px;color:var(--text2);font-weight:600;"></span>
       </div>
+      <div id="forecastDataRange" style="padding:2px 12px 6px;"></div>
       <div class="chart-wrapper" style="height:220px;"><canvas id="forecastChart"></canvas></div>
       <div id="forecastLegend" style="display:flex;gap:14px;flex-wrap:wrap;padding:8px 12px 4px;font-size:11px;color:var(--text2);"></div>
-      <div id="forecastDetail" style="padding:6px 12px 10px;font-size:11.5px;line-height:1.75;color:var(--text);"></div>
+      <div id="forecastRadar" style="padding:4px 12px 8px;"></div>
+      <div id="forecastDetail" style="padding:6px 12px 12px;font-size:11.5px;line-height:1.75;color:var(--text);display:none;"></div>
     </div>
     <div class="chart-card">
       <div class="chart-title"><div class="dot" style="background:var(--accent2)"></div>粗利構成（全機種）</div>
@@ -1068,15 +1073,15 @@
         <div class="dow-detail-title" id="dowDetailTitle">月曜日の平均</div>
         <button class="dow-detail-close" onclick="closeDowDetail()">✕ 閉じる</button>
         <div class="view-toggle" style="margin-left:auto;">
-          <button class="vtab active" id="dowDetailBtnTable" onclick="setDowDetailView('table')">📋 テーブル</button>
-          <button class="vtab" id="dowDetailBtnChart" onclick="setDowDetailView('chart')">📊 ビジュアル</button>
+          <button class="vtab active" id="dowDetailBtnTable" onclick="setDowDetailView('table')">テーブル</button>
+          <button class="vtab" id="dowDetailBtnChart" onclick="setDowDetailView('chart')">ビジュアル</button>
         </div>
       </div>
       <div class="dow-detail-kpi" id="dowDetailKPI"></div>
       <!-- 時系列グラフ（機種テーブルの上） -->
       <div class="ts-chart-box" id="dowTsBox" style="display:none;">
         <div class="ts-chart-label">
-          <span>📅</span>
+          <span></span>
           <span id="dowTsTitle">該当日の時系列推移（売上・粗利・1台平均IN枚数）</span>
         </div>
         <div class="ts-chart-wrap"><canvas id="dowTsChart"></canvas></div>
@@ -1146,15 +1151,15 @@
         <div class="dow-detail-title" id="digitDetailTitle">1の付く日の平均</div>
         <button class="dow-detail-close" onclick="closeDigitDetail()">✕ 閉じる</button>
         <div class="view-toggle" style="margin-left:auto;">
-          <button class="vtab active" id="digitDetailBtnTable" onclick="setDigitDetailView('table')">📋 テーブル</button>
-          <button class="vtab" id="digitDetailBtnChart" onclick="setDigitDetailView('chart')">📊 ビジュアル</button>
+          <button class="vtab active" id="digitDetailBtnTable" onclick="setDigitDetailView('table')">テーブル</button>
+          <button class="vtab" id="digitDetailBtnChart" onclick="setDigitDetailView('chart')">ビジュアル</button>
         </div>
       </div>
       <div class="dow-detail-kpi" id="digitDetailKPI"></div>
       <!-- 時系列グラフ（機種テーブルの上） -->
       <div class="ts-chart-box" id="digitTsBox" style="display:none;">
         <div class="ts-chart-label">
-          <span>📅</span>
+          <span></span>
           <span id="digitTsTitle">該当日の時系列推移（売上・粗利・1台平均IN枚数）</span>
         </div>
         <div class="ts-chart-wrap"><canvas id="digitTsChart"></canvas></div>
@@ -1217,8 +1222,8 @@
         機種別集計
       </div>
       <div class="view-toggle">
-        <button class="vtab active" id="modelAggViewTable" onclick="setModelAggView('table')">📋 テーブル</button>
-        <button class="vtab" id="modelAggViewChart" onclick="setModelAggView('chart')">📊 ビジュアル</button>
+        <button class="vtab active" id="modelAggViewTable" onclick="setModelAggView('table')">テーブル</button>
+        <button class="vtab" id="modelAggViewChart" onclick="setModelAggView('chart')">ビジュアル</button>
       </div>
     </div>
     <!-- テーブルビュー -->
@@ -1234,19 +1239,19 @@
     <div id="modelAggChartView" style="display:none;">
       <div class="model-charts-grid">
         <div class="model-chart-box">
-          <div class="model-chart-label in-label" data-s="📊 1台平均IN枚数（枚/台）" data-p="📊 1台平均アウト（発/台）">📊 1台平均IN枚数（枚/台）</div>
+          <div class="model-chart-label in-label" data-s="1台平均IN枚数（枚/台）" data-p="1台平均アウト（発/台）">1台平均IN枚数（枚/台）</div>
           <div class="model-chart-scroll" id="modelAggINWrap"><canvas id="modelAggINChart"></canvas></div>
         </div>
         <div class="model-chart-box">
-          <div class="model-chart-label">💰 1台平均粗利（円/台）</div>
+          <div class="model-chart-label">1台平均粗利（円/台）</div>
           <div class="model-chart-scroll" id="modelAggProfitAvgWrap"><canvas id="modelAggProfitAvgChart"></canvas></div>
         </div>
         <div class="model-chart-box">
-          <div class="model-chart-label">💴 推定粗利合計（円）</div>
+          <div class="model-chart-label">推定粗利合計（円）</div>
           <div class="model-chart-scroll" id="modelAggProfitTotalWrap"><canvas id="modelAggProfitTotalChart"></canvas></div>
         </div>
         <div class="model-chart-box">
-          <div class="model-chart-label">📈 利益率（%）</div>
+          <div class="model-chart-label">▲ 利益率（%）</div>
           <div class="model-chart-scroll" id="modelAggRateWrap"><canvas id="modelAggRateChart"></canvas></div>
         </div>
       </div>
@@ -1260,19 +1265,19 @@
         日別カレンダー（店舗全体）
       </div>
       <div class="view-toggle">
-        <button class="vtab active" id="calVTabCal"   onclick="setCalView('calendar')">📅 カレンダー</button>
-        <button class="vtab"        id="calVTabChart" onclick="setCalView('chart')">📊 グラフ</button>
-        <button class="vtab"        id="calVTabTable" onclick="setCalView('table')">📋 テーブル</button>
+        <button class="vtab active" id="calVTabCal"   onclick="setCalView('calendar')">カレンダー</button>
+        <button class="vtab"        id="calVTabChart" onclick="setCalView('chart')">グラフ</button>
+        <button class="vtab"        id="calVTabTable" onclick="setCalView('table')">テーブル</button>
       </div>
     </div>
     <!-- 月ナビゲーション（全ビュー共通）-->
     <div class="cal-nav" id="calNav">
-      <button class="cal-nav-btn" id="calPrevBtn" onclick="calNavMonth(-1)">◀</button>
+      <button class="cal-nav-btn" id="calPrevBtn" onclick="calNavMonth(-1)"></button>
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px;">
         <div class="cal-nav-title" id="calNavTitle">─</div>
         <div class="cal-nav-months" id="calNavMonths"></div>
       </div>
-      <button class="cal-nav-btn" id="calNextBtn" onclick="calNavMonth(+1)">▶</button>
+      <button class="cal-nav-btn" id="calNextBtn" onclick="calNavMonth(+1)"></button>
     </div>
     <!-- カレンダービュー（デフォルト）-->
     <div id="calGridView">
@@ -1293,11 +1298,11 @@
     <!-- カレンダー月次AIサマリー -->
     <div class="pin-ai-box" id="calAIBox" style="margin-top:18px;">
       <div class="pin-ai-header">
-        <div class="pin-ai-title">🤖 月次サマリー（自動分析）</div>
-        <button class="pin-ai-btn" id="calAIBtn" onclick="generateCalMonthAdvice()">✨ この月を分析</button>
+        <div class="pin-ai-title">月次サマリー（自動分析）</div>
+        <button class="pin-ai-btn" id="calAIBtn" onclick="generateCalMonthAdvice()">この月を分析</button>
       </div>
       <div class="pin-ai-content" id="calAIContent">
-        <span style="color:var(--text2);font-size:12px;">▶ 「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>
+        <span style="color:var(--text2);font-size:12px;">「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>
       </div>
     </div>
   </div>
@@ -1326,20 +1331,20 @@
       <!-- 店舗A・B・比較対象 -->
       <div class="store-cmp-selectors">
         <div class="store-cmp-slot">
-          <div class="store-cmp-slot-label cmp-label-a">▶ 店舗 A</div>
+          <div class="store-cmp-slot-label cmp-label-a">店舗 A</div>
           <select id="cmpStoreA" class="store-cmp-select sel-a" onchange="onCmpStoreChange()">
             <option value="">-- 選択 --</option>
           </select>
         </div>
         <div class="store-cmp-vs">VS</div>
         <div class="store-cmp-slot">
-          <div class="store-cmp-slot-label cmp-label-b">▶ 店舗 B</div>
+          <div class="store-cmp-slot-label cmp-label-b">店舗 B</div>
           <select id="cmpStoreB" class="store-cmp-select sel-b" onchange="onCmpStoreChange()">
             <option value="">-- 選択 --</option>
           </select>
         </div>
         <div class="store-cmp-slot" style="margin-left:6px;">
-          <div class="store-cmp-slot-label" style="color:var(--accent3);">▶ 比較対象</div>
+          <div class="store-cmp-slot-label" style="color:var(--accent3);">比較対象</div>
           <select id="cmpTarget" class="store-cmp-select" style="border-color:var(--accent3);min-width:190px;" onchange="renderStoreCmp()">
             <option value="__all__">店舗全体</option>
           </select>
@@ -1348,7 +1353,7 @@
 
       <!-- 指標ボタン（複数選択可） -->
       <div class="store-cmp-metric-btns">
-        <span style="font-size:10px;font-weight:700;color:var(--text2);align-self:center;margin-right:2px;">複数選択可▶</span>
+        <span style="font-size:10px;font-weight:700;color:var(--text2);align-self:center;margin-right:2px;">複数選択可</span>
         <button class="cmp-metric-btn active" id="cmpBtn_inmai"   onclick="cmpToggleMetric('inmai')"  >1台平均IN枚数</button>
         <button class="cmp-metric-btn"        id="cmpBtn_profit"  onclick="cmpToggleMetric('profit')" >台粗利（1台平均）</button>
         <button class="cmp-metric-btn"        id="cmpBtn_sales"   onclick="cmpToggleMetric('sales')"  >1台平均売上</button>
@@ -1386,32 +1391,32 @@
     <div id="cmpPDFBtn" style="display:none;margin-top:16px;text-align:right;">
       <button onclick="generateCmpPDF()"
         style="background:linear-gradient(135deg,#1e293b,#0f172a);color:#e2e8f0;border:1px solid rgba(148,163,184,0.3);border-radius:8px;padding:8px 18px;font-size:12px;font-weight:800;cursor:pointer;letter-spacing:1px;">
-        📄 PDF ダウンロード（ベーシック＋PPM 統合）
+        PDF ダウンロード（ベーシック＋PPM 統合）
       </button>
     </div>
 
     <!-- 疑似AI分析 -->
     <div class="pin-ai-box" id="cmpAIBox" style="margin-top:20px;">
       <div class="pin-ai-header">
-        <div class="pin-ai-title">🤖 店舗比較AI分析（ルールベース自動生成）</div>
-        <button class="pin-ai-btn" id="cmpAIBtn" onclick="generateStoreCmpAdvice()">✨ 分析する</button>
+        <div class="pin-ai-title">店舗比較AI分析（ルールベース自動生成）</div>
+        <button class="pin-ai-btn" id="cmpAIBtn" onclick="generateStoreCmpAdvice()">分析する</button>
       </div>
       <div class="pin-ai-content" id="cmpAIContent">
-        <span style="color:var(--text2);font-size:12px;">▶ 店舗 A・B を選択後、「分析する」を押すと機種別の比較レポートを自動生成します。</span>
+        <span style="color:var(--text2);font-size:12px;">店舗 A・B を選択後、「分析する」を押すと機種別の比較レポートを自動生成します。</span>
       </div>
     </div>
   </div>
 
   <!-- ▼ ピンポイント分析・比較（別ベクトル機能）▼ -->
   <div class="pin-section-wrapper">
-    <div class="pin-section-label">🔬 詳細分析ゾーン — ピンポイント &amp; 期間比較</div>
+    <div class="pin-section-label">詳細分析ゾーン — ピンポイント &amp; 期間比較</div>
 
   <!-- ピンポイント分析 -->
   <div class="pin-card" id="pinCard">
     <div class="pin-header">
       <div class="pin-header-title">
         <div class="dot" style="background:#f59e0b"></div>
-        📍 ピンポイント分析
+        ピンポイント分析
       </div>
       <input type="date" id="pinDateInput" class="pin-date-input">
       <button class="pin-toggle-btn" onclick="runPinpoint()">この日を分析</button>
@@ -1447,13 +1452,13 @@
       <!-- AIアドバイスパネル -->
       <div class="pin-ai-box" id="pinAIBox">
         <div class="pin-ai-header">
-          <div class="pin-ai-title">🤖 AIアドバイス（ルールベース自動分析）</div>
+          <div class="pin-ai-title">AIアドバイス（ルールベース自動分析）</div>
           <button class="pin-ai-btn" id="pinAIBtn" onclick="generatePinpointAdvice()">
-            ✨ 分析する
+            分析する
           </button>
         </div>
         <div class="pin-ai-content" id="pinAIContent">
-          <span style="color:var(--text2);font-size:12px;">▶ 「分析する」ボタンを押すと、本日のデータを自動解析してアドバイスを表示します。</span>
+          <span style="color:var(--text2);font-size:12px;">「分析する」ボタンを押すと、本日のデータを自動解析してアドバイスを表示します。</span>
         </div>
       </div>
       <!-- チャート -->
@@ -1495,8 +1500,8 @@
           <div class="dot" style="background:var(--accent3)"></div>
           <span id="pinModelTitle">機種別内訳</span>
           <div class="view-toggle" style="margin-left:auto;">
-            <button class="vtab" id="pinModelBtnTable" onclick="setPinModelView('table')">📋 テーブル</button>
-            <button class="vtab active" id="pinModelBtnChart" onclick="setPinModelView('chart')">📊 グラフ</button>
+            <button class="vtab" id="pinModelBtnTable" onclick="setPinModelView('table')">テーブル</button>
+            <button class="vtab active" id="pinModelBtnChart" onclick="setPinModelView('chart')">グラフ</button>
           </div>
         </div>
         <!-- テーブルビュー（デフォルト非表示）-->
@@ -1510,19 +1515,19 @@
         <div id="pinModelChartView">
           <div class="model-charts-grid">
             <div class="model-chart-box">
-              <div class="model-chart-label in-label" data-s="📊 1台平均IN枚数（稼働）" data-p="📊 1台平均アウト（稼働）">📊 1台平均IN枚数（稼働）</div>
+              <div class="model-chart-label in-label" data-s="1台平均IN枚数（稼働）" data-p="1台平均アウト（稼働）">1台平均IN枚数（稼働）</div>
               <div class="model-chart-scroll" id="pinMcINWrap"><canvas id="pinMcINChart"></canvas></div>
             </div>
             <div class="model-chart-box">
-              <div class="model-chart-label">💰 推定粗利合計</div>
+              <div class="model-chart-label">推定粗利合計</div>
               <div class="model-chart-scroll" id="pinMcProfitWrap"><canvas id="pinMcProfitChart"></canvas></div>
             </div>
             <div class="model-chart-box">
-              <div class="model-chart-label">💴 1台平均粗利</div>
+              <div class="model-chart-label">1台平均粗利</div>
               <div class="model-chart-scroll" id="pinMcAvgProfitWrap"><canvas id="pinMcAvgProfitChart"></canvas></div>
             </div>
             <div class="model-chart-box">
-              <div class="model-chart-label">📈 利益率（%）</div>
+              <div class="model-chart-label">▲ 利益率（%）</div>
               <div class="model-chart-scroll" id="pinMcRateWrap"><canvas id="pinMcRateChart"></canvas></div>
             </div>
           </div>
@@ -1535,13 +1540,13 @@
   <div class="table-card" id="dateCompCard" style="padding:18px;">
     <div class="table-title" style="margin-bottom:16px;">
       <div class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent3)"></div>
-      🔀 この日とこの日を比較
+      この日とこの日を比較
     </div>
     <!-- 日付選択UI -->
     <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px;">
       <!-- A -->
       <div style="background:rgba(108,99,255,0.09);border:1px solid rgba(108,99,255,0.28);border-radius:10px;padding:14px;min-width:220px;">
-        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;">📅 期間 A（基準）</div>
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px;">期間 A（基準）</div>
         <div class="dc-radio-group">
           <label><input type="radio" name="dcTypeA" value="single" checked onchange="dcToggleType('A',this.value)">単日</label>
           <label><input type="radio" name="dcTypeA" value="range" onchange="dcToggleType('A',this.value)">期間</label>
@@ -1553,10 +1558,10 @@
           <input type="date" id="dcToA" class="pin-date-input" style="width:100%;">
         </div>
       </div>
-      <div style="font-size:24px;color:var(--text2);padding-bottom:8px;">↔</div>
+      <div style="font-size:24px;color:var(--text2);padding-bottom:8px;"></div>
       <!-- B -->
       <div style="background:rgba(247,151,30,0.09);border:1px solid rgba(247,151,30,0.28);border-radius:10px;padding:14px;min-width:220px;">
-        <div style="font-size:11px;font-weight:700;color:#f7971e;margin-bottom:8px;">📅 期間 B（比較）</div>
+        <div style="font-size:11px;font-weight:700;color:#f7971e;margin-bottom:8px;">期間 B（比較）</div>
         <div class="dc-radio-group">
           <label><input type="radio" name="dcTypeB" value="single" checked onchange="dcToggleType('B',this.value)">単日</label>
           <label><input type="radio" name="dcTypeB" value="range" onchange="dcToggleType('B',this.value)">期間</label>
@@ -1580,8 +1585,8 @@
           <div class="dot" style="width:7px;height:7px;border-radius:50%;background:var(--accent2);flex-shrink:0;"></div>
           <span id="dcModelTitle" style="font-size:12px;font-weight:700;color:var(--text2);">機種別比較</span>
           <div style="margin-left:auto;display:flex;gap:6px;">
-            <button id="dcBtnTable" onclick="dcView('table')" class="pin-toggle-btn dc-active" style="font-size:11px;padding:4px 14px;">📋 テーブル</button>
-            <button id="dcBtnChart" onclick="dcView('chart')" class="pin-toggle-btn" style="font-size:11px;padding:4px 14px;">📊 グラフ</button>
+            <button id="dcBtnTable" onclick="dcView('table')" class="pin-toggle-btn dc-active" style="font-size:11px;padding:4px 14px;">テーブル</button>
+            <button id="dcBtnChart" onclick="dcView('chart')" class="pin-toggle-btn" style="font-size:11px;padding:4px 14px;">グラフ</button>
           </div>
         </div>
         <!-- テーブルビュー -->
@@ -1637,6 +1642,146 @@ const JAPAN_HOLIDAYS = new Set([
   '2027-10-11','2027-11-03','2027-11-23',
 ]);
 const isHoliday = d => JAPAN_HOLIDAYS.has(d);
+
+// ── 特定日 自動検出（末尾数字/ゾロ目/月日一致）── 未来予想の精度向上用
+// 店の実績から、曜日・給料日を補正しても明らかにアウトが高い日（＝その店の特定日）を自動で拾う。
+// あやふやな日（バラつきが大きい日）は採用しない。バックテストで全店検証済み（効く店だけ効き、ほぼ悪化なし）。
+function _bjDayPats(dateStr){
+  const d = new Date(dateStr+'T00:00:00'), dom=d.getDate(), mon=d.getMonth()+1, P=['e'+(dom%10)];
+  if(dom===11||dom===22) P.push('z'+dom);   // ゾロ目（11・22日）
+  if(mon===dom) P.push('md');               // 月日一致（1/1・3/3・8/8…）
+  return P;
+}
+function _bjDayTypeExp(s, dateStr){
+  const mean=s.mean; if(!mean) return 0;
+  const d=new Date(dateStr+'T00:00:00'), dom=d.getDate(), mon=d.getMonth()+1, dow=d.getDay(), hol=isHoliday(dateStr);
+  const R=x=>(x!=null&&mean!==0)?x/mean:1;
+  const monMul = dom<=10?R(s.avgJou):dom<=20?R(s.avgChu):R(s.avgKa);
+  const sp = (dom>=25&&dom<=29)?R(s.avgSalary):(dom>=1&&dom<=7)?R(s.avgMonthInit):(mon%2===0&&dom>=15&&dom<=19)?R(s.avgPension):1;
+  let dowMul; if(hol&&s.avgHoliday!=null){dowMul=R(s.avgHoliday);}else{const e=(s.dowAvgs||[]).find(x=>x.dow===dow);dowMul=(e&&e.avg!=null)?R(e.avg):1;}
+  return mean*Math.max(0.3,Math.min(2.5, monMul*0.35+sp*0.25+dowMul*0.4));
+}
+function _bjDetectTokuteibi(dates, vals, s){
+  const byPat={};
+  dates.forEach((d,i)=>{ const exp=_bjDayTypeExp(s,d); if(exp<=0)return; const r=vals[i]/exp;
+    _bjDayPats(d).forEach(p=>{(byPat[p]=byPat[p]||[]).push(r);}); });
+  const adopted={}, SHRINK=0.6;
+  Object.keys(byPat).forEach(p=>{ const arr=byPat[p]; if(arr.length<5)return;          // 出現5回以上
+    const lift=arr.reduce((a,b)=>a+b,0)/arr.length;
+    const pos=arr.filter(x=>x>1).length/arr.length;                                    // 連続性ガード
+    if(lift>=1.10&&pos>=0.6) adopted[p]=Math.min(1+(lift-1)*SHRINK,1.6);                // 控えめ適用＋上限
+  });
+  return adopted;
+}
+function _bjSpecialLift(map, dateStr){ if(!map)return 1; let best=1; _bjDayPats(dateStr).forEach(p=>{ if(map[p]&&map[p]>best)best=map[p]; }); return best; }
+function _bjPatLabel(p){ if(p[0]==='e')return '末尾'+p.slice(1)+'の日'; if(p[0]==='z')return 'ゾロ目'+p.slice(1)+'日'; if(p==='md')return '月日一致の日'; return p; }
+
+// ── 的中度＋乖離レーダー（直近の予想 vs 実績）＋説明ボタン ──
+function _bjRenderForecastScore(metricKey, recentDev, hitRate, pita, unit, expAvg, actAvg, fcAvg, horizon, edge){
+  const host = document.getElementById('forecastRadar');
+  if(!host) return;
+  const isIn = metricKey === 'IN枚数';
+  let html = '';
+  const edgeTxt = (edge && edge > 1) ? `エッジ ${edge.toFixed(1)}×（この店に自動最適化）` : '標準（エッジ補正なし）';
+  // ① 的中度バッジ（目立つ・過去30日の予想/実績＋今後の予想平均）
+  if(hitRate != null){
+    const hc = hitRate>=80?'#15a36e':hitRate>=70?'#e08a00':'#e1483c';
+    const stat = (lab, val, col) => `<div style="line-height:1.2;"><span style="font-size:10px;color:var(--text2);">${lab}</span><br><span style="font-size:16px;font-weight:800;color:${col||'var(--text)'};">${val!=null?val.toLocaleString():'—'}<span style="font-size:10px;font-weight:600;color:var(--text2);"> ${unit}</span></span></div>`;
+    const pastBlock = (expAvg!=null&&actAvg!=null)
+      ? `<div style="display:flex;gap:18px;flex-wrap:wrap;padding-left:14px;border-left:1px solid var(--border);">
+           ${stat('実績 平均（直近'+recentDev.length+'日）', actAvg)}
+           ${stat('予想 平均（直近'+recentDev.length+'日）', expAvg)}
+         </div>` : '';
+    const futBlock = (fcAvg!=null)
+      ? `<div style="display:flex;gap:18px;flex-wrap:wrap;padding-left:14px;border-left:1px solid var(--border);">
+           ${stat('今後'+horizon+'日 予想平均', fcAvg, '#0098d4')}
+         </div>` : '';
+    html += `<div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:2px 0 12px;padding:13px 16px;background:rgba(0,152,212,0.07);border:1px solid rgba(0,152,212,0.22);border-radius:12px;">
+      <div style="line-height:1.08;">
+        <div style="font-size:11px;color:var(--text2);font-weight:700;">この予想の的中度 <span style="font-weight:500;">（直近${recentDev.length}日）</span></div>
+        <div style="font-size:34px;font-weight:800;color:${hc};letter-spacing:.5px;">約${hitRate}<span style="font-size:20px;">%</span></div>
+        ${pita!=null?`<div style="font-size:10.5px;color:var(--text2);">ピタリ率（±10%以内）：<b style="color:var(--text);">${pita}%</b></div>`:''}
+        <div style="font-size:10px;color:var(--text3,#94a3b8);margin-top:1px;">${edgeTxt}</div>
+      </div>
+      ${pastBlock}${futBlock}</div>`;
+  }
+  // ② 乖離レーダー（フラグ日リスト）
+  const flagged = (recentDev||[]).filter(r=>r.flag).sort((a,b)=>Math.abs(b.dev)-Math.abs(a.dev));
+  html += `<div style="font-size:11px;font-weight:800;color:#0098d4;margin:2px 0 7px;letter-spacing:.3px;">EVENT RADAR ／ 直近の予想 vs 実績（普段とのズレ${isIn?'＝競合シグナル':''}）</div>`;
+  if(flagged.length){
+    html += `<div style="display:flex;flex-direction:column;gap:5px;">`;
+    flagged.forEach(r=>{
+      const up = r.dev>0, col = up?'#e1483c':'#15a36e';
+      const head = up ? '▲ 予想超え（普段より高め）' : '▼ 予想割れ（普段より低め）';
+      const note = isIn
+        ? (up ? '競合店なら"動いた"サイン＝要分析／自店なら成功施策' : '競合店なら"スキ"＝攻めどき／自店なら客が流れた可能性')
+        : (up ? '普段より高かった日' : '普段より低かった日');
+      html += `<div style="font-size:11px;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;">
+        <span style="font-weight:800;color:${col};min-width:96px;">${r.d.slice(5).replace('-','/')} ${r.dev>=0?'+':''}${Math.round(r.dev)}%</span>
+        <span style="color:var(--text);">${head}</span>
+        <span style="color:var(--text2);font-size:10.5px;">${note}</span></div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<div style="font-size:10.5px;color:var(--text2);">直近${recentDev.length}日は予想どおり（±15%以内）＝普段通りの動き。特別な動きは検出されず。</div>`;
+  }
+  // ③ ボタン3つを1列に（詳細トグル＋説明2つ）
+  html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+      <button class="bjp-info" id="fcDetailToggle" style="margin-left:0;">予測の内訳・注目日・特定日を開く ▼</button>
+      <button class="bjp-info" id="fcInfoBtn2" style="margin-left:0;">日付と足切りの考え方</button>
+      <button class="bjp-info" id="fcInfoBtn" style="margin-left:0;">計算方法と考え方</button>
+    </div>`;
+  host.innerHTML = html;
+  _bjWireForecastInfo();
+  const _dt = document.getElementById('fcDetailToggle'), _dd = document.getElementById('forecastDetail');
+  if(_dt && _dd){ _dt.onclick = () => {
+    const open = _dd.style.display !== 'none';
+    _dd.style.display = open ? 'none' : 'block';
+    _dt.textContent = open ? '予測の内訳・注目日・特定日を開く ▼' : '予測の内訳・注目日・特定日を閉じる ▲';
+  }; }
+}
+function _bjForecastInfoModalHTML(){
+  return '<div class="bjp-modalbg" id="fcInfoBg"><div class="bjp-modal"><button class="bjp-modalx" id="fcInfoX" title="閉じる">×</button>'
+    + '<h2>計算方法と考え方 <small>（未来予想）</small></h2>'
+    + '<h3>① 予想の作り方</h3><ul>'
+    + '<li>その店の<b>過去実績だけ</b>から計算（他店の影響なし）。アウトは台あたり平均。</li>'
+    + '<li>予想 ＝ <b>基準水準</b> ×（月内35％ ＋ 給料日25％ ＋ 曜日40％）× <b>特定日乗数</b>。</li>'
+    + '<li>基準水準 ＝ 直近トレンド（線形回帰）と全体平均のブレンド。</li>'
+    + '<li><b>特定日</b>＝末尾数字／ゾロ目(11・22)／月日一致(3/3等)を、曜日・給料日で補正しても高い日だけ自動採用（控えめ適用・バックテスト検証済）。</li></ul>'
+    + '<h3>② 的中度</h3><ul>'
+    + '<li><b>的中度</b>＝100％ − 平均誤差。直近の「予想 vs 実績」がどれだけ近かったか。</li>'
+    + '<li><b>ピタリ率</b>＝予想の±10％以内に収まった日の割合（厳しめの当たり判定）。</li></ul>'
+    + '<h3>③ 予想vs実績＝競合シグナル（稼働のとき）</h3><ul>'
+    + '<li><b>予想超え（▲）</b>＝普段より客が多い。競合店なら"動いた"＝要分析／自店なら成功施策。</li>'
+    + '<li><b>予想割れ（▼）</b>＝普段より少ない。競合店なら"スキ"＝攻めどき／自店なら客が流れた可能性。</li>'
+    + '<li>しきい値：予想から<b>±15％超</b>でフラグ。</li></ul>'
+    + '<h3>④ 注意・限界</h3><ul>'
+    + '<li>未来の新台・突発イベントは織り込めない（予定が分かれば別途反映可）。</li>'
+    + '<li>先の日ほど精度は落ちる。半月先までの目安。</li></ul>'
+    + '</div></div>';
+}
+function _bjForecastInfoModal2HTML(){
+  return '<div class="bjp-modalbg" id="fcInfoBg2"><div class="bjp-modal"><button class="bjp-modalx" id="fcInfoX2" title="閉じる">×</button>'
+    + '<h2>日付と足切りの考え方 <small>（未来予想）</small></h2><ul>'
+    + '<li>対象は<b>今ヘッダーで選んでいる店舗</b>・<b>選択中の期間フィルター</b>のデータ。</li>'
+    + '<li>予想には<b>7日以上</b>のデータが必要（それ未満は非表示）。</li>'
+    + '<li>曜日・特定日の判定は<b>出現回数が一定以上</b>の日だけ（薄い日はノイズとしてスルー）。</li>'
+    + '<li><b>特定日は5回以上</b>出ていて、かつ"あやふや"でない日だけ採用。</li>'
+    + '<li>予測は<b>最終日の翌日から15日（半月）</b>。グラフ左は直近30日の予想vs実績。</li>'
+    + '<li>祝日は専用枠、給料日(25〜29)・月初(1〜7)・年金(偶数月15〜19)は別枠で考慮。</li>'
+    + '</ul></div></div>';
+}
+function _bjWireForecastInfo(){
+  if(!document.getElementById('fcInfoBg')){
+    const wrap=document.createElement('div'); wrap.innerHTML=_bjForecastInfoModal2HTML()+_bjForecastInfoModalHTML();
+    while(wrap.firstChild) document.body.appendChild(wrap.firstChild);
+  }
+  const bind=(btn,bg,x)=>{ const b=document.getElementById(btn),g=document.getElementById(bg),c=document.getElementById(x);
+    if(b&&g)b.onclick=()=>g.classList.add('on'); if(c&&g)c.onclick=()=>g.classList.remove('on');
+    if(g)g.onclick=e=>{if(e.target===g)g.classList.remove('on');}; };
+  bind('fcInfoBtn','fcInfoBg','fcInfoX');
+  bind('fcInfoBtn2','fcInfoBg2','fcInfoX2');
+}
 
 const RAW_DATA = [];
 const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX-TP", "Lスマスロ北斗", "LモンキーターンVCE", "L北斗の拳 転生の章2", "Sゴーゴージャグラー3KA", "S沖ドキ!GOLD", "Lカバネリ海門決戦", "ネオアイムジャグラーEX", "L東京喰種", "S甲鉄城のカバネリ", "SハッピージャグラーVIII", "Lゴッドイーター リザレクション", "L鉄拳6", "L新鬼武者3", "L東京リベンジャーズ", "LからくりサーカスG", "Lカグヤ様は告らせたい", "L革命機ヴァルヴレイヴ2", "L吉宗", "Lバジリスク絆2天膳ZN", "L沖ドキ!DUO2 アンコール", "Lハナビ", "Sファンキージャグラー2KT", "ジャグラーガールズSS", "ウルトラミラクルジャグラー", "Lスーパーブラックジャック", "S炎炎ノ消防隊", "S押忍!番長ZERO", "S MHWアイスボーンZF", "L秘宝伝", "Lいざ!番長", "Lレヴュースタァライト", "L攻殻機動隊", "Lマギアレコード", "LゴブリンスレイヤーII", "L化物語", "Sバイオハザード RE:2", "L真・北斗無双", "Lアリフレタ職業デ世界最強", "L戦国乙女4S3", "L真・一騎当千", "L炎炎ノ消防隊", "L押忍!番長4", "Lデビルメイクライ5ST", "Lモンスターハンターライズ", "LBサンダーV", "LBクレアの秘宝伝", "LB SHAKE BT", "LBニューパルサー", "LBマタドールIII", "LBエヴァンゲリヲン約束の扉", "ダンまち2", "SグランベルムZXZ", "Sディスクアップ2", "S/新ハナビR/HA", "SエウレカセブンHIEVO XS", "L炎炎ノ消防隊2", "L七つの魔剣が支配", "Lダーリン・イン・ザ・フランキス", "L閃乱カグラ2 シノビマスター", "Lガールズ&パンツァー最終H1", "L絶対衝激IV", "Lラブ嬢3M4", "Lルパン三世大航海者", "Lネオプラネット", "Lトアル科学の超電磁砲2", "L範馬刃牙", "Lバイオハザード5", "L主役は銭形5", "L防振り", "Lバーニングエクスプレス", "L革命機ヴァルヴレイヴ", "L ToLOVEるダークネスS8", "LアズールレーンANIMATION", "L無職転生"];
@@ -1851,7 +1996,7 @@ async function loadRemoteData() {
     if (badge) {
       const d = data.generated ? new Date(data.generated) : null;
       const dateStr = d ? `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '';
-      badge.textContent = `📡 データ配信済み ${dateStr}`;
+      badge.textContent = `データ配信済み ${dateStr}`;
       badge.style.display = '';
     }
   } catch(e) {
@@ -1905,7 +2050,7 @@ async function _buildBenchmarkFromCache() {
 
 async function exportUserData() {
   if (!USERS_CONFIG.length) { alert('USERS_CONFIGが設定されていません'); return; }
-  showMsg('⏳ データを書き出し中...', 'ok');
+  showMsg('データを書き出し中...', 'ok');
   const allStores = getStores();
   const results = [];
 
@@ -2021,12 +2166,12 @@ async function exportUserData() {
     }
   }
   if (unmatched.length > 0) {
-    const msg = '⚠️ 以下の店舗がシステム内に見つかりません（Excelが未アップまたはファイル名の店舗名が不一致）:\n\n' + unmatched.join('\n');
+    const msg = '以下の店舗がシステム内に見つかりません（Excelが未アップまたはファイル名の店舗名が不一致）:\n\n' + unmatched.join('\n');
     alert(msg);
   }
   console.log('[診断] --- 診断終了 ---');
 
-  showMsg(`✅ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
+  showMsg(`✓ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
 }
 
 // ── 管理者専用：全データ一括バックアップ ──
@@ -2154,17 +2299,17 @@ function closeWizardResult() {
 function wzCopy(id) {
   const el = document.getElementById(id);
   navigator.clipboard.writeText(el.value).then(() => {
-    showMsg('✅ クリップボードにコピーしました', 'ok');
+    showMsg('✓ クリップボードにコピーしました', 'ok');
   }).catch(() => {
     el.select();
     document.execCommand('copy');
-    showMsg('✅ コピーしました', 'ok');
+    showMsg('✓ コピーしました', 'ok');
   });
 }
 // ===== /担当者追加ウィザード =====
 
 async function exportFullBackup() {
-  showMsg('⏳ 全データをバックアップ中...', 'ok');
+  showMsg('全データをバックアップ中...', 'ok');
   const allStores = getStores().filter(s => s.id !== 'default' && s.id !== '__benchmark__');
   const exportData = { generated: new Date().toISOString(), type: 'full_backup', stores: {} };
   let totalRecords = 0;
@@ -2188,14 +2333,14 @@ async function exportFullBackup() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
-  showMsg('✅ バックアップ完了！ ' + allStores.length + '店舗・' + totalRecords.toLocaleString() + '件', 'ok');
+  showMsg('✓ バックアップ完了！ ' + allStores.length + '店舗・' + totalRecords.toLocaleString() + '件', 'ok');
 }
 
 async function restoreFromJson(event) {
   const files = Array.from(event.target.files);
   event.target.value = '';
   if (!files.length) return;
-  showMsg('⏳ ' + files.length + 'ファイルを復元中...', 'ok');
+  showMsg('' + files.length + 'ファイルを復元中...', 'ok');
   let totalStores = 0, totalRecords = 0;
   const errors = [];
   for (const file of files) {
@@ -2234,9 +2379,9 @@ async function restoreFromJson(event) {
     } catch(e) { errors.push(file.name + ': ' + e.message); }
   }
   if (errors.length) {
-    showMsg('⚠️ 復元エラー: ' + errors.join(', '), 'warn');
+    showMsg('復元エラー: ' + errors.join(', '), 'warn');
   } else {
-    showMsg('✅ 復元完了！ ' + totalStores + '店舗・' + totalRecords.toLocaleString() + '件を追加しました', 'ok');
+    showMsg('✓ 復元完了！ ' + totalStores + '店舗・' + totalRecords.toLocaleString() + '件を追加しました', 'ok');
   }
   render();
   updateDateDots();
@@ -2263,7 +2408,7 @@ function updateDateDots() {
   });
 
   const resetBtn = (addedDates.length > 0)
-    ? `<button onclick="clearAdded()" title="データをリセット" style="margin-left:auto;font-size:11px;background:rgba(197,48,48,0.15);color:#fc8181;border:1px solid rgba(197,48,48,0.3);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">🗑 追加分リセット</button>`
+    ? `<button onclick="clearAdded()" title="データをリセット" style="margin-left:auto;font-size:11px;background:rgba(197,48,48,0.15);color:#fc8181;border:1px solid rgba(197,48,48,0.3);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">追加分リセット</button>`
     : '';
 
   if (allDates.length === 0) {
@@ -2281,12 +2426,12 @@ function updateDateDots() {
     const chipId = 'mchips-' + ym.replace('-','');
     const chips = dates.map(d => {
       const chipCls = addedSet.has(d) ? 'date-chip added' : 'date-chip base';
-      const icon = addedSet.has(d) ? '✨' : '';
+      const icon = addedSet.has(d) ? '' : '';
       return `<span class="${chipCls}">${icon}${d.slice(5)}</span>`;
     }).join('');
     return `<div style="display:inline-flex;flex-direction:column;">
       <span class="${cls}" onclick="toggleMonthGroup('${ym}')">
-        <span class="mbadge-arrow" id="marr-${ym.replace('-','')}">▶</span>${label}
+        <span class="mbadge-arrow" id="marr-${ym.replace('-','')}"></span>${label}
       </span>
       <div class="month-chips" id="${chipId}">${chips}</div>
     </div>`;
@@ -2509,7 +2654,7 @@ async function handleUpload(event) {
   event.target.value = '';
   if (!files.length) return;
 
-  if (files.length > 1) showMsg(`⏳ ${files.length}ファイルを処理中...`, 'ok');
+  if (files.length > 1) showMsg(`${files.length}ファイルを処理中...`, 'ok');
 
   // ファイルごとに保存先店舗を判定
   const fileStoreMap = files.map(f => {
@@ -2599,11 +2744,11 @@ async function handleUpload(event) {
 
   // 結果メッセージ
   if (totalAdded === 0) {
-    showMsg('⚠️ 追加データなし（重複 or 空ファイル）', 'err');
+    showMsg('追加データなし（重複 or 空ファイル）', 'err');
   } else {
     const parts = summaries.map(s => `【${s.storeName}】${s.dates.join('・')} ${s.count}台`);
-    let msg = `✅ ${parts.join(' / ')} を追加`;
-    if (errors.length > 0) msg += ` / ⚠️${errors.length}件スキップ`;
+    let msg = `✓ ${parts.join(' / ')} を追加`;
+    if (errors.length > 0) msg += ` / ${errors.length}件スキップ`;
     showMsg(msg, 'ok');
   }
 }
@@ -2622,31 +2767,31 @@ function renderAIGreeting() {
   const dd0 = String(now.getDate()).padStart(2,'0');
   const todayKey = `${mm}/${dd0}`;
   const CALENDAR = {
-    '01/01':'元旦おめでとうございます🎍','01/07':'七草の日🌿','01/11':'鏡開きの日',
-    '02/03':'節分の日👹','02/14':'バレンタインデー🍫','02/22':'猫の日🐱',
-    '03/03':'ひな祭り🎎','03/14':'ホワイトデー🍬',
-    '04/01':'エイプリルフール🤡',
-    '05/05':'こどもの日🎏',
-    '07/07':'七夕ですね⭐',
+    '01/01':'元旦おめでとうございます','01/07':'七草の日','01/11':'鏡開きの日',
+    '02/03':'節分の日','02/14':'バレンタインデー','02/22':'猫の日',
+    '03/03':'ひな祭り','03/14':'ホワイトデー',
+    '04/01':'エイプリルフール',
+    '05/05':'こどもの日',
+    '07/07':'七夕ですね★',
     '08/11':'山の日','08/13':'お盆シーズン入りです',
     '09/09':'重陽の節句',
-    '10/31':'ハロウィン🎃',
-    '11/03':'文化の日','11/15':'七五三👘','11/23':'勤労感謝の日',
-    '12/24':'クリスマスイブ🎄','12/25':'メリークリスマス🎄🎅','12/31':'大晦日です🎆',
+    '10/31':'ハロウィン',
+    '11/03':'文化の日','11/15':'七五三','11/23':'勤労感謝の日',
+    '12/24':'クリスマスイブ','12/25':'メリークリスマス','12/31':'大晦日です',
   };
   const SEASONAL = [null,
     ['新年の幕開けです','寒さが続きますがお体に気をつけて'],
     ['立春が過ぎ、春の気配も感じられます','まだまだ寒い日が続きますね'],
-    ['春の訪れを感じる季節ですね🌸','卒業・異動シーズン、何かと慌ただしい時期です'],
-    ['桜の季節ですね🌸','新年度スタートです、気持ち新たに'],
+    ['春の訪れを感じる季節ですね','卒業・異動シーズン、何かと慌ただしい時期です'],
+    ['桜の季節ですね','新年度スタートです、気持ち新たに'],
     ['ゴールデンウィーク時期、お客様の入りはいかがでしょう','気持ちのいい季節になりました'],
-    ['梅雨入りの季節ですね☔','じめじめした日が続きますが頑張りましょう'],
-    ['夏本番ですね☀️','暑い日が続いています、水分補給を忘れずに'],
+    ['梅雨入りの季節ですね△','じめじめした日が続きますが頑張りましょう'],
+    ['夏本番ですね◎','暑い日が続いています、水分補給を忘れずに'],
     ['お盆シーズン、賑わいが期待できます','厳しい暑さが続いていますね'],
-    ['秋の気配が漂ってきました🍂','残暑もそろそろ落ち着いてきますね'],
-    ['秋が深まってきました🍁','ハロウィンシーズン、にぎやかですね'],
-    ['紅葉シーズンですね🍂','冬の足音が近づいてきました'],
-    ['師走ですね、年の瀬が迫ってきました','クリスマスシーズン真っ盛りです🎄'],
+    ['秋の気配が漂ってきました','残暑もそろそろ落ち着いてきますね'],
+    ['秋が深まってきました','ハロウィンシーズン、にぎやかですね'],
+    ['紅葉シーズンですね','冬の足音が近づいてきました'],
+    ['師走ですね、年の瀬が迫ってきました','クリスマスシーズン真っ盛りです'],
   ];
   const calEvent = CALENDAR[todayKey];
   const seasonal = SEASONAL[now.getMonth()+1] || [];
@@ -2684,11 +2829,11 @@ function renderAIGreeting() {
     const profitRank = rankedP.findIndex(([d])=>d===latestDate)+1;
     const outRank    = rankedO.findIndex(([d])=>d===latestDate)+1;
     if (profitRank && totalDays > 1) {
-      const m = profitRank===1?'🥇':profitRank===2?'🥈':profitRank===3?'🥉':'';
+      const m = profitRank===1?'1位':profitRank===2?'2位':profitRank===3?'3位':'';
       insights.push(`${dateLabel}は今月${totalDays}日中 粗利<strong>${profitRank}位</strong>の成績でした ${m}`);
     }
     if (outRank && totalDays > 1) {
-      const m = outRank===1?'🥇':outRank===2?'🥈':outRank===3?'🥉':'';
+      const m = outRank===1?'1位':outRank===2?'2位':outRank===3?'3位':'';
       insights.push(`${dateLabel}は今月${totalDays}日中 アウト<strong>${outRank}位</strong>の賑わいでした ${m}`);
     }
 
@@ -2706,11 +2851,11 @@ function renderAIGreeting() {
       const rate = v.profit / v.sales * 100;
       const who = multiStore ? `<strong>${name}</strong>` : '昨日';
       if (v.profit < 0) {
-        insights.push(`${dateLabel}の${who}は赤字でした 😔`);
+        insights.push(`${dateLabel}の${who}は赤字でした `);
       } else if (rate < 8) {
         insights.push(`${dateLabel}の${who}はちょっと薄利営業でした（利益率 ${rate.toFixed(1)}%）`);
       } else if (rate >= 15) {
-        insights.push(`${dateLabel}の${who}は抜きましたね💪（利益率 ${rate.toFixed(1)}%）`);
+        insights.push(`${dateLabel}の${who}は抜きましたね（利益率 ${rate.toFixed(1)}%）`);
       }
     });
 
@@ -2749,7 +2894,7 @@ function renderAIGreeting() {
 
   if (!contextMsg && !insightHtml) { el.style.display='none'; return; }
   el.style.display = 'flex';
-  el.innerHTML = `<span style="font-size:15px;flex-shrink:0;">🐻</span><span><strong>${greeting}！</strong>${contextMsg}${insightHtml}</span>`;
+  el.innerHTML = `<span style="font-size:15px;flex-shrink:0;"></span><span><strong>${greeting}！</strong>${contextMsg}${insightHtml}</span>`;
 }
 
 function reloadAll() {
@@ -2823,7 +2968,7 @@ function init() {
   // ── USER_LABEL バッジ表示 ──
   if (USER_LABEL) {
     const badge = document.getElementById('userLabelBadge');
-    if (badge) { badge.textContent = '👤 ' + USER_LABEL; badge.style.display = ''; }
+    if (badge) { badge.textContent = '' + USER_LABEL; badge.style.display = ''; }
   }
   // ── ホワイトリストが設定されている場合、対象外の既存店舗を非表示ガード ──
   if (STORE_WHITELIST.length > 0) {
@@ -2897,7 +3042,7 @@ function applyFilter() {
 
   // 除外件数をメッセージ表示
   if (settingSet && settingSet.size > 0) {
-    showMsg(`🆕 新台セッティング日: ${settingSet.size}件を除外しました`, 'ok');
+    showMsg(`新台セッティング日: ${settingSet.size}件を除外しました`, 'ok');
   }
 
   render();
@@ -3328,9 +3473,9 @@ function runDateComparison() {
   const fmtV = (v, unit) => v == null ? 'データなし'
     : unit === '円' ? Math.round(v).toLocaleString()+'円' : Math.round(v).toLocaleString()+_inUnit()+'/台';
   const metrics = [
-    { key:'sales',  label:'推定売上',     unit:'円', icon:'💰', color:'#60a5fa' },
-    { key:'profit', label:'推定粗利',     unit:'円', icon:'📈', color:'#34d399' },
-    { key:'inmai',  label:'1台平均'+_inLabel(true), unit:_inUnit(), icon:'🎰', color:'#f7971e' },
+    { key:'sales',  label:'推定売上',     unit:'円', icon:'', color:'#60a5fa' },
+    { key:'profit', label:'推定粗利',     unit:'円', icon:'▲', color:'#34d399' },
+    { key:'inmai',  label:'1台平均'+_inLabel(true), unit:_inUnit(), icon:'', color:'#f7971e' },
   ];
   const days_suffix = n => n > 1 ? `（${n}日平均）` : '';
   document.getElementById('dcSummaryGrid').innerHTML = metrics.map(m => {
@@ -3435,7 +3580,7 @@ function runDateComparison() {
 
     commentEl.innerHTML = `
       <div style="padding:14px 18px;background:rgba(108,99,255,0.08);border-left:4px solid #6c63ff;border-radius:0 10px 10px 0;">
-        <div style="font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:.5px;margin-bottom:6px;">📝 比較サマリー</div>
+        <div style="font-size:11px;font-weight:800;color:#a78bfa;letter-spacing:.5px;margin-bottom:6px;">比較サマリー</div>
         <div style="font-size:13px;line-height:1.8;color:var(--text);">${fullText}</div>
       </div>`;
   } else if (commentEl) {
@@ -4436,10 +4581,10 @@ function renderRivalAnalysis() {
     const inRising     = m.inTrend   >= TREND_UP_TH;
     const inFalling    = m.inTrend   <= TREND_DOWN_TH;
 
-    if      (inRising  && isHighProfit)  classified.rising_profit.push(m);  // 🔴 最優先警戒
-    else if (inRising  && !isHighProfit) classified.rising_low.push(m);     // 🟡 集客警戒
-    else if (inFalling && isHighProfit)  classified.falling_profit.push(m); // 🟠 転換点観察
-    else if (inFalling && !isHighProfit) classified.falling_low.push(m);    // 🟢 好機
+    if      (inRising  && isHighProfit)  classified.rising_profit.push(m);  // ● 最優先警戒
+    else if (inRising  && !isHighProfit) classified.rising_low.push(m);     // ● 集客警戒
+    else if (inFalling && isHighProfit)  classified.falling_profit.push(m); // ● 転換点観察
+    else if (inFalling && !isHighProfit) classified.falling_low.push(m);    // ● 好機
     else                                 classified.stable.push(m);          // 横ばい（非表示）
   });
   Object.keys(classified).forEach(k => classified[k].sort((a,b) => b.avgProfit - a.avgProfit));
@@ -4567,7 +4712,7 @@ function renderRivalAnalysis() {
     const weekendRate = weekendTotal > 0 ? weekendSq/weekendTotal : 0;
     const weekdayRate = weekdayTotal > 0 ? weekdaySq/weekdayTotal : 0;
     const pattern = weekdayRate > weekendRate + 0.15 ? '平日に絞る傾向' : weekendRate > weekdayRate + 0.15 ? '週末に絞る傾向' : '曜日に関係なく絞る日が点在';
-    squeezeComment = `💡 <b style="color:#fbbf24">${top.name}曜日</b>に最も絞り傾向（${top.sq}/${top.total}日・${rate}%）。${pattern}。翌日に自店イベントを集中させるのが有効。`;
+    squeezeComment = `<b style="color:#fbbf24">${top.name}曜日</b>に最も絞り傾向（${top.sq}/${top.total}日・${rate}%）。${pattern}。翌日に自店イベントを集中させるのが有効。`;
   }
 
   // 集客日コメント
@@ -4588,7 +4733,7 @@ function renderRivalAnalysis() {
     const weekendRate = weekendTotal > 0 ? weekendAt/weekendTotal : 0;
     const weekdayRate = weekdayTotal > 0 ? weekdayAt/weekdayTotal : 0;
     const pattern = weekendRate > weekdayRate + 0.2 ? '週末集中型の集客スタイル' : weekdayRate > weekendRate + 0.2 ? '平日に集客日を置くスタイル' : '曜日を問わず集客日を配置';
-    attractComment = `💡 <b style="color:#60a5fa">${top.name}曜日</b>に最も集客傾向（${top.at}/${top.total}日・${rate}%）。${pattern}。集客日のアウトは通常日比 <b style="color:#60a5fa">+${inUpRate}%</b>。この曜日に自店も放出を合わせると客の取り合いになる。`;
+    attractComment = `<b style="color:#60a5fa">${top.name}曜日</b>に最も集客傾向（${top.at}/${top.total}日・${rate}%）。${pattern}。集客日のアウトは通常日比 <b style="color:#60a5fa">+${inUpRate}%</b>。この曜日に自店も放出を合わせると客の取り合いになる。`;
   }
 
   // ── インサイトフィードへ登録（攻略分析）──
@@ -4610,7 +4755,7 @@ function renderRivalAnalysis() {
     const _sqVals   = _sqOrder.map(di => { const d = dowType.find(x=>x.dow===di); return d ? d.sq/Math.max(d.total,1)*100 : 0; });
     const _sqCols   = _sqOrder.map(di => (dowType.find(x=>x.dow===di)||{}).name === sqTop.name ? '#fbbf24' : '#374151');
     const sqVis = _svgVBar(_sqVals, _sqLabels, _sqCols, 96, 44);
-    _pushInsight('rival','🟡',
+    _pushInsight('rival','●',
       `${sqTop.name}曜日に絞り傾向 — 翌日が仕掛けどき`,
       `${sqTop.name}曜日の絞り率が最も高い（全${sqTop.total}日中${sqTop.sq}日・${sqRate}%）。${sqPattern}。翌日に自店イベントを集中させるのが有効。`, 1, sqVis, 'rivalAnalysisCard');
   }
@@ -4633,7 +4778,7 @@ function renderRivalAnalysis() {
     const _atVals   = _atOrder.map(di => { const d = dowType.find(x=>x.dow===di); return d ? d.at/Math.max(d.total,1)*100 : 0; });
     const _atCols   = _atOrder.map(di => (dowType.find(x=>x.dow===di)||{}).name === atTop.name ? '#60a5fa' : '#374151');
     const atVis = _svgVBar(_atVals, _atLabels, _atCols, 96, 44);
-    _pushInsight('rival','🔵',
+    _pushInsight('rival','●',
       `${atTop.name}曜日が集客日 — 真っ向勝負は避けよ`,
       `${atTop.name}曜日の集客率が最も高い（全${atTop.total}日中${atTop.at}日・${atRate}%）。${atPattern}。集客日のアウトは通常日比+${inUpRate}%。この曜日に自店も放出を合わせると客の取り合いになる。`, 1, atVis, 'rivalAnalysisCard');
   }
@@ -4643,36 +4788,36 @@ function renderRivalAnalysis() {
   {
     const alertDefs = [
       {
-        key: 'rising_profit', priority: 'p1', icon: '🔴', level: '最優先警戒',
+        key: 'rising_profit', priority: 'p1', icon: '●', level: '最優先警戒',
         title: 'アウト上昇 × 粗利高い',
         desc: '稼ぎながら客も増えている最強状態。自店で同機種を甘く使い客を引き戻せ。',
         badge: 'attack', badgeText: '即対抗',
         chipBg: 'rgba(239,68,68,0.12)', chipBorder: 'rgba(239,68,68,0.4)', chipColor: '#fca5a5',
-        trendIcon: '📈'
+        trendIcon: '▲'
       },
       {
-        key: 'rising_low', priority: 'p2', icon: '🟡', level: '集客警戒',
+        key: 'rising_low', priority: 'p2', icon: '●', level: '集客警戒',
         title: 'アウト上昇 × 粗利低い',
         desc: '放出で客を引っ張っている状態。自店の客が流れている可能性あり。同機種で競合せよ。',
         badge: 'block', badgeText: '邪魔せよ',
         chipBg: 'rgba(234,179,8,0.12)', chipBorder: 'rgba(234,179,8,0.4)', chipColor: '#fcd34d',
-        trendIcon: '📈'
+        trendIcon: '▲'
       },
       {
-        key: 'falling_profit', priority: 'p3', icon: '🟠', level: '転換点・観察',
+        key: 'falling_profit', priority: 'p3', icon: '●', level: '転換点・観察',
         title: 'アウト下降 × 粗利高い',
         desc: '抜きすぎで客離れが始まっている。近く設定変更か客が逃げ出す転換点。様子を見よ。',
         badge: 'wait', badgeText: '変化を待て',
         chipBg: 'rgba(249,115,22,0.12)', chipBorder: 'rgba(249,115,22,0.4)', chipColor: '#fdba74',
-        trendIcon: '📉'
+        trendIcon: '▼'
       },
       {
-        key: 'falling_low', priority: 'p4', icon: '🟢', level: '好機',
+        key: 'falling_low', priority: 'p4', icon: '●', level: '好機',
         title: 'アウト下降 × 粗利低い',
         desc: '競合の弱点。放出しているのに客が来なくなっている。自店でこの機種を強化するチャンス。',
         badge: 'copy', badgeText: '今が仕掛けどき',
         chipBg: 'rgba(34,197,94,0.12)', chipBorder: 'rgba(34,197,94,0.4)', chipColor: '#86efac',
-        trendIcon: '📉'
+        trendIcon: '▼'
       },
     ];
 
@@ -5050,7 +5195,7 @@ function renderRivalAnalysis() {
     const removeCount = changeEvents.filter(e => e.type === 'remove').length;
     if (changeEvents.length > 0) {
       const topEvent = changeEvents[0];
-      _pushInsight('rival', '📊',
+      _pushInsight('rival', '',
         `増台・減台 計${changeEvents.length}件を検出`,
         `直近: ${topEvent.date.slice(5)} ${topEvent.model} ${topEvent.before}台→${topEvent.after}台（${topEvent.delta > 0 ? '+' : ''}${topEvent.delta}台）`, 3, null, 'rivalAnalysisCard');
     }
@@ -5081,7 +5226,7 @@ function renderRivalAnalysis() {
           + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.04)\'" '
           + 'onmouseleave="this.style.background=\'\'">'
           + '<td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">' + e.date + approxBadge + '</td>'
-          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + e.model + ' <span style="font-size:9px;color:var(--text3);">📈</span></td>'
+          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + e.model + ' <span style="font-size:9px;color:var(--text3);">▲</span></td>'
           + '<td style="padding:7px 10px;font-size:13px;font-weight:700;color:var(--text2);text-align:center;">' + e.before + '台</td>'
           + '<td style="padding:7px 10px;font-size:13px;font-weight:700;color:' + accentColor + ';text-align:center;">' + e.after + '台</td>'
           + '<td style="padding:7px 10px;font-size:14px;font-weight:900;color:' + accentColor + ';text-align:center;">' + deltaStr + '</td>'
@@ -5516,7 +5661,7 @@ function renderRivalAnalysis() {
     // インサイト登録
     if (newModels.length > 0) {
       const top = newModels[0];
-      _pushInsight('rival', '🆕',
+      _pushInsight('rival', '',
         `新台登場 ${newModels.length}機種を検出`,
         `直近: ${top.firstDate.slice(5)} ${top.model}（${top.firstDayCount}台）`, 3, null, 'rivalAnalysisCard');
     }
@@ -5546,7 +5691,7 @@ function renderRivalAnalysis() {
           + 'onmouseenter="this.style.background=\'rgba(255,255,255,0.04)\'" '
           + 'onmouseleave="this.style.background=\'\'">'
           + '<td style="padding:7px 10px;font-size:12px;color:var(--text2);white-space:nowrap;">' + m.firstDate + '</td>'
-          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + m.model + ' <span style="font-size:9px;color:var(--text3);">📈</span></td>'
+          + '<td style="padding:7px 10px;font-size:12px;font-weight:700;color:var(--text);">' + m.model + ' <span style="font-size:9px;color:var(--text3);">▲</span></td>'
           + '<td style="padding:7px 10px;font-size:13px;font-weight:700;color:#a78bfa;text-align:center;">' + m.firstDayCount + '台</td>'
           + '<td style="padding:7px 10px;font-size:11px;color:var(--text3);text-align:center;">' + elapsed + '</td>'
           + '<td style="padding:7px 10px;font-size:11px;color:var(--text2);text-align:right;">' + fIn + '</td>'
@@ -5776,7 +5921,7 @@ function renderRivalAnalysis() {
 
     // インサイト登録
     if (manEvt10k.length > 0) {
-      _pushInsight('rival', '🎰',
+      _pushInsight('rival', '',
         _mc.l1 + ' ' + manEvt10k.length + '件を検出',
         '最大: ' + manEvt10k[0].date + ' 台' + manEvt10k[0].tai + '（' + manEvt10k[0].model + '）差' + _manUnit + manEvt10k[0].diff.toLocaleString() + _manUnit,
         2, null, 'rivalAnalysisCard');
@@ -6146,7 +6291,7 @@ function renderRivalAnalysis() {
       ['設置','利益','アウト'],
       ['#a78bfa', varProfitRate > varInstallRate ? '#34d399' : '#f87171', '#60a5fa'],
       84, 44);
-    _pushInsight('variety','🎲',`バラエティ ${varTotalMachines}台（${varInstallRate.toFixed(0)}%設置）— ${varProfitComment.split('—')[0].trim()}`,
+    _pushInsight('variety','',`バラエティ ${varTotalMachines}台（${varInstallRate.toFixed(0)}%設置）— ${varProfitComment.split('—')[0].trim()}`,
       `設置比率${varInstallRate.toFixed(1)}%に対し利益比率${varProfitRate.toFixed(1)}%・アウト比率${varInRate.toFixed(1)}%。${varProfitComment}`, 3, varVis, 'rivalAnalysisCard');
   }
 
@@ -6170,7 +6315,7 @@ function renderRivalAnalysis() {
         <div style="font-size:18px;font-weight:800;color:#a78bfa;">${varInRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
       </div>
       <div style="flex:1;min-width:220px;background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.2);border-radius:12px;padding:12px 16px;display:flex;align-items:center;">
-        <span style="font-size:11.5px;color:var(--text2);line-height:1.7;">💡 ${varProfitComment}</span>
+        <span style="font-size:11.5px;color:var(--text2);line-height:1.7;">${varProfitComment}</span>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -6268,7 +6413,7 @@ function renderRivalAnalysis() {
       ['設置','利益','アウト'],
       ['#f59e0b', jagProfitRate > jagInstallRate ? '#34d399' : '#f87171', '#fcd34d'],
       84, 44);
-    _pushInsight('juggler','🫐',`ジャグラー ${jagMachines}台（${jagInstallRate.toFixed(0)}%）— ${jagComment.split('—')[0].trim()}`,
+    _pushInsight('juggler','',`ジャグラー ${jagMachines}台（${jagInstallRate.toFixed(0)}%）— ${jagComment.split('—')[0].trim()}`,
       `設置比率${jagInstallRate.toFixed(1)}%に対し利益比率${jagProfitRate.toFixed(1)}%・アウト比率${jagInRate.toFixed(1)}%。${jagInComment}`, 3, jagVis, 'rivalAnalysisCard');
 
     html += `<div class="rival-section" id="rivalJugglerSection">
@@ -6291,7 +6436,7 @@ function renderRivalAnalysis() {
           <div style="font-size:18px;font-weight:800;color:#f59e0b;">${jagInRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
         </div>
         <div style="flex:1;min-width:220px;background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.2);border-radius:12px;padding:12px 16px;">
-          <div style="font-size:11.5px;color:var(--text2);line-height:1.7;">💡 ${jagComment}<br><br>${jagInComment}</div>
+          <div style="font-size:11.5px;color:var(--text2);line-height:1.7;">${jagComment}<br><br>${jagInComment}</div>
         </div>
       </div>
       <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:10px;">機種別内訳（台粗利順・${jagModels.length}機種）</div>
@@ -6481,7 +6626,7 @@ function renderRivalAnalysis() {
             <div style="font-size:11.5px;font-weight:700;color:#34d399;margin-bottom:4px;">ドボン台（最低IN台 + 最低出玉率台）→ 翌日改善の記録</div>
             <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;">出現率 ${dobonRate.toFixed(1)}%（${dobonHits}/${dobonTotal}件）— 翌日の出玉率100%超 かつ 店舗平均IN以上に改善した台を「ヒット」とカウント</div>
             <div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;padding:8px 10px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:8px;line-height:1.7;">
-              ⚡ <b style="color:#fbbf24;">ダブル判定</b>：「最低IN台」と「最低出玉率台」をそれぞれ独立して特定。同一台なら1台、別々の台なら最大2台がドボン台になります。
+              <b style="color:#fbbf24;">ダブル判定</b>：「最低IN台」と「最低出玉率台」をそれぞれ独立して特定。同一台なら1台、別々の台なら最大2台がドボン台になります。
             </div>
             ${dobonDetail.length === 0
               ? '<div style="font-size:11px;color:var(--text2);">該当なし（台番データがあり複数台の記録が必要です）</div>'
@@ -6606,8 +6751,8 @@ function renderRivalAnalysis() {
               ${bars}${avgLine}${lbls}
             </svg></div>
             <div style="font-size:10px;color:var(--text2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
-              <span>🟢 60%以上（放出寄り）</span><span style="color:#f59e0b;">🟡 40～60%（均衡）</span>
-              <span>🔴 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
+              <span>● 60%以上（放出寄り）</span><span style="color:#f59e0b;">● 40～60%（均衡）</span>
+              <span>● 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
             </div></div>`;
         }).join('');
 
@@ -6656,7 +6801,7 @@ function renderRivalAnalysis() {
         ['設置','利益','アウト'],
         ['#06b6d4', phi30ProfitRate > phi30InstallRate ? '#34d399' : '#f87171', '#67e8f9'],
         84, 44);
-      _pushInsight('juggler','🐚',`${_short} ${phi30Machines}台（${phi30InstallRate.toFixed(0)}%）— ${phi30Comment.split('—')[0].trim()}`,
+      _pushInsight('juggler','',`${_short} ${phi30Machines}台（${phi30InstallRate.toFixed(0)}%）— ${phi30Comment.split('—')[0].trim()}`,
         `設置比率${phi30InstallRate.toFixed(1)}%に対し利益比率${phi30ProfitRate.toFixed(1)}%・アウト比率${phi30InRate.toFixed(1)}%。${phi30InComment}`, 3.5, phi30Vis, 'rivalAnalysisCard');
 
       html += `<div class="rival-section" id="rival${_pfx}Section">
@@ -6679,7 +6824,7 @@ function renderRivalAnalysis() {
             <div style="font-size:18px;font-weight:800;color:${phi30Color};">${phi30InRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
           </div>
           <div style="flex:1;min-width:220px;background:rgba(6,182,212,0.05);border:1px solid rgba(6,182,212,0.2);border-radius:12px;padding:12px 16px;">
-            <div style="font-size:11.5px;color:var(--text2);line-height:1.7;">💡 ${phi30Comment}<br><br>${phi30InComment}</div>
+            <div style="font-size:11.5px;color:var(--text2);line-height:1.7;">${phi30Comment}<br><br>${phi30InComment}</div>
           </div>
         </div>
         <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:10px;">機種別内訳（台粗利順・${phi30Models.length}機種）</div>
@@ -6954,8 +7099,8 @@ function renderRivalAnalysis() {
                 ${bars}${avgLine}${lbls}
               </svg></div>
               <div style="font-size:10px;color:var(--text2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
-                <span>🟢 60%以上（放出寄り）</span><span style="color:#06b6d4;">🔵 40～60%（均衡）</span>
-                <span>🔴 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
+                <span>● 60%以上（放出寄り）</span><span style="color:#06b6d4;">● 40～60%（均衡）</span>
+                <span>● 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
               </div></div>`;
           }).join('');
 
@@ -7061,7 +7206,7 @@ function renderRivalAnalysis() {
           <div style="font-size:18px;font-weight:800;color:${serColor};">${serInRate.toFixed(1)}<span style="font-size:11px;color:var(--text2);">%</span></div>
         </div>
         <div style="flex:1;min-width:220px;background:${serBg};border:1px solid ${serBorder};border-radius:12px;padding:12px 16px;">
-          <div style="font-size:11.5px;color:var(--text2);line-height:1.7;">💡 ${serComment}<br><br>${serInComment}</div>
+          <div style="font-size:11.5px;color:var(--text2);line-height:1.7;">${serComment}<br><br>${serInComment}</div>
         </div>
       </div>
       <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:10px;">機種別内訳（台粗利順・${serModels.length}機種）</div>
@@ -7371,7 +7516,7 @@ function renderRivalAnalysis() {
             + '<div style="font-size:11.5px;font-weight:700;color:#34d399;margin-bottom:4px;">ドボン台（最低IN台 + 最低出玉率台）→ 翌日改善の記録</div>'
             + '<div style="font-size:10.5px;color:var(--text2);margin-bottom:8px;">出現率 ' + mnDobRate.toFixed(1) + '%（' + mnDobHits + '/' + mnDobTotal + '件）</div>'
             + '<div style="font-size:10.5px;color:var(--text2);margin-bottom:12px;padding:8px 10px;background:rgba(251,191,36,0.06);border:1px solid rgba(251,191,36,0.2);border-radius:8px;line-height:1.7;">'
-            + '⚡ <b style="color:#fbbf24;">ダブル判定</b>：「最低IN台」と「最低出玉率台」をそれぞれ独立して特定。同一台なら1台、別々の台なら最大2台がドボン台になります。</div>'
+            + '<b style="color:#fbbf24;">ダブル判定</b>：「最低IN台」と「最低出玉率台」をそれぞれ独立して特定。同一台なら1台、別々の台なら最大2台がドボン台になります。</div>'
             + mnDobTable
             + '</div>'
             + '</div>';
@@ -7487,8 +7632,8 @@ function renderRivalAnalysis() {
                 ${bars}${avgLine}${lbls}
               </svg></div>
               <div style="font-size:10px;color:var(--text2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;">
-                <span>\ud83d\udfe2 60%以上（放出寄り）</span><span>\ud83d\udd35 40\uff5e60%（均衡）</span>
-                <span>\ud83d\udd34 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
+                <span>● 60%以上（放出寄り）</span><span>● 40\uff5e60%（均衡）</span>
+                <span>● 40%未満（回収寄り）</span><span style="color:#fbbf24;">--- 期間平均</span>
               </div></div>`;
           }).join('')}
         </div>
@@ -7503,7 +7648,7 @@ function renderRivalAnalysis() {
   // 免責メモ
 
   html += `<div style="margin-top:28px;font-size:10.5px;color:var(--text2);border-top:1px solid var(--border);padding-top:14px;line-height:1.7;">
-    🤖 分類は統計的な推定です。設置台数はユニーク台番または日次平均レコード数から推定。
+    分類は統計的な推定です。設置台数はユニーク台番または日次平均レコード数から推定。
     閾値：収益源＝台粗利が全体平均の${Math.round(HIGH_PROFIT_TH*100)}%超、高アウト＝全体平均の${Math.round(HIGH_IN_TH*100)}%超。
     データ期間・台数が少ない機種は参考値としてご活用ください。
   </div>`;
@@ -7531,13 +7676,34 @@ function renderForecast() {
 
   const { mean, std, filteredDates, trendData, metricKey,
           avgJou, avgChu, avgKa, avgMonthInit, avgSalary, avgPension,
-          dowAvgs, avgHoliday, slope } = fs;
+          dowAvgs, avgHoliday, slope, specialDigitMul } = fs;
 
   const metricUnit = metricKey === 'IN枚数' ? _inUnit() + '/台' : '円';
   const metricLabel = {'IN枚数': _inLabel() + '（台あたり）', '台粗利': '推定粗利', '台売上': '推定売上'}[metricKey] || metricKey;
 
-  // ── 予測期間 ──
-  const horizon = Math.min(45, Math.max(7, Math.round(filteredDates.length * 0.4)));
+  // ── 予測期間（半月＝15日）──
+  const horizon = 15;
+  // 「その日らしさ」の生の乗数（曜日・月内・給料日・特定日、トレンド抜き・エッジ抜き）
+  const _fcStats = { mean, avgJou, avgChu, avgKa, avgMonthInit, avgSalary, avgPension, dowAvgs, avgHoliday };
+  const _expRaw = ds => _bjDayTypeExp(_fcStats, ds) * _bjSpecialLift(specialDigitMul, ds);
+
+  // 直近窓（予想vs実績・的中度・エッジ自動選定に使用）
+  const actualWindow = Math.min(filteredDates.length, 30);
+  const actualDates  = filteredDates.slice(-actualWindow);
+  const actualData   = trendData.slice(-actualWindow);
+
+  // ── エッジ強度を店ごとに自動選定（的中度が最大になる振れ幅。1.0より0.3pt以上良い時だけ採用）──
+  let _EDGE = 1;
+  (function(){
+    if (mean <= 0 || !actualData.length) return;
+    const mulFull = actualDates.map(ds => _expRaw(ds) / mean);
+    const mapeFor = E => { let s=0,c=0; for (let i=0;i<actualData.length;i++){ const a=actualData[i]; if(a>0){ const p=mean*Math.max(0.2,1+(mulFull[i]-1)*E); s+=Math.abs(p-a)/a; c++; } } return c?s/c*100:1e9; };
+    const baseM = mapeFor(1); let best=1, bestM=baseM;
+    for (let E=1.0; E<=2.4001; E+=0.1){ const m=mapeFor(E); if(m<bestM-1e-6){ bestM=m; best=Math.round(E*10)/10; } }
+    if (baseM - bestM >= 0.3) _EDGE = best;   // 明確に改善する時だけエッジON
+  })();
+  // エッジ適用後の「普段ならこれくらい」基準線
+  const _expBaseline = ds => { const mf = _expRaw(ds) / (mean || 1); return mean * Math.max(0.2, 1 + (mf - 1) * _EDGE); };
 
   // 最後の日付から次の日を起点に予測日生成
   const lastDate = new Date(filteredDates[filteredDates.length - 1] + 'T00:00:00');
@@ -7598,7 +7764,12 @@ function renderForecast() {
 
     // 合成（乗数を平均周辺に作用させる）
     const combinedMul = (monMul * 0.35 + specialMul * 0.25 + dowMul * 0.4);
-    return base * Math.max(0.3, Math.min(2.5, combinedMul));
+    // 自動検出した特定日の上乗せ（給料日・曜日で説明できない"本物の特定日"だけ作用）
+    const tokuMul = _bjSpecialLift(specialDigitMul, dateStr);
+    const mulFull = Math.max(0.3, Math.min(2.5, combinedMul)) * tokuMul;
+    // 店ごと自動選定したエッジ強度で振れ幅を調整（_EDGE=1なら現状のまま）
+    const edgeMul = 1 + (mulFull - 1) * _EDGE;
+    return base * Math.max(0.2, edgeMul);
   }
 
   const forecastDates  = [];
@@ -7613,10 +7784,35 @@ function renderForecast() {
   // ── グラフ描画 ──
   card.style.display = '';
 
-  // 実績は直近30日（またはすべて）表示
-  const actualWindow = Math.min(filteredDates.length, 30);
-  const actualLabels = filteredDates.slice(-actualWindow).map(d => d.slice(5));
-  const actualData   = trendData.slice(-actualWindow);
+  // 実績は直近30日（actualWindow/actualDates/actualData は上部で算出済み）
+  const actualLabels = actualDates.map(d => d.slice(5));
+
+  // ── 直近の「予想 vs 実績」＋ 的中度 ──
+  const pastExpected = actualDates.map(ds => _expBaseline(ds));
+  const recentDev = actualDates.map((ds, i) => {
+    const a = actualData[i], e = pastExpected[i];
+    const dev = (e > 0 && a > 0) ? (a / e - 1) * 100 : null;
+    return { d: ds, actual: a, exp: e, dev, flag: dev != null && Math.abs(dev) > 15 };
+  });
+  const _devValid = recentDev.filter(r => r.dev != null);
+  const _mape    = _devValid.length ? _devValid.reduce((s,r)=>s+Math.abs(r.dev),0)/_devValid.length : null;
+  const _hitRate = _mape != null ? Math.max(0, Math.min(100, Math.round(100 - _mape))) : null;  // 的中度
+  const _pita    = _devValid.length ? Math.round(_devValid.filter(r=>Math.abs(r.dev)<=10).length/_devValid.length*100) : null; // ピタリ率(±10%)
+  const _expAvg  = pastExpected.length ? Math.round(pastExpected.reduce((a,b)=>a+b,0)/pastExpected.length) : null; // 直近窓の予想平均
+  const _actAvg  = actualData.length   ? Math.round(actualData.reduce((a,b)=>a+b,0)/actualData.length)     : null; // 直近窓の実績平均
+  const _fcAvg   = forecastValues.length ? Math.round(forecastValues.reduce((a,b)=>a+b,0)/forecastValues.length) : null; // 今後15日の予想平均
+
+  // ── 読み込んだ実績データ期間（目立つように）──
+  const _slash = ds => ds.slice(0,4)+'/'+ds.slice(5,7)+'/'+ds.slice(8,10);
+  const _rangeEl = document.getElementById('forecastDataRange');
+  if (_rangeEl) {
+    _rangeEl.innerHTML =
+      `<div style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;background:rgba(0,152,212,0.07);border:1px solid rgba(0,152,212,0.2);border-radius:9px;padding:7px 12px;">
+        <span style="font-size:10.5px;font-weight:800;color:var(--accent);letter-spacing:.3px;">読み込んだ実績データ</span>
+        <span style="font-size:14px;font-weight:800;color:var(--text);">${_slash(filteredDates[0])} 〜 ${_slash(filteredDates[filteredDates.length-1])}</span>
+        <span style="font-size:10.5px;color:var(--text2);">（${filteredDates.length}日分）この期間から予想を計算</span>
+      </div>`;
+  }
 
   const fcLabels = forecastDates.map(d => d.slice(5));
   const allLabels = [...actualLabels, ...fcLabels];
@@ -7629,9 +7825,18 @@ function renderForecast() {
     backgroundColor: 'rgba(96,165,250,0.12)',
     fill: false,
     tension: 0.3,
-    pointRadius: actualData.map((_, i) => i === actualData.length - 1 ? 5 : 2),
-    pointBackgroundColor: '#60a5fa',
+    pointRadius: recentDev.map((r, i) => r.flag ? 6 : (i === actualData.length - 1 ? 5 : 2)),
+    pointBackgroundColor: recentDev.map(r => r.flag ? (r.dev > 0 ? '#e1483c' : '#15a36e') : '#60a5fa'),
     borderWidth: 2,
+  };
+  // 直近の「予想だった」基準線（過去にこの店なら普段これくらい、の線）
+  const pastExpectedDataset = {
+    label: `予想だった ${metricLabel}`,
+    data: [...pastExpected, ...new Array(horizon).fill(null)],
+    borderColor: 'rgba(148,163,184,0.85)',
+    backgroundColor: 'transparent',
+    fill: false, tension: 0.3, borderDash: [3, 3],
+    pointRadius: 0, borderWidth: 1.5,
   };
   const forecastDataset = {
     label: `予測 ${metricLabel}`,
@@ -7668,7 +7873,7 @@ function renderForecast() {
   forecastChart = new Chart(
     document.getElementById('forecastChart').getContext('2d'), {
       type: 'line',
-      data: { labels: allLabels, datasets: [actualDataset, forecastDataset, confUpper, confLower] },
+      data: { labels: allLabels, datasets: [actualDataset, pastExpectedDataset, forecastDataset, confUpper, confLower] },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
@@ -7709,13 +7914,15 @@ function renderForecast() {
 
   // メタ情報
   document.getElementById('forecastMeta').textContent =
-    `過去${actualWindow}日 + 今後${horizon}日予測`;
+    `直近${actualWindow}日の予想vs実績 ＋ 今後${horizon}日（半月）予測`;
 
   // 凡例
   document.getElementById('forecastLegend').innerHTML = `
     <span><span class="forecast-legend-dot" style="background:#60a5fa;"></span>実績</span>
-    <span><span class="forecast-legend-dot" style="background:#a78bfa;border:2px dashed #a78bfa;background:transparent;"></span>予測</span>
-    <span><span class="forecast-legend-dot" style="background:rgba(167,139,250,0.3);"></span>信頼帯 ±1σ</span>
+    <span><span class="forecast-legend-dot" style="background:transparent;border:1px dashed #94a3b8;"></span>予想だった（普段の基準線）</span>
+    <span><span class="forecast-legend-dot" style="background:#a78bfa;border:2px dashed #a78bfa;background:transparent;"></span>未来予測</span>
+    <span><span class="forecast-legend-dot" style="background:#e1483c;"></span>予想超え</span>
+    <span><span class="forecast-legend-dot" style="background:#15a36e;"></span>予想割れ</span>
   `;
 
   // 予測サマリー
@@ -7731,10 +7938,10 @@ function renderForecast() {
     const dom = parseInt(ds.slice(8));
     const mon = parseInt(ds.slice(5,7));
     const tags = [];
-    if (isHoliday(ds)) tags.push({label:'🎌祝日', col:'#fbbf24'});
-    if (dom >= 25 && dom <= 29) tags.push({label:'💰給料日帯', col:'#60a5fa'});
-    if (dom >= 1  && dom <= 7)  tags.push({label:'💴月初', col:'#a78bfa'});
-    if (mon % 2 === 0 && dom >= 15 && dom <= 19) tags.push({label:'👴年金日帯', col:'#34d399'});
+    if (isHoliday(ds)) tags.push({label:'祝日', col:'#fbbf24'});
+    if (dom >= 25 && dom <= 29) tags.push({label:'給料日帯', col:'#60a5fa'});
+    if (dom >= 1  && dom <= 7)  tags.push({label:'月初', col:'#a78bfa'});
+    if (mon % 2 === 0 && dom >= 15 && dom <= 19) tags.push({label:'年金日帯', col:'#34d399'});
     if (tags.length) notableDays.push({ ds, val: forecastValues[i], tags });
   });
 
@@ -7751,7 +7958,21 @@ function renderForecast() {
       detailHtml += `<span style="font-size:11px;">${nd.ds.slice(5)} ${tagHtml}予測 ${valStr}</span>　`;
     });
   }
+
+  // 予想に反映した特定日（自動検出：曜日・給料日で説明できない"本物の特定日"のみ）
+  if (specialDigitMul && Object.keys(specialDigitMul).length) {
+    const _tk = Object.keys(specialDigitMul).sort((a,b)=>specialDigitMul[b]-specialDigitMul[a]);
+    const _tc2 = '#0098d4';
+    detailHtml += `<br><span style="font-size:10.5px;color:var(--text2);">この店の特定日（自動検出・予想に反映済）：</span> `;
+    _tk.forEach(p => {
+      detailHtml += `<span class="forecast-tag" style="background:${_tc2}1a;color:${_tc2};border:1px solid ${_tc2}44;">${_bjPatLabel(p)} +${Math.round((specialDigitMul[p]-1)*100)}%</span> `;
+    });
+  }
+
   document.getElementById('forecastDetail').innerHTML = detailHtml;
+
+  // 的中度＋乖離レーダー（直近の予想vs実績・競合シグナル）＋説明ボタン
+  try { _bjRenderForecastScore(metricKey, recentDev, _hitRate, _pita, metricUnit, _expAvg, _actAvg, _fcAvg, horizon, _EDGE); } catch(e) { console.warn('forecastScore', e); }
 }
 
 function renderTrendAnalysis(filteredDates, trendData, metricKey) {
@@ -7844,6 +8065,20 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
   const avgHoliday = holidayBucket.length >= 2
     ? holidayBucket.reduce((a,b)=>a+b,0)/holidayBucket.length : null;
 
+  // ── 特定日（末尾数字・ゾロ目・月日一致）自動検出 ── 予想の精度向上＋乖離レーダー用
+  const _tokStats = {
+    mean,
+    avgJou:       avgJou       != null ? avgJou       : mean,
+    avgChu:       avgChu       != null ? avgChu       : mean,
+    avgKa:        avgKa        != null ? avgKa        : mean,
+    avgMonthInit: avgMonthInit != null ? avgMonthInit : mean,
+    avgSalary:    avgSalary    != null ? avgSalary    : mean,
+    avgPension:   avgPension   != null ? avgPension   : mean,
+    dowAvgs,
+    avgHoliday:   avgHoliday   != null ? avgHoliday   : mean,
+  };
+  const specialDigitMul = _bjDetectTokuteibi(filteredDates, trendData, _tokStats);
+
   // ⑤ 業界ベンチマーク対比
   const benchByDate = {};
   (DB_CACHE['__benchmark__'] || []).forEach(r => { benchByDate[r.date] = r; });
@@ -7872,49 +8107,49 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
       metricMode === 'profit' ? profit : metricMode === 'in' ? inTxt : sales;
     let pattern, pIcon, pComment;
     if (maxMin < TH) {
-      pattern='フラット型'; pIcon='🔁';
+      pattern='フラット型'; pIcon='';
       pComment=_pc(
         '月を通じて安定した運用。規則性が読みにくい。',
         '月を通じて稼働が安定。大きな偏りは見られない。',
         '月を通じて売上が安定。大きな偏りは見られない。');
     } else if (avgJou > avgChu + TH && avgJou > avgKa + TH) {
-      pattern='月初突出型'; pIcon='🌅';
+      pattern='月初突出型'; pIcon='';
       pComment=_pc(
         '上旬だけ突出。給料・月初のタイミングで素早く回収するスタイル。',
         '上旬に稼働が集中。月初の来店が多く、中旬以降に落ちる傾向。',
         '上旬に売上が集中。月初の客入りが多い傾向。');
     } else if (avgKa > avgJou + TH && avgKa > avgChu + TH) {
-      pattern='月末追い込み型'; pIcon='🌇';
+      pattern='月末追い込み型'; pIcon='';
       pComment=_pc(
         '下旬だけ突出。給料日前後に合わせて絞るスタイル。',
         '下旬に稼働が集中。給料日前後に来店が増える傾向。',
         '下旬に売上が集中。給料日前後の客入りが多い傾向。');
     } else if (avgChu > avgJou + TH && avgChu > avgKa + TH) {
-      pattern='山型（中旬ピーク）'; pIcon='⛰️';
+      pattern='山型（中旬ピーク）'; pIcon='';
       pComment=_pc(
         '中旬に最も稼ぐ。月初・月末は緩め、中旬で回収する独特なスタイル。',
         '中旬に稼働がピーク。上旬・下旬より中旬の来店が多い独特なパターン。',
         '中旬に売上がピーク。中旬に来店が集中する独特なパターン。');
     } else if (avgChu < avgJou - TH && avgChu < avgKa - TH) {
-      pattern='谷型（中旬低下）'; pIcon='🔻';
+      pattern='谷型（中旬低下）'; pIcon='▼';
       pComment=_pc(
         '中旬が最低。上旬・下旬で稼ぎ、中旬で客を呼び込む。',
         '中旬に稼働が落ち込む。上旬・下旬と比べて中旬の来店が少ない傾向。',
         '中旬に売上が落ち込む。上旬・下旬と比べて中旬の客入りが少ない傾向。');
     } else if (avgJou <= avgChu && avgChu <= avgKa && avgKa - avgJou > TH) {
-      pattern='右肩上がり型'; pIcon='📈';
+      pattern='右肩上がり型'; pIcon='▲';
       pComment=_pc(
         '上旬→中旬→下旬と段階的に上昇。月末に向けて絞っていくスタイル。',
         '上旬→中旬→下旬と稼働が段階的に上昇。月末に向けて来店が増える傾向。',
         '上旬→中旬→下旬と売上が段階的に上昇。月末に向けて客入りが増える傾向。');
     } else if (avgJou >= avgChu && avgChu >= avgKa && avgJou - avgKa > TH) {
-      pattern='右肩下がり型'; pIcon='📉';
+      pattern='右肩下がり型'; pIcon='▼';
       pComment=_pc(
         '上旬→中旬→下旬と段階的に下降。月初回収・後半解放スタイル。',
         '上旬→中旬→下旬と稼働が段階的に低下。月末に向けて来店が減る傾向。',
         '上旬→中旬→下旬と売上が段階的に低下。月末に向けて客入りが減る傾向。');
     } else {
-      pattern='複合型'; pIcon='〰️';
+      pattern='複合型'; pIcon='';
       pComment='明確な月内パターンは検出されませんでした。';
     }
     html += `<div class="trend-analysis-box">
@@ -7948,16 +8183,16 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
       </div>
     </div>`;
   };
-  html += _inkinBox('💴', '月初効果（1〜7日）',        avgMonthInit, monthInitZone, 3);
-  html += _inkinBox('💰', '給料日効果（25〜29日）',    avgSalary,    salaryZone,    3);
-  html += _inkinBox('👴', '年金日効果（偶数月15〜19日）', avgPension, pensionZone,   2);
+  html += _inkinBox('', '月初効果（1〜7日）',        avgMonthInit, monthInitZone, 3);
+  html += _inkinBox('', '給料日効果（25〜29日）',    avgSalary,    salaryZone,    3);
+  html += _inkinBox('', '年金日効果（偶数月15〜19日）', avgPension, pensionZone,   2);
 
   // ③ 曜日バイアス
   if (bestDow && worstDow && bestDow.dow !== worstDow.dow) {
     const spread = bestDow.avg - worstDow.avg;
     const spreadPct = mean !== 0 ? Math.abs(spread/mean*100).toFixed(0) : '—';
     html += `<div class="trend-analysis-box">
-      <div class="tab-box-title">📅 曜日バイアス</div>
+      <div class="tab-box-title">曜日バイアス</div>
       <div class="tab-box-body">
         <span style="color:var(--green)">▲ ${bestDow.name}曜日が最強</span>（平均 ${Math.round(bestDow.avg).toLocaleString()}${metricUnit}）<br>
         <span style="color:var(--red)">▼ ${worstDow.name}曜日が最弱</span>（平均 ${Math.round(worstDow.avg).toLocaleString()}${metricUnit}）<br>
@@ -7980,7 +8215,7 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     const judge    = _holLabel;
     const judgeCol = _diffJudgeCol(diff);
     html += `<div class="trend-analysis-box">
-      <div class="tab-box-title">🎌 祝日バイアス（${holidayBucket.length}日）</div>
+      <div class="tab-box-title">祝日バイアス（${holidayBucket.length}日）</div>
       <div class="tab-box-body">
         全体平均比 <b style="color:${col};font-size:15px;">${sign}${pct}%</b><br>
         <b style="color:${judgeCol};">→ ${judge}</b><br>
@@ -7997,9 +8232,9 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     const recent10 = storeVsBench.slice(-10);
     const recentAbove = recent10.filter(x=>x.diff>=0).length;
     let bIcon, bText;
-    if (recentAbove >= 7)      { bIcon='📈'; bText=`直近は業界平均を<b style="color:var(--green)">上回る</b>日が多い（${recentAbove}/${recent10.length}日）`; }
-    else if (recentAbove <= 3) { bIcon='📉'; bText=`直近は業界平均を<b style="color:var(--red)">下回る</b>日が多い（${recent10.length-recentAbove}/${recent10.length}日）`; }
-    else                        { bIcon='🔁'; bText=`業界平均と拮抗（上回った日 ${aboveCount}/${totalDays}日）`; }
+    if (recentAbove >= 7)      { bIcon='▲'; bText=`直近は業界平均を<b style="color:var(--green)">上回る</b>日が多い（${recentAbove}/${recent10.length}日）`; }
+    else if (recentAbove <= 3) { bIcon='▼'; bText=`直近は業界平均を<b style="color:var(--red)">下回る</b>日が多い（${recent10.length-recentAbove}/${recent10.length}日）`; }
+    else                        { bIcon=''; bText=`業界平均と拮抗（上回った日 ${aboveCount}/${totalDays}日）`; }
     const diffSign = avgDiff >= 0 ? '+' : '';
     html += `<div class="trend-analysis-box">
       <div class="tab-box-title">${bIcon} 業界ベンチマーク対比</div>
@@ -8089,7 +8324,7 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     if (parts.length > 0) {
       const summary = parts.join('。') + '。';
       html += `<div style="margin:12px 0 8px;padding:10px 14px;background:rgba(108,99,255,0.07);border-left:3px solid #6c63ff;border-radius:0 8px 8px 0;">
-        <span style="font-size:10px;font-weight:800;color:#a78bfa;letter-spacing:.4px;">📝 総評</span><br>
+        <span style="font-size:10px;font-weight:800;color:#a78bfa;letter-spacing:.4px;">総評</span><br>
         <span style="font-size:12.5px;line-height:1.7;color:var(--text);">${summary}</span>
       </div>`;
       // ── インサイトフィードへ登録（月内パターン + 棒グラフ） ──
@@ -8097,7 +8332,7 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
       const _patMax   = Math.max(..._patVals, 1);
       const _patCols  = _patVals.map(v => v === Math.max(..._patVals) ? '#a78bfa' : '#4b5563');
       const _patVis   = _svgVBar(_patVals, ['上旬','中旬','下旬'], _patCols, 80, 44);
-      _pushInsight('trend', '📊', parts[0], summary, 2, _patVis, 'trendAnalysisCard');
+      _pushInsight('trend', '', parts[0], summary, 2, _patVis, 'trendAnalysisCard');
     }
   }
 
@@ -8116,7 +8351,7 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
         : metricMode==='in'
         ? `給料日帯の稼働が全体平均比 ${diff>0?'+':''}${pct}%。稼働の変化を把握してイベント戦略の参考に。`
         : `給料日帯の売上が全体平均比 ${diff>0?'+':''}${pct}%。給料日の売上動向を把握してイベント戦略の参考に。`;
-      _pushInsight('trend', '💰', `給料日（25〜29日）に${dir}`, body, 3, salVis, 'trendAnalysisCard');
+      _pushInsight('trend', '', `給料日（25〜29日）に${dir}`, body, 3, salVis, 'trendAnalysisCard');
     }
   }
   if (avgPension !== null && pensionZone.length >= 2) {
@@ -8133,7 +8368,7 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
         : metricMode==='in'
         ? `年金日帯の稼働が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして稼働の変化に注目。`
         : `年金日帯の売上が全体比 ${diff>0?'+':''}${pct}%。年金層の来店タイミングとして売上の変化に注目。`;
-      _pushInsight('trend', '👴', `年金日（偶数月15〜19日）に${dir}`, body, 4, penVis, 'trendAnalysisCard');
+      _pushInsight('trend', '', `年金日（偶数月15〜19日）に${dir}`, body, 4, penVis, 'trendAnalysisCard');
     }
   }
   if (bestDow && worstDow && bestDow.dow !== worstDow.dow) {
@@ -8150,7 +8385,7 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
         return '#4b5563';
       });
       const dowVis = _svgVBar(_dowVals, _dowLabels, _dowCols, 96, 44);
-      _pushInsight('trend', '📅', `${bestDow.name}曜日が最強・${worstDow.name}曜日が最弱`, `曜日間の差が統計的に有意。${bestDow.name}曜日に合わせてイベントを仕掛けると対抗効果が高い。`, 4, dowVis, 'trendAnalysisCard');
+      _pushInsight('trend', '', `${bestDow.name}曜日が最強・${worstDow.name}曜日が最弱`, `曜日間の差が統計的に有意。${bestDow.name}曜日に合わせてイベントを仕掛けると対抗効果が高い。`, 4, dowVis, 'trendAnalysisCard');
     }
   }
   if (storeVsBench.length >= 5) {
@@ -8158,26 +8393,26 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     const recentAbove = recent10.filter(x=>x.diff>=0).length;
     const recentBelow = recent10.length - recentAbove;
     const benchVis = _svgAboveBelow(recentAbove, recentBelow);
-    if (recentAbove >= 7)      _pushInsight('trend','📈','直近は業界平均を上回る日が多い',`直近10日中${recentAbove}日が業界ベンチマーク超え。強い時期に自店イベントを集中させるのが有効。`,5, benchVis,'trendAnalysisCard');
-    else if (recentAbove <= 3) _pushInsight('trend','📉','直近は業界平均を下回る日が続いている',`直近10日中${recentBelow}日が業界平均以下。この店舗が苦手な時期に自店の集客を強化するチャンス。`,3, benchVis,'trendAnalysisCard');
+    if (recentAbove >= 7)      _pushInsight('trend','▲','直近は業界平均を上回る日が多い',`直近10日中${recentAbove}日が業界ベンチマーク超え。強い時期に自店イベントを集中させるのが有効。`,5, benchVis,'trendAnalysisCard');
+    else if (recentAbove <= 3) _pushInsight('trend','▼','直近は業界平均を下回る日が続いている',`直近10日中${recentBelow}日が業界平均以下。この店舗が苦手な時期に自店の集客を強化するチャンス。`,3, benchVis,'trendAnalysisCard');
   }
   if (anomalies.length > 0) {
     const ups   = anomalies.filter(a=>a.z>0).length;
     const downs  = anomalies.filter(a=>a.z<0).length;
     const dominant = ups > downs ? `突出した回収日が${ups}日` : `突出した放出日が${downs}日`;
     const anomVis = _svgAboveBelow(downs, ups); // 放出=上（グリーン）、回収=下（レッド）
-    _pushInsight('trend','⚡',`統計的異常日 ${anomalies.length}日を検出`,`${dominant}検出。異常日は競合の特別施策が絡んでいる可能性があり、自店の仕掛けタイミングの参考に。`, 4, anomVis,'trendAnalysisCard');
+    _pushInsight('trend','',`統計的異常日 ${anomalies.length}日を検出`,`${dominant}検出。異常日は競合の特別施策が絡んでいる可能性があり、自店の仕掛けタイミングの参考に。`, 4, anomVis,'trendAnalysisCard');
   }
 
   // ② 注目日（異常日フラグ）
   if (anomalies.length > 0) {
     html += `<div>
-      <div style="font-size:11px;font-weight:800;color:#f59e0b;margin-bottom:6px;letter-spacing:.3px;">⚡ 注目日（統計的に突出した日 ±${SIGMA}σ超）</div>
+      <div style="font-size:11px;font-weight:800;color:#f59e0b;margin-bottom:6px;letter-spacing:.3px;">注目日（統計的に突出した日 ±${SIGMA}σ超）</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;">`;
     anomalies.forEach(a => {
       const sign  = a.val >= 0 ? '+' : '';
       const isUp  = a.z > 0;
-      const icon  = isUp ? '🔺' : '🔻';
+      const icon  = isUp ? '▲' : '▼';
       const col   = isUp ? 'rgba(67,233,123,0.12)' : 'rgba(255,77,109,0.12)';
       const bdr   = isUp ? 'rgba(67,233,123,0.4)'  : 'rgba(255,77,109,0.4)';
       const zStr  = (a.z>0?'+':'')+a.z.toFixed(1)+'σ';
@@ -8205,6 +8440,7 @@ function renderTrendAnalysis(filteredDates, trendData, metricKey) {
     dowAvgs,        // [{dow, name, count, avg}, ...]
     avgHoliday:   avgHoliday   !== null ? avgHoliday   : mean,
     slope,
+    specialDigitMul,   // 自動検出した特定日乗数（末尾/ゾロ目/月日一致）
   };
   // 予測グラフを描画
   try { renderForecast(); } catch(e) { console.warn('renderForecast', e); }
@@ -8690,8 +8926,8 @@ function calNavMonth(delta) {
   // 月が変わったらAIをリセット
   const area = document.getElementById('calAIContent');
   const btn  = document.getElementById('calAIBtn');
-  if (area) area.innerHTML = '<span style="color:var(--text2);font-size:12px;">▶ 「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>';
-  if (btn)  { btn.disabled = false; btn.innerHTML = '✨ この月を分析'; }
+  if (area) area.innerHTML = '<span style="color:var(--text2);font-size:12px;">「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>';
+  if (btn)  { btn.disabled = false; btn.innerHTML = 'この月を分析'; }
 }
 
 function calJumpToMonth(ym) {
@@ -8701,8 +8937,8 @@ function calJumpToMonth(ym) {
   // 月が変わったらAIをリセット
   const area = document.getElementById('calAIContent');
   const btn  = document.getElementById('calAIBtn');
-  if (area) area.innerHTML = '<span style="color:var(--text2);font-size:12px;">▶ 「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>';
-  if (btn)  { btn.disabled = false; btn.innerHTML = '✨ この月を分析'; }
+  if (area) area.innerHTML = '<span style="color:var(--text2);font-size:12px;">「この月を分析」ボタンを押すと、表示中の月のデータを自動解析してサマリーを表示します。</span>';
+  if (btn)  { btn.disabled = false; btn.innerHTML = 'この月を分析'; }
 }
 
 function generateCalMonthAdvice() {
@@ -8719,7 +8955,7 @@ function generateCalMonthAdvice() {
       area.innerHTML = '<span style="color:#ff6b6b;">分析中にエラーが発生しました: ' + e.message + '</span>';
     }
     btn.disabled = false;
-    btn.innerHTML = '🔄 再分析';
+    btn.innerHTML = '再分析';
   }, 700);
 }
 
@@ -8802,13 +9038,13 @@ function _buildCalMonthAdviceHTML(ym) {
   let h = '';
 
   // ① 月全体パフォーマンス
-  h += sec(`📊 ${monthLabel} 全体パフォーマンス（${days}営業日）`);
+  h += sec(`${monthLabel} 全体パフォーマンス（${days}営業日）`);
   const rateChip = profitRate>=15 ? chip(`利益率${profitRate.toFixed(1)}%`,'ai-chip-green')
                  : profitRate>=8  ? chip(`利益率${profitRate.toFixed(1)}%`,'ai-chip-yellow')
                  :                  chip(`利益率${profitRate.toFixed(1)}%`,'ai-chip-red');
-  h += row('💰', `月間推定粗利 <span class="${clr(totalProfit)}">${Math.round(totalProfit).toLocaleString()}円</span> ${rateChip}`);
-  h += row('📈', `1日平均粗利 <span class="${clr(avgProfit)}">${sgn(avgProfit)}円</span>`);
-  h += row('🎰', `月間平均アウト（1台平均） <strong>${_fmtInVal(avgIn)}</strong>`);
+  h += row('', `月間推定粗利 <span class="${clr(totalProfit)}">${Math.round(totalProfit).toLocaleString()}円</span> ${rateChip}`);
+  h += row('▲', `1日平均粗利 <span class="${clr(avgProfit)}">${sgn(avgProfit)}円</span>`);
+  h += row('', `月間平均アウト（1台平均） <strong>${_fmtInVal(avgIn)}</strong>`);
   if (prevAvg !== null && prevDays > 0) {
     const diff = avgProfit - prevAvg;
     const pct  = prevAvg !== 0 ? diff/Math.abs(prevAvg)*100 : 0;
@@ -8817,40 +9053,40 @@ function _buildCalMonthAdviceHTML(ym) {
                   : pct >= -5 ? 'ほぼ横ばいでした'
                   : pct >= -20? '微減しました'
                   : '大幅に減少しました';
-    h += row('🔄', `前月日平均比 <span class="${clr(diff)}">${sgn(diff)}円 (${pct>=0?'+':''}${pct.toFixed(1)}%)</span> <em style="font-size:12px;color:var(--text2);">${comment}</em>`);
+    h += row('', `前月日平均比 <span class="${clr(diff)}">${sgn(diff)}円 (${pct>=0?'+':''}${pct.toFixed(1)}%)</span> <em style="font-size:12px;color:var(--text2);">${comment}</em>`);
   }
 
   // ② 日別ハイライト
-  h += sec('🏆 日別ハイライト');
-  h += row('🥇', `最高粗利日： <strong>${fmtDate(bestDay[0])}</strong> <span class="ai-up">${Math.round(bestDay[1].profit).toLocaleString()}円</span>`);
-  h += row('📉', `${worstDayLabel}： <strong>${fmtDate(worstDay[0])}</strong> <span class="${clr(worstDay[1].profit)}">${Math.round(worstDay[1].profit).toLocaleString()}円</span>`);
-  h += row('🎰', `最高アウト日： <strong>${fmtDate(bestOut[0])}</strong> ${_fmtInVal(bestOut[1].inmai)}`);
-  h += row('📉', `ワーストアウト日： <strong>${fmtDate(worstOut[0])}</strong> ${_fmtInVal(worstOut[1].inmai)}`);
+  h += sec('日別ハイライト');
+  h += row('1位', `最高粗利日： <strong>${fmtDate(bestDay[0])}</strong> <span class="ai-up">${Math.round(bestDay[1].profit).toLocaleString()}円</span>`);
+  h += row('▼', `${worstDayLabel}： <strong>${fmtDate(worstDay[0])}</strong> <span class="${clr(worstDay[1].profit)}">${Math.round(worstDay[1].profit).toLocaleString()}円</span>`);
+  h += row('', `最高アウト日： <strong>${fmtDate(bestOut[0])}</strong> ${_fmtInVal(bestOut[1].inmai)}`);
+  h += row('▼', `ワーストアウト日： <strong>${fmtDate(worstOut[0])}</strong> ${_fmtInVal(worstOut[1].inmai)}`);
 
   // ③ 曜日傾向
   if (bestDow && worstDow && bestDow.dw !== worstDow.dw) {
-    h += sec('📅 曜日傾向');
-    h += row('😊', `調子がよい曜日： <strong>${DOW[bestDow.dw]}曜日</strong> 平均 <span class="ai-up">${sgn(bestDow.avg)}円</span>`);
-    h += row('😓', `苦手な曜日： <strong>${DOW[worstDow.dw]}曜日</strong> 平均 <span class="${clr(worstDow.avg)}">${sgn(worstDow.avg)}円</span>`);
+    h += sec('曜日傾向');
+    h += row('', `調子がよい曜日： <strong>${DOW[bestDow.dw]}曜日</strong> 平均 <span class="ai-up">${sgn(bestDow.avg)}円</span>`);
+    h += row('', `苦手な曜日： <strong>${DOW[worstDow.dw]}曜日</strong> 平均 <span class="${clr(worstDow.avg)}">${sgn(worstDow.avg)}円</span>`);
   }
 
   // ④ 機種ハイライト
   if (mvpModel || outModel) {
-    h += sec('🎮 機種ハイライト（5台以上）');
+    h += sec('機種ハイライト（5台以上）');
     if (mvpModel) {
       const avgP = Math.round(mvpModel[1].profit/mvpModel[1].count);
-      h += row('🏆', `月間MVP： <strong>${mvpModel[0]}</strong> 粗利合計 <span class="ai-up">${Math.round(mvpModel[1].profit).toLocaleString()}円</span>（1台平均 ${sgn(avgP)}円）`);
+      h += row('', `月間MVP： <strong>${mvpModel[0]}</strong> 粗利合計 <span class="ai-up">${Math.round(mvpModel[1].profit).toLocaleString()}円</span>（1台平均 ${sgn(avgP)}円）`);
     }
     if (outModel && outModel[0] !== (mvpModel&&mvpModel[0])) {
       const avgO = Math.round(outModel[1].inmai/outModel[1].count);
-      h += row('🎰', `アウトMVP： <strong>${outModel[0]}</strong> 1台平均 ${_fmtInVal(avgO)}`);
+      h += row('', `アウトMVP： <strong>${outModel[0]}</strong> 1台平均 ${_fmtInVal(avgO)}`);
     }
     if (lameModel && lameModel[1].profit < 0) {
-      h += row('⚠️', `要注意機種： <strong>${lameModel[0]}</strong> 月間粗利 <span class="ai-down">${Math.round(lameModel[1].profit).toLocaleString()}円</span>`);
+      h += row('', `要注意機種： <strong>${lameModel[0]}</strong> 月間粗利 <span class="ai-down">${Math.round(lameModel[1].profit).toLocaleString()}円</span>`);
     }
   }
 
-  h += `<div style="margin-top:14px;font-size:11px;color:var(--text2);">🤖 このサマリーはルールベース自動生成です。実際の判断は現場スタッフの経験と合わせてご活用ください。</div>`;
+  h += `<div style="margin-top:14px;font-size:11px;color:var(--text2);">このサマリーはルールベース自動生成です。実際の判断は現場スタッフの経験と合わせてご活用ください。</div>`;
   return h;
 }
 
@@ -8884,7 +9120,7 @@ function generatePinpointAdvice() {
       area.innerHTML = '<span style="color:#ff6b6b;">分析中にエラーが発生しました: ' + e.message + '</span>';
     }
     btn.disabled = false;
-    btn.innerHTML = '🔄 再分析';
+    btn.innerHTML = '再分析';
   }, 600);
 }
 
@@ -8946,17 +9182,17 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
   else if (profitRate < 5) overallScore -= 1;
 
   const overall =
-    overallScore >= 2.5 ? { emoji:'☀️', label:'絶好調', chip:'ai-chip-green',  color:'#43e97b' } :
-    overallScore >= 1   ? { emoji:'🌤️', label:'好調',   chip:'ai-chip-green',  color:'#a3e635' } :
-    overallScore >= -0.5? { emoji:'⛅', label:'平均的', chip:'ai-chip-blue',   color:'#60a5fa' } :
-    overallScore >= -2  ? { emoji:'🌧️', label:'やや不調', chip:'ai-chip-yellow', color:'#fbbf24' } :
-                          { emoji:'⛈️', label:'低迷',    chip:'ai-chip-red',    color:'#ff6b6b' };
+    overallScore >= 2.5 ? { emoji:'◎', label:'絶好調', chip:'ai-chip-green',  color:'#43e97b' } :
+    overallScore >= 1   ? { emoji:'○', label:'好調',   chip:'ai-chip-green',  color:'#a3e635' } :
+    overallScore >= -0.5? { emoji:'○', label:'平均的', chip:'ai-chip-blue',   color:'#60a5fa' } :
+    overallScore >= -2  ? { emoji:'△', label:'やや不調', chip:'ai-chip-yellow', color:'#fbbf24' } :
+                          { emoji:'▽', label:'低迷',    chip:'ai-chip-red',    color:'#ff6b6b' };
 
   // ── HTML組み立て ──
   let h = '';
 
   // ① 総括
-  h += `<div class="ai-section-head">📊 総括 — ${dateVal}（${dow}曜日）</div>`;
+  h += `<div class="ai-section-head">総括 — ${dateVal}（${dow}曜日）</div>`;
   h += `<div class="ai-row">`;
   h += `${overall.emoji} 本日の総合評価： <span class="ai-chip ${overall.chip}">${overall.label}</span>`;
   h += `</div>`;
@@ -8966,7 +9202,7 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
   h += `<div class="ai-row">設置台数 <strong>${curr.count}台</strong> ／ 1台平均${_inLabel(true)} <span class="ai-warn">${_fmtInVal(curr.inmai)}</span></div>`;
 
   // ② 対比分析
-  h += `<div class="ai-section-head">📈 対比分析</div>`;
+  h += `<div class="ai-section-head">▲ 対比分析</div>`;
 
   // 先週同日比
   if (pw?.data) {
@@ -8982,8 +9218,8 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
     // コメント
     if (Math.abs(pwPct) >= 20) {
       h += pwPct >= 0
-        ? ` <span class="ai-up">→ 先週比で大幅プラス！稼働が上向いています✨</span>`
-        : ` <span class="ai-down">→ 先週比で大幅ダウン。稼働低下が懸念されます⚠️</span>`;
+        ? ` <span class="ai-up">→ 先週比で大幅プラス！稼働が上向いています</span>`
+        : ` <span class="ai-down">→ 先週比で大幅ダウン。稼働低下が懸念されます</span>`;
     } else if (Math.abs(pwPct) >= 5) {
       h += pwPct >= 0
         ? ` <span class="ai-up">→ 先週より堅調に推移</span>`
@@ -9031,13 +9267,13 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
   }
 
   // ③ 機種別チェック
-  h += `<div class="ai-section-head">🎯 機種別チェック（${modelRows.length}機種）</div>`;
+  h += `<div class="ai-section-head">機種別チェック（${modelRows.length}機種）</div>`;
 
   // 粗利TOP3
   if (top3.length) {
-    h += `<div class="ai-row">✅ <strong>稼ぎ頭TOP3：</strong></div>`;
+    h += `<div class="ai-row">✓ <strong>稼ぎ頭TOP3：</strong></div>`;
     top3.forEach((r, i) => {
-      const medal = ['🥇','🥈','🥉'][i];
+      const medal = ['1位','2位','3位'][i];
       h += `<div class="ai-row" style="margin-left:20px;">${medal} ${r.name.replace(/^[LS]B?/,'')}`;
       h += ` ／ 粗利合計 <span class="${r.profit>=0?'ai-up':'ai-down'}">${Math.round(r.profit).toLocaleString()}円</span>`;
       h += ` ／ 1台平均 ${Math.round(r.avgProfit).toLocaleString()}円`;
@@ -9048,9 +9284,9 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
   // 粗利ワースト（赤字機種）
   const redMachines = bot3.filter(r => r.profit < 0);
   if (redMachines.length) {
-    h += `<div class="ai-row" style="margin-top:6px;">⚠️ <strong>赤字機種（${redMachines.length}機種）：</strong></div>`;
+    h += `<div class="ai-row" style="margin-top:6px;"><strong>赤字機種（${redMachines.length}機種）：</strong></div>`;
     redMachines.forEach(r => {
-      h += `<div class="ai-row" style="margin-left:20px;">🔴 ${r.name.replace(/^[LS]B?/,'')}`;
+      h += `<div class="ai-row" style="margin-left:20px;">● ${r.name.replace(/^[LS]B?/,'')}`;
       h += ` ／ 粗利 <span class="ai-down">${Math.round(r.profit).toLocaleString()}円</span>`;
       h += ` ／ ${_inLabel(true)} ${_fmtInVal(r.avgIn)}/台</div>`;
     });
@@ -9059,34 +9295,34 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
   // IN枚数が多いのに利益率が低い機種（要確認）
   const inefficient = modelRows.filter(r => r.avgIn > (curr.inmai * 1.1) && r.rate < (profitRate - 5) && r.count >= 2);
   if (inefficient.length) {
-    h += `<div class="ai-row" style="margin-top:6px;">🔍 <strong>IN多・利益率低（要確認）：</strong></div>`;
+    h += `<div class="ai-row" style="margin-top:6px;"><strong>IN多・利益率低（要確認）：</strong></div>`;
     inefficient.slice(0,2).forEach(r => {
-      h += `<div class="ai-row" style="margin-left:20px;">📌 ${r.name.replace(/^[LS]B?/,'')}`;
+      h += `<div class="ai-row" style="margin-left:20px;">${r.name.replace(/^[LS]B?/,'')}`;
       h += ` ／ ${_inLabel(true)} ${_fmtInVal(r.avgIn)}/台（平均比↑）`;
       h += ` ／ 利益率 <span class="ai-down">${r.rate.toFixed(1)}%</span></div>`;
     });
   }
 
   // ④ アクションアドバイス
-  h += `<div class="ai-section-head">💡 アクションアドバイス</div>`;
+  h += `<div class="ai-section-head">アクションアドバイス</div>`;
   const actions = [];
 
   if (pwPct !== null && pwPct < -15)
-    actions.push('📉 先週同日比で粗利が大幅ダウンしています。稼働数・回転数の変化を確認してください。');
+    actions.push('▼ 先週同日比で粗利が大幅ダウンしています。稼働数・回転数の変化を確認してください。');
   if (pwInPct !== null && pwInPct < -10)
-    actions.push('🪙 '+_inLabel(true)+'（稼働）が先週より落ちています。集客施策・イベントの効果を見直しましょう。');
+    actions.push(''+_inLabel(true)+'（稼働）が先週より落ちています。集客施策・イベントの効果を見直しましょう。');
   if (profitRate < 5)
-    actions.push('⚠️ 利益率が5%を下回っています。出玉設定・還元率の見直しが必要かもしれません。');
+    actions.push('利益率が5%を下回っています。出玉設定・還元率の見直しが必要かもしれません。');
   if (profitRate > 20)
-    actions.push('💰 利益率が20%超えと高水準です。過度な絞り込みになっていないか確認しておきましょう。');
+    actions.push('利益率が20%超えと高水準です。過度な絞り込みになっていないか確認しておきましょう。');
   if (redMachines.length >= 3)
-    actions.push(`🔴 ${redMachines.length}機種が赤字です。特に「${redMachines[0].name.replace(/^[LS]B?/,'')}」の稼働状況を重点チェックしてください。`);
+    actions.push(`● ${redMachines.length}機種が赤字です。特に「${redMachines[0].name.replace(/^[LS]B?/,'')}」の稼働状況を重点チェックしてください。`);
   if (inefficient.length)
-    actions.push(`🔎 「${inefficient[0].name.replace(/^[LS]B?/,'')}」は${_inLabel(true)}が多いのに利益率が低め。設定・釘の確認を推奨します。`);
+    actions.push(`「${inefficient[0].name.replace(/^[LS]B?/,'')}」は${_inLabel(true)}が多いのに利益率が低め。設定・釘の確認を推奨します。`);
   if (maPct !== null && maPct > 20)
-    actions.push('🎉 当月日平均を大きく上回っています。好調の要因（イベント・曜日・天候等）を記録しておきましょう。');
+    actions.push('当月日平均を大きく上回っています。好調の要因（イベント・曜日・天候等）を記録しておきましょう。');
   if (actions.length === 0)
-    actions.push('✅ 特に大きな問題は検出されませんでした。引き続き安定した運営を維持してください。');
+    actions.push('✓ 特に大きな問題は検出されませんでした。引き続き安定した運営を維持してください。');
 
   actions.forEach(a => {
     h += `<div class="ai-row">${a}</div>`;
@@ -9094,7 +9330,7 @@ function _buildAdviceHTML({ curr, comparisons, selDay, dateVal }) {
 
   // フッター
   h += `<div style="margin-top:12px;padding-top:8px;border-top:1px solid rgba(108,99,255,0.2);font-size:10px;color:var(--text2);">`;
-  h += `🤖 このアドバイスはルールベース自動生成です。実際の判断は現場スタッフの経験と合わせてご活用ください。`;
+  h += `このアドバイスはルールベース自動生成です。実際の判断は現場スタッフの経験と合わせてご活用ください。`;
   h += `</div>`;
 
   return h;
@@ -9617,14 +9853,14 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
 
   // ── 3. Day Type判定 ──
   let dayType;
-  if      (inDevPct >= 8  && prDevPct >= 8)   dayType={icon:'🌟',label:'超好調日',   desc:'アウト・利益ともに上振れ',          color:'#f59e0b'};
-  else if (inDevPct >= 8  && prDevPct <= -5)   dayType={icon:'🔵',label:'集客日',     desc:'アウト高・利益低（放出寄り）',      color:'#60a5fa'};
-  else if (inDevPct <= -5 && prDevPct >= 8)    dayType={icon:'🔴',label:'絞り日',     desc:'アウト低・利益高（絞り運用）',      color:'#f87171'};
-  else if (prDevPct <= -15)                    dayType={icon:'🟠',label:'放出日',     desc:'利益が大きくマイナス方向',          color:'#f97316'};
-  else if (inDevPct >= 5)                      dayType={icon:'🟡',label:'高稼働日',   desc:'アウト高め（利益は平均的）',        color:'#fbbf24'};
+  if      (inDevPct >= 8  && prDevPct >= 8)   dayType={icon:'★',label:'超好調日',   desc:'アウト・利益ともに上振れ',          color:'#f59e0b'};
+  else if (inDevPct >= 8  && prDevPct <= -5)   dayType={icon:'●',label:'集客日',     desc:'アウト高・利益低（放出寄り）',      color:'#60a5fa'};
+  else if (inDevPct <= -5 && prDevPct >= 8)    dayType={icon:'●',label:'絞り日',     desc:'アウト低・利益高（絞り運用）',      color:'#f87171'};
+  else if (prDevPct <= -15)                    dayType={icon:'●',label:'放出日',     desc:'利益が大きくマイナス方向',          color:'#f97316'};
+  else if (inDevPct >= 5)                      dayType={icon:'●',label:'高稼働日',   desc:'アウト高め（利益は平均的）',        color:'#fbbf24'};
   else if (Math.abs(inDevPct)<=5 && Math.abs(prDevPct)<=8)
-                                               dayType={icon:'🟢',label:'通常営業日', desc:'前後平均に近い標準的な日',          color:'#34d399'};
-  else                                         dayType={icon:'⚪',label:'特異日',     desc:'一部機種が突出している可能性あり',  color:'#9ca3af'};
+                                               dayType={icon:'●',label:'通常営業日', desc:'前後平均に近い標準的な日',          color:'#34d399'};
+  else                                         dayType={icon:'○',label:'特異日',     desc:'一部機種が突出している可能性あり',  color:'#9ca3af'};
 
   // ── 4. 機種別偏差リスト ──
   const compByModel = {};
@@ -9832,9 +10068,9 @@ function _renderPinDayAnalysis(dateVal, selDay, modelRows, all) {
   const row2 = document.getElementById('pinDayTilesRow2');
   if (row2) {
     row2.innerHTML =
-      makeCatTile('jug',     'ジャグラー', '🎰', '#a78bfa', jugSum)
-    + makeCatTile('main',    'メイン機種', '⭐', '#38bdf8', mainSum)
-    + makeCatTile('variety', 'バラエティ', '🎲', '#fb923c', varSum);
+      makeCatTile('jug',     'ジャグラー', '', '#a78bfa', jugSum)
+    + makeCatTile('main',    'メイン機種', '★', '#38bdf8', mainSum)
+    + makeCatTile('variety', 'バラエティ', '', '#fb923c', varSum);
   }
 
   // Row3: 万枚/万発突破3タイル
@@ -10409,11 +10645,11 @@ function runPinpoint() {
         : null;
       if (avgVal && avgVal !== 0) {
         const ratio = cmpVal / avgVal;
-        const wt = ratio >= 1.2  ? { icon:'☀️',  tip:'絶好調（当月平均比+' + Math.round((ratio-1)*100) + '%）' }
-                 : ratio >= 1.05 ? { icon:'🌤️', tip:'好調（当月平均比+' + Math.round((ratio-1)*100) + '%）' }
-                 : ratio >= 0.95 ? { icon:'⛅',  tip:'平均的（当月平均比' + Math.round((ratio-1)*100) + '%）' }
-                 : ratio >= 0.8  ? { icon:'🌧️', tip:'やや不調（当月平均比' + Math.round((ratio-1)*100) + '%）' }
-                 :                 { icon:'⛈️', tip:'低迷（当月平均比' + Math.round((ratio-1)*100) + '%）' };
+        const wt = ratio >= 1.2  ? { icon:'◎',  tip:'絶好調（当月平均比+' + Math.round((ratio-1)*100) + '%）' }
+                 : ratio >= 1.05 ? { icon:'○', tip:'好調（当月平均比+' + Math.round((ratio-1)*100) + '%）' }
+                 : ratio >= 0.95 ? { icon:'○',  tip:'平均的（当月平均比' + Math.round((ratio-1)*100) + '%）' }
+                 : ratio >= 0.8  ? { icon:'△', tip:'やや不調（当月平均比' + Math.round((ratio-1)*100) + '%）' }
+                 :                 { icon:'▽', tip:'低迷（当月平均比' + Math.round((ratio-1)*100) + '%）' };
         weatherEl.textContent = wt.icon;
         weatherEl.title = wt.tip;
       } else {
@@ -10546,11 +10782,11 @@ function runPinpoint() {
   const validNorm = selRadarNorm.filter(v => v != null && v > 0);
   const weatherScore = validNorm.length ? Math.round(validNorm.reduce((s,v)=>s+v,0)/validNorm.length) : 50;
   const weatherMap = [
-    { min:80, icon:'☀️',  label:'絶好調',  color:'#f59e0b' },
-    { min:60, icon:'🌤️', label:'好調',    color:'#fbbf24' },
-    { min:40, icon:'⛅',  label:'平均的',  color:'#9499b7' },
-    { min:20, icon:'🌧️', label:'やや不調', color:'#60a5fa' },
-    { min:0,  icon:'⛈️', label:'低迷',    color:'#f87171' },
+    { min:80, icon:'◎',  label:'絶好調',  color:'#f59e0b' },
+    { min:60, icon:'○', label:'好調',    color:'#fbbf24' },
+    { min:40, icon:'○',  label:'平均的',  color:'#9499b7' },
+    { min:20, icon:'△', label:'やや不調', color:'#60a5fa' },
+    { min:0,  icon:'▽', label:'低迷',    color:'#f87171' },
   ];
   const wt = weatherMap.find(w => weatherScore >= w.min) || weatherMap[weatherMap.length-1];
   const wtIcon  = document.getElementById('pinWeatherIcon');
@@ -10640,9 +10876,9 @@ function runPinpoint() {
   // AIアドバイス用にデータを保存、パネルをリセット
   _storePinAdviceData(curr, comparisons, selDay, dateVal);
   document.getElementById('pinAIContent').innerHTML =
-    '<span style="color:var(--text2);font-size:12px;">▶ 「分析する」ボタンを押すと本日のデータを自動解析してアドバイスを表示します。</span>';
+    '<span style="color:var(--text2);font-size:12px;">「分析する」ボタンを押すと本日のデータを自動解析してアドバイスを表示します。</span>';
   document.getElementById('pinAIBtn').disabled = false;
-  document.getElementById('pinAIBtn').innerHTML = '✨ 分析する';
+  document.getElementById('pinAIBtn').innerHTML = '分析する';
 }
 
 // 日別集計ソート状態
@@ -11064,7 +11300,7 @@ function renderDigit() {
     const isBest  = ap === maxP && validProfit.length > 1;
     const isWorst = ap === minP && validProfit.length > 1;
     const cls = isBest ? 'dow-badge best' : isWorst ? 'dow-badge worst' : 'dow-badge';
-    const badge = isBest ? '👑' : isWorst ? '📉' : '';
+    const badge = isBest ? '★' : isWorst ? '▼' : '';
     const profitColor = ap >= 0 ? 'var(--green)' : 'var(--red)';
     const rateStr     = r != null ? r + '%' : '-';
     const rateColor   = r != null && r >= 0 ? 'var(--green)' : 'var(--red)';
@@ -11434,7 +11670,7 @@ function showDowDetail(dowIdx) {
   const modelRows = _buildDetailModelRows(datesForDow);
   _dowDetailLastRows = modelRows;
 
-  const titleLabel = dowIdx === 7 ? '🎌 祝日の平均' : DOW_NAMES_JP[dowIdx] + '曜日の平均';
+  const titleLabel = dowIdx === 7 ? '祝日の平均' : DOW_NAMES_JP[dowIdx] + '曜日の平均';
   document.getElementById('dowDetailTitle').textContent = titleLabel;
   document.getElementById('dowDetailKPI').innerHTML = _renderDetailKPIHtml(kpi);
   _renderDetailTable('dowDetailTableHead', 'dowDetailTableBody', modelRows);
@@ -11553,7 +11789,7 @@ function renderDOW() {
     const isWeekend = i === 0 || i === 6;
     const cls = isBest ? 'dow-badge best' : isWorst ? 'dow-badge worst' : isWeekend ? 'dow-badge weekend' : 'dow-badge';
     const nameColor = i===0?'#ff6b6b':i===6?'#60a5fa':'var(--text)';
-    const badge = isBest ? '👑' : isWorst ? '📉' : '';
+    const badge = isBest ? '★' : isWorst ? '▼' : '';
     const profitColor = ap >= 0 ? 'var(--green)' : 'var(--red)';
     const rateStr = r != null ? r + '%' : '-';
     const rateColor = r != null && r >= 0 ? 'var(--green)' : 'var(--red)';
@@ -11575,7 +11811,7 @@ function renderDOW() {
     const isBestH  = ap !== null && ap === maxP;
     const isWorstH = ap !== null && ap === minP;
     const cls = isBestH ? 'dow-badge holiday best' : isWorstH ? 'dow-badge holiday worst' : 'dow-badge holiday';
-    const badge = isBestH ? '👑' : isWorstH ? '📉' : '🎌';
+    const badge = isBestH ? '★' : isWorstH ? '▼' : '';
     const profitColor = ap >= 0 ? 'var(--green)' : 'var(--red)';
     const rateStr = r != null ? r + '%' : '-';
     const rateColor = r != null && r >= 0 ? 'var(--green)' : 'var(--red)';
@@ -11868,7 +12104,7 @@ async function checkAuth() {
   const overlay = document.createElement('div');
   overlay.id = 'dropOverlay';
   overlay.style.cssText = 'display:none;position:fixed;inset:0;z-index:19999;background:rgba(34,197,94,0.18);border:4px dashed #22c55e;border-radius:16px;pointer-events:none;align-items:center;justify-content:center;';
-  overlay.innerHTML = '<div style="text-align:center;color:#22c55e;font-size:22px;font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,0.6);">📂 ここにファイルをドロップ<br><span style="font-size:14px;font-weight:600;opacity:.8;">Excel（.xlsx）または バックアップJSON（.json）</span></div>';
+  overlay.innerHTML = '<div style="text-align:center;color:#22c55e;font-size:22px;font-weight:900;text-shadow:0 2px 8px rgba(0,0,0,0.6);">ここにファイルをドロップ<br><span style="font-size:14px;font-weight:600;opacity:.8;">Excel（.xlsx）または バックアップJSON（.json）</span></div>';
   document.addEventListener('DOMContentLoaded', () => document.body.appendChild(overlay));
 
   document.addEventListener('dragenter', (e) => {
@@ -11924,9 +12160,9 @@ function _checkAdminDataEmpty() {
     .filter(([k]) => k !== '__benchmark__')
     .reduce((sum, [, arr]) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
   if (total === 0) {
-    showMsg('⚠️ データが空です。バックアップJSONから復元してください', 'warn');
+    showMsg('データが空です。バックアップJSONから復元してください', 'warn');
     setTimeout(() => {
-      if (confirm('⚠️ 管理者データが空です。\n\nバックアップJSONから復元しますか？')) {
+      if (confirm('管理者データが空です。\n\nバックアップJSONから復元しますか？')) {
         document.getElementById('restoreJsonBtn').click();
       }
     }, 500);
@@ -12246,8 +12482,8 @@ function renderStoreCmp() {
   // AI エリアをリセット（店舗が変わったら再分析を促す）
   const aiArea = document.getElementById('cmpAIContent');
   const aiBtn  = document.getElementById('cmpAIBtn');
-  if (aiArea) aiArea.innerHTML = '<span style="color:var(--text2);font-size:12px;">▶ 「分析する」を押すと機種別の比較レポートを自動生成します。</span>';
-  if (aiBtn)  { aiBtn.disabled = false; aiBtn.innerHTML = '✨ 分析する'; }
+  if (aiArea) aiArea.innerHTML = '<span style="color:var(--text2);font-size:12px;">「分析する」を押すと機種別の比較レポートを自動生成します。</span>';
+  if (aiBtn)  { aiBtn.disabled = false; aiBtn.innerHTML = '分析する'; }
 
   // ── 複数指標対応グラフ描画 ──
   const _metaCfg = {
@@ -12468,7 +12704,7 @@ function _renderCmpModelTable(keyA, keyB, nameA, nameB) {
   el.innerHTML = `
     <div style="font-size:23px;font-weight:700;color:var(--text);margin-bottom:10px;letter-spacing:2px;font-family:'Hiragino Mincho ProN','Yu Mincho','YuMincho','Noto Serif JP',Georgia,'Times New Roman',serif;">
       BASIC
-      <span style="font-size:11px;font-weight:500;color:var(--text2);margin-left:10px;">🔵A優位 / 🟡B優位 / A÷B比率（105%↑=A優位・95%↓=B優位）｜機種名クリックでグラフ反映</span>
+      <span style="font-size:11px;font-weight:500;color:var(--text2);margin-left:10px;">●A優位 / ●B優位 / A÷B比率（105%↑=A優位・95%↓=B優位）｜機種名クリックでグラフ反映</span>
     </div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
@@ -13180,7 +13416,7 @@ function _renderCmpKippin(keyA, keyB, nameA, nameB) {
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
           <div>
-            <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;letter-spacing:.5px;">📊 アウト</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;letter-spacing:.5px;">アウト</div>
             <div style="font-size:11px;color:var(--text2);">1台平均</div>
             <div style="font-size:15px;font-weight:800;color:var(--text);">${fmtN(grp.avgInmai)}<span style="font-size:10px;color:var(--text2);"> ${_inUnit()}/台</span></div>
             <div style="font-size:11px;color:var(--text2);margin-top:6px;">合計</div>
@@ -13190,7 +13426,7 @@ function _renderCmpKippin(keyA, keyB, nameA, nameB) {
             ${bar(grp.inShare, titleColor)}
           </div>
           <div>
-            <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;letter-spacing:.5px;">💴 粗利</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;letter-spacing:.5px;">粗利</div>
             <div style="font-size:11px;color:var(--text2);">1台平均</div>
             <div style="font-size:15px;font-weight:800;color:${grp.avgProfit >= 0 ? 'var(--green)' : 'var(--red)'};">${fmtY(grp.avgProfit)}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:6px;">合計</div>
@@ -13333,7 +13569,7 @@ function generateStoreCmpAdvice() {
       area.innerHTML = '<span style="color:#ff6b6b;">分析エラー: ' + e.message + '</span>';
     }
     btn.disabled = false;
-    btn.innerHTML = '🔄 再分析';
+    btn.innerHTML = '再分析';
   }, 600);
 }
 
@@ -13409,23 +13645,23 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   // ── 全体サマリー（IN枚数・台粗利の平均差）──
   const allInDiff  = diffs.reduce((s,d) => s + d.inmaiDiff,  0) / diffs.length;
   const allProfDiff = diffs.reduce((s,d) => s + d.profitDiff, 0) / diffs.length;
-  h += sec('📊 全体概況（共通機種 平均）');
-  h += row('🎰', `1台平均${_cmpInLabel()}の差（A−B）：${sgn(allInDiff,_cmpInUnit())} — ${nameA}が${allInDiff >= 0 ? '多い' : '少ない'}`);
-  h += row('💰', `台粗利の差（A−B）：${sgn(allProfDiff,'円')} — ${nameA}が${allProfDiff >= 0 ? '稼げている' : '下回っている'}`);
+  h += sec('全体概況（共通機種 平均）');
+  h += row('', `1台平均${_cmpInLabel()}の差（A−B）：${sgn(allInDiff,_cmpInUnit())} — ${nameA}が${allInDiff >= 0 ? '多い' : '少ない'}`);
+  h += row('', `台粗利の差（A−B）：${sgn(allProfDiff,'円')} — ${nameA}が${allProfDiff >= 0 ? '稼げている' : '下回っている'}`);
 
   // ── 上位3機種（A が B より台粗利が高い機種）──
-  h += sec(`🏆 上位3機種 — ${nameA} が有利な機種`);
+  h += sec(`上位3機種 — ${nameA} が有利な機種`);
   top3.forEach((d, i) => {
-    const medal = ['🥇','🥈','🥉'][i];
+    const medal = ['1位','2位','3位'][i];
     h += row(medal, `<strong>${d.model}</strong>（A:${d.countA}台 / B:${d.countB}台）`);
     h += row('  ', `${_cmpInLabel()} 差: ${sgn(d.inmaiDiff,_cmpInUnit())} &nbsp;|&nbsp; 台粗利 差: ${sgn(d.profitDiff,'円')}`);
     h += row('  ', `A: <span class="ai-up">${fmtV(d.profitA,'円')}</span> &nbsp;/&nbsp; B: <span class="${d.profitB>=0?'ai-up':'ai-down'}">${fmtV(d.profitB,'円')}</span>`);
   });
 
   // ── ワースト3機種（B が A より台粗利が高い機種）──
-  h += sec(`⚠️ ワースト3機種 — ${nameB} が有利な機種`);
+  h += sec(`ワースト3機種 — ${nameB} が有利な機種`);
   worst3.forEach((d, i) => {
-    const icon = ['📉','📉','📉'][i];
+    const icon = ['▼','▼','▼'][i];
     h += row(icon, `<strong>${d.model}</strong>（A:${d.countA}台 / B:${d.countB}台）`);
     h += row('  ', `${_cmpInLabel()} 差: ${sgn(d.inmaiDiff,_cmpInUnit())} &nbsp;|&nbsp; 台粗利 差: ${sgn(d.profitDiff,'円')}`);
     h += row('  ', `A: <span class="${d.profitA>=0?'ai-up':'ai-down'}">${fmtV(d.profitA,'円')}</span> &nbsp;/&nbsp; B: <span class="ai-up">${fmtV(d.profitB,'円')}</span>`);
@@ -13436,20 +13672,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   const inTopA = byInSorted.filter(d => d.inmaiDiff > 0).slice(0, 3);
   const inTopB = [...byInSorted].reverse().filter(d => d.inmaiDiff < 0).slice(0, 3);
 
-  h += sec(`🎰 ${_cmpInLabel()} — ${nameA} が優位な機種 TOP3`);
+  h += sec(`${_cmpInLabel()} — ${nameA} が優位な機種 TOP3`);
   if (inTopA.length) {
     inTopA.forEach((d, i) => {
-      const medal = ['🥇','🥈','🥉'][i];
+      const medal = ['1位','2位','3位'][i];
       h += row(medal, `<strong>${d.model}</strong>: ${sgn(d.inmaiDiff,_cmpInUnit())} &nbsp;<span style="color:var(--text2);">（A:${fmtV(d.inmaiA,_cmpInUnit())} / B:${fmtV(d.inmaiB,_cmpInUnit())}）</span>`);
     });
   } else {
     h += row('—', `${nameA} が優位な機種はありません`);
   }
 
-  h += sec(`🎰 ${_cmpInLabel()} — ${nameB} が優位な機種 TOP3`);
+  h += sec(`${_cmpInLabel()} — ${nameB} が優位な機種 TOP3`);
   if (inTopB.length) {
     inTopB.forEach((d, i) => {
-      const medal = ['🥇','🥈','🥉'][i];
+      const medal = ['1位','2位','3位'][i];
       h += row(medal, `<strong>${d.model}</strong>: ${sgn(d.inmaiDiff,_cmpInUnit())} &nbsp;<span style="color:var(--text2);">（A:${fmtV(d.inmaiA,_cmpInUnit())} / B:${fmtV(d.inmaiB,_cmpInUnit())}）</span>`);
     });
   } else {
@@ -13496,22 +13732,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   const corrColor = r => Math.abs(r) >= 0.7 ? 'var(--green)' : Math.abs(r) >= 0.4 ? '#f59e0b' : 'var(--text2)';
 
   if (corrTop3.length > 0) {
-    h += sec('📈 プラス相関 TOP3（A・B が連動して動く機種）');
+    h += sec('▲ プラス相関 TOP3（A・B が連動して動く機種）');
     corrTop3.forEach((c, i) => {
-      const medal = ['🥇','🥈','🥉'][i];
+      const medal = ['1位','2位','3位'][i];
       h += row(medal, `<strong>${c.model}</strong> &nbsp; r = <span style="color:${corrColor(c.r)};font-weight:700;">${c.r.toFixed(3)}</span> &nbsp;<span style="color:var(--text2);">${corrStr(c.r)}（${c.days}日）</span>`);
     });
   }
 
   if (corrBot3.length > 0) {
-    h += sec('📉 マイナス相関 TOP3（A・B が逆に動く機種）');
+    h += sec('▼ マイナス相関 TOP3（A・B が逆に動く機種）');
     corrBot3.forEach((c, i) => {
-      const icon = ['⚡','⚡','⚡'][i];
+      const icon = ['','',''][i];
       h += row(icon, `<strong>${c.model}</strong> &nbsp; r = <span style="color:${corrColor(c.r)};font-weight:700;">${c.r.toFixed(3)}</span> &nbsp;<span style="color:var(--text2);">${corrStr(c.r)}（${c.days}日）</span>`);
     });
   }
 
-  h += `<div style="margin-top:14px;font-size:11px;color:var(--text2);">🤖 台粗利・${_cmpInLabel()}は「1台平均値」。設置台数が極端に異なる機種は参考値として扱ってください。相関係数は共通5日以上のデータがある機種のみ対象。</div>`;
+  h += `<div style="margin-top:14px;font-size:11px;color:var(--text2);">台粗利・${_cmpInLabel()}は「1台平均値」。設置台数が極端に異なる機種は参考値として扱ってください。相関係数は共通5日以上のデータがある機種のみ対象。</div>`;
   return h;
 }
 
@@ -13787,9 +14023,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(aUp&&pDn&&wUp){d='ideal';t='理想形 ◎';v='締めて(量↓)・広く配り直し(勝率↑)→稼働UP。放出効率の改善';}
     else if(aUp&&pDn){d='strong';t='強い台';v='出さずに(量↓)稼働UP。絞って正解・さらに絞り余地';}
     else if(aUp&&pUp&&wDn){d='spectacle';t='万枚型';v='出してる(量↑)が1台集中(勝率↓)で稼働。看板向き・客は大半負け';}
-    else if(aUp&&pUp){d='invest';t='集客投資 ↗';v='出して(量↑)広げて稼働UP。効くが利益コスト要確認';}
-    else if(aDn&&pUp){d='waste';t='無駄放出 ↘';v='出してる(量↑)のに稼働DOWN。'+(m.win<25?'集中配分も一因。':'')+'締め候補';}
-    else if(aDn&&pDn){d='collapse';t='崩壊注意 ↙';v='締めて(量↓)稼働も低下。下限割れの可能性。緩めるか入替';}
+    else if(aUp&&pUp){d='invest';t='集客投資 ';v='出して(量↑)広げて稼働UP。効くが利益コスト要確認';}
+    else if(aDn&&pUp){d='waste';t='無駄放出 ';v='出してる(量↑)のに稼働DOWN。'+(m.win<25?'集中配分も一因。':'')+'締め候補';}
+    else if(aDn&&pDn){d='collapse';t='崩壊注意 ';v='締めて(量↓)稼働も低下。下限割れの可能性。緩めるか入替';}
     else if(aUp){d='up';t='稼働上昇';v='配分ほぼ変えずに稼働UP。人気/トレンド上昇';}
     else if(aDn){d='down';t='稼働低下';v='配分ほぼ変えずに稼働DOWN。人気減退・要観察';}
     m.d=d;m.t=t;m.verdict=v;});}
@@ -13825,7 +14061,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       pointRadius:list.map(function(m){return Math.min(17,Math.max(4,Math.abs(m.dOutPct)*55));}),pointHoverRadius:list.map(function(m){return Math.min(19,Math.max(6,Math.abs(m.dOutPct)*55+3));})}]},
       options:{responsive:false,animation:false,layout:{padding:8},
         plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){var m=c.raw._m;
-          return [m.n,'アウト '+(m.dOutPct>=0?'+':'')+(m.dOutPct*100).toFixed(0)+'% ／ 出玉率 '+(m.dPay>=0?'+':'')+m.dPay.toFixed(1)+'pt ／ 勝率 '+(m.dWin>=0?'+':'')+m.dWin.toFixed(0)+'pt',m.t?('▶ '+m.t):''];}}}},
+          return [m.n,'アウト '+(m.dOutPct>=0?'+':'')+(m.dOutPct*100).toFixed(0)+'% ／ 出玉率 '+(m.dPay>=0?'+':'')+m.dPay.toFixed(1)+'pt ／ 勝率 '+(m.dWin>=0?'+':'')+m.dWin.toFixed(0)+'pt',m.t?(''+m.t):''];}}}},
         scales:{x:{type:'linear',min:-maxP,max:maxP,title:{display:true,text:'← 締めた  Δ出玉率(量)  出した →',color:'#64748b',font:{size:11,weight:'700'}},grid:{display:false},ticks:{color:'#94a3b8'}},
           y:{type:'linear',min:-maxW,max:maxW,title:{display:true,text:'↓集中  Δ勝率(配り方)  広げた↑',color:'#64748b',font:{size:11,weight:'700'}},grid:{display:false},ticks:{color:'#94a3b8'}}}},
       plugins:[_bjpQuad(cfg),_bjpLabel(list)]});
@@ -13904,7 +14140,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     +'<li><b>Δ（変化）</b>＝ 直近の7日トレイリング − 約2週間前の7日トレイリング</li></ul>'
     +'<h3>② 考え方</h3><ul>'
     +'<li>目的は<b>アウト（稼働）を上げること</b>。出玉率・勝率はそのためのレバー。</li>'
-    +'<li>出玉率＝放出の<b>量</b>、勝率＝放出の<b>配り方</b>（広く薄く↔集中）。別物。</li>'
+    +'<li>出玉率＝放出の<b>量</b>、勝率＝放出の<b>配り方</b>（広く薄く集中）。別物。</li>'
     +'<li>結果（アウト↑/↓）で2枚に分け、各グラフで「量×配り方をどう動かしたか」を見る。</li></ul>'
     +'<h3>③ 自動診断（3方向の組み合わせ）</h3><table><tr><th>稼働</th><th>出玉率</th><th>勝率</th><th>診断</th></tr>'
     +'<tr><td>↑</td><td>↓</td><td>↑</td><td>理想形（締めて広げて稼働UP）</td></tr>'
