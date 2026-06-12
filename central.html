@@ -813,6 +813,36 @@
     <a href="https://p-media.info/company/contact" target="_blank" rel="noopener noreferrer"
        style="display:inline-block;margin-top:14px;font-size:12px;font-weight:700;color:#0098d4;text-decoration:none;border:1px solid rgba(0,152,212,0.4);border-radius:8px;padding:8px 18px;transition:background .15s;"
        onmouseover="this.style.background='rgba(0,152,212,0.08)'" onmouseout="this.style.background='transparent'">お問い合わせはこちら</a>
+    <a href="javascript:void(0)" onclick="document.getElementById('bjSecModal').style.display='flex'"
+       style="display:inline-block;margin-top:14px;margin-left:8px;font-size:12px;font-weight:700;color:#0098d4;text-decoration:none;border:1px solid rgba(0,152,212,0.4);border-radius:8px;padding:8px 18px;transition:background .15s;"
+       onmouseover="this.style.background='rgba(0,152,212,0.08)'" onmouseout="this.style.background='transparent'">セキュリティについて</a>
+  </div>
+</div>
+<div id="bjSecModal" style="display:none;position:fixed;inset:0;z-index:10001;background:rgba(15,23,42,0.5);align-items:flex-start;justify-content:center;padding:40px 20px;overflow:auto;">
+  <div style="background:#fff;border-radius:16px;max-width:680px;width:100%;padding:30px 34px 28px;position:relative;box-shadow:0 20px 60px rgba(15,23,42,0.3);color:#1e293b;text-align:left;">
+    <button onclick="document.getElementById('bjSecModal').style.display='none'" title="閉じる"
+      style="position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;color:#94a3b8;cursor:pointer;line-height:1;">×</button>
+    <div style="font-family:'Hiragino Mincho ProN','Yu Mincho','YuMincho','Noto Serif JP',Georgia,'Times New Roman',serif;font-size:20px;font-weight:700;letter-spacing:2px;color:#0f172a;">SECURITY</div>
+    <div style="font-size:12.5px;font-weight:700;color:#64748b;margin:2px 0 4px;">セキュリティへの取り組み</div>
+    <div style="font-size:10.5px;color:#94a3b8;margin-bottom:16px;">最終更新：2026年6月</div>
+    <div style="font-size:12.5px;line-height:1.85;">
+      <p style="margin:0 0 14px;">お客様の営業データをお守りするため、本サービスでは以下の対策を実施しています。</p>
+      <div style="font-weight:800;color:#0098d4;margin-bottom:2px;">1. パスワードによる閲覧保護</div>
+      <p style="margin:0 0 12px;">ページの閲覧にはパスワードが必要です。パスワードは毎月変更しています。さらに2026年7月1日より法人様ごとの専用パスワードに切り替わり、自社ページは自社のパスワードでのみ閲覧できるようになります。</p>
+      <div style="font-weight:800;color:#0098d4;margin-bottom:2px;">2. 配信データの暗号化（AES-256）</div>
+      <p style="margin:0 0 12px;">配信するデータファイルは、国際標準の暗号方式（AES-256-GCM）で暗号化しています。暗号を解く処理は、正しいパスワードを入力したお客様のブラウザ内でのみ行われます。万一ファイルが第三者の手に渡っても、内容を読むことはできません。</p>
+      <div style="font-weight:800;color:#0098d4;margin-bottom:2px;">3. 検索エンジンへの非掲載</div>
+      <p style="margin:0 0 12px;">全ページに検索回避設定（noindex）を施しており、Google等の検索結果には表示されません。</p>
+      <div style="font-weight:800;color:#0098d4;margin-bottom:2px;">4. お客様情報の分離</div>
+      <p style="margin:0 0 12px;">各法人様のページには自社に関係する情報のみを含め、他の法人様の名称・店舗一覧などは一切含めていません。</p>
+      <div style="font-weight:800;color:#0098d4;margin-bottom:2px;">5. 管理機能の非公開</div>
+      <p style="margin:0 0 12px;">データの集計・配信などの管理作業は公開サーバー上では行わず、管理者の手元の環境でのみ行っています。公開サイト上に管理画面はありません。</p>
+      <div style="font-weight:800;color:#0098d4;margin-bottom:2px;">6. 通信の暗号化</div>
+      <p style="margin:0 0 12px;">本サイトへのアクセスは常時HTTPS（暗号化通信）で保護されています。</p>
+      <div style="font-weight:800;color:#0098d4;margin-bottom:2px;">7. 閲覧データの取り扱い</div>
+      <p style="margin:0 0 12px;">表示のために読み込んだデータはお使いのブラウザ内にのみ保存され、外部へ送信されることはありません。アクセス解析ツール等によるお客様の行動収集も行っていません。</p>
+      <p style="margin:14px 0 0;color:#64748b;font-size:11.5px;">これらの対策は継続的に見直し・強化しています。ご不明な点は「お問い合わせ」よりご連絡ください。</p>
+    </div>
   </div>
 </div>
 <div id="bjLoadingOverlay">
@@ -1989,6 +2019,29 @@ function showMsg(txt, type) {
   setTimeout(() => { el.textContent = ''; el.className = ''; }, 4000);
 }
 
+// ── 配信JSONの暗号化／復号（パスワード＝鍵。直URLで取られても読めない）──
+// 圧縮(LZString)→AES-GCM暗号化。鍵はPBKDF2(パスワード+salt, 15万回)で導出。
+function _bjB64(buf){ let s=''; const u=new Uint8Array(buf); for(let i=0;i<u.length;i+=0x8000){ s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000)); } return btoa(s); }
+function _bjB64d(str){ const bin=atob(str); const u=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i); return u; }
+async function _bjDeriveKey(password, saltBytes){
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2', salt:saltBytes, iterations:150000, hash:'SHA-256'}, base,
+    {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+async function _bjEncryptJSON(obj, password){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await _bjDeriveKey(password, salt);
+  const plain = LZString.compressToUint8Array(JSON.stringify(obj));
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, plain);
+  return { enc:'v1', salt:_bjB64(salt), iv:_bjB64(iv), ct:_bjB64(ct) };
+}
+async function _bjDecryptJSON(wrapper, password){
+  const key = await _bjDeriveKey(password, _bjB64d(wrapper.salt));
+  const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:_bjB64d(wrapper.iv)}, key, _bjB64d(wrapper.ct));
+  return JSON.parse(LZString.decompressFromUint8Array(new Uint8Array(pt)));
+}
+
 // ── リモートデータ読み込み（ユーザー用 GitHub Pages JSON）──
 async function loadRemoteData() {
   if (USER_ID === 'admin') return;
@@ -1996,7 +2049,18 @@ async function loadRemoteData() {
     const url = `./${USER_ID}_data.json?t=${Date.now()}`;
     const resp = await fetch(url);
     if (!resp.ok) return;
-    const data = await resp.json();
+    let data = await resp.json();
+    // 暗号化形式（enc:v1）ならログインパスワードで復号。旧形式（平文）はそのまま読む
+    if (data && data.enc === 'v1') {
+      try {
+        data = await _bjDecryptJSON(data, window._bjPw || '');
+      } catch(e) {
+        console.error('[remote] 復号失敗（パスワード不一致 or データ更新中）', e);
+        const badge = document.getElementById('remoteDataBadge');
+        if (badge) { badge.textContent = 'データを開けませんでした（更新中の可能性・しばらくして再読み込み）'; badge.style.display = ''; }
+        return;
+      }
+    }
     if (!data || !data.stores) return;
     let total = 0;
     for (const storeName of Object.keys(data.stores)) {
@@ -2157,12 +2221,19 @@ async function exportUserData() {
       };
     }
 
-    results.push({ name: `${userConf.file}_data.json`, data: exportData, storeCount, recordCount });
+    results.push({ name: `${userConf.file}_data.json`, data: exportData, pw: userConf.pw || '', storeCount, recordCount });
   }
 
-  // ダウンロード
+  // ダウンロード（pwがある法人は圧縮＋暗号化して書き出し。直URLで取られても読めない）
   for (const f of results) {
-    const blob = new Blob([JSON.stringify(f.data)], { type: 'application/json' });
+    let payload = f.data;
+    if (f.pw) {
+      try { payload = await _bjEncryptJSON(f.data, f.pw); }
+      catch(e) { console.error(`[export] ${f.name} 暗号化失敗 — 平文では書き出しません`, e); continue; }
+    } else {
+      console.warn(`[export] ${f.name}: pw未設定のため平文で書き出します（USERS_CONFIGにpwを設定してください）`);
+    }
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = f.name;
@@ -12182,7 +12253,8 @@ async function checkAuth() {
   const val = document.getElementById('authInput').value;
   const hash = await sha256(val);
   if (hash === PW_HASH) {
-    sessionStorage.setItem(AUTH_KEY, '1');
+    window._bjPw = val;                       // 配信JSONの復号鍵として保持（メモリ＋タブ内セッションのみ）
+    sessionStorage.setItem(AUTH_KEY, val);    // リロード時も復号できるようタブ内セッションに保存
     document.getElementById('authOverlay').style.display = 'none';
     await initDB();
     await _buildBenchmarkFromCache();
@@ -12243,7 +12315,10 @@ async function checkAuth() {
 })();
 
 window.addEventListener('DOMContentLoaded', () => {
-  if (sessionStorage.getItem(AUTH_KEY) === '1') {
+  const _sv = sessionStorage.getItem(AUTH_KEY);
+  if (_sv) {
+    // 旧形式('1')はパスワード無しで通す（暗号化前のセッション互換）。新形式はパスワードそのものが入っている
+    window._bjPw = (_sv === '1') ? '' : _sv;
     document.getElementById('authOverlay').style.display = 'none';
     initDB().then(_buildBenchmarkFromCache).then(loadRemoteData).then(init).then(_checkAdminDataEmpty).catch(e => { console.error('[initDB]', e); init(); });
   } else {
