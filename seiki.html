@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow, noarchive">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjIwIiBmaWxsPSJub25lIj4KICA8IS0tIOW3puOCouODvOODoO+8iOe/vOWei++8iSAtLT4KICA8cGF0aCBkPSJNIDU4LDEwOCBDIDQ4LDkwIDIyLDcyIDIsODAgQyAtNiw5NSAxOCwxMTYgNTgsMTE4IFoiIGZpbGw9IiMwMEFFRUYiLz4KICA8IS0tIOWPs+OCouODvOODoO+8iOe/vOWei++8iSAtLT4KICA8cGF0aCBkPSJNIDE0MiwxMDggQyAxNTIsOTAgMTc4LDcyIDE5OCw4MCBDIDIwNiw5NSAxODIsMTE2IDE0MiwxMTggWiIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g6aaWL+iCqeOBpOOBquOBjiAtLT4KICA8ZWxsaXBzZSBjeD0iMTAwIiBjeT0iMTEyIiByeD0iMjYiIHJ5PSIxMiIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g6aCtIC0tPgogIDxjaXJjbGUgY3g9IjEwMCIgY3k9IjgyIiByPSIzNyIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g5bem6ICzIC0tPgogIDxjaXJjbGUgY3g9IjcxIiBjeT0iNTEiIHI9IjE1IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDlj7PogLMgLS0+CiAgPGNpcmNsZSBjeD0iMTI5IiBjeT0iNTEiIHI9IjE1IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDpvLsgKOm7kuOBhOWwj+WGhikgLS0+CiAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iNjUiIHI9IjkiIGZpbGw9IiMxMTEiLz4KICA8IS0tIOiDtOS9kyAtLT4KICA8Y2lyY2xlIGN4PSIxMDAiIGN5PSIxNTAiIHI9IjQ3IiBmaWxsPSIjMDBBRUVGIi8+CiAgPCEtLSDog7TkvZPjga7jgY/jgormipzjgY0gKOWkp+OBjeOBquWGhikgLS0+CiAgPGNpcmNsZSBjeD0iMTAwIiBjeT0iMTUyIiByPSIzMCIgZmlsbD0iIzExMSIvPgogIDwhLS0g5bem6ISaIC0tPgogIDxlbGxpcHNlIGN4PSI4NyIgY3k9IjE5NSIgcng9IjEzIiByeT0iOSIgZmlsbD0iIzAwQUVFRiIvPgogIDwhLS0g5Y+z6ISaIC0tPgogIDxlbGxpcHNlIGN4PSIxMTMiIGN5PSIxOTUiIHJ4PSIxMyIgcnk9IjkiIGZpbGw9IiMwMEFFRUYiLz4KPC9zdmc+">
 <title>ベアジョン | BI ダッシュボード</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" integrity="sha512-CQBWl4fJHWbryGE+Pc7UAxWMUMNMWzWxF4SQo9CgkJIN1kx6djDQZjh3Y8SZ1d+6I+1zze6Z7kHXO7q3UyZAWw==" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNhJlKfuyQM4tIRAI062MaV8sfjQKYVGjOBaZBOA87z+IhZE9DA==" crossorigin="anonymous"></script>
@@ -13940,6 +13941,29 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjp-badge.b-red{ background:#fdecea; color:#b3261e; } .bjp-badge.b-red2{ background:#fbe0dd; color:#8c1d14; }
   .bjp-badge.b-blue{ background:#e6f6fc; color:#0079a8; } .bjp-badge.b-green{ background:#e7f6ef; color:#0f7a4f; }
   .bjp-badge.b-orange{ background:#fdf0db; color:#9a5b00; } .bjp-badge.b-teal{ background:#e0f5f1; color:#0f766e; }
+  /* AIの朝礼（NewsPicks風＝1つの記事・装飾最小・サイズと余白で階層） */
+  .bjb-sub{ font-size:11.5px; color:var(--text2); font-weight:600; margin:-4px 0 14px; }
+  .bjb-bar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; font-size:12px; font-weight:600; color:var(--text2); margin:0 0 13px; }
+  .bjb-bar input[type=date]{ font-family:inherit; font-size:12.5px; padding:6px 10px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); }
+  .bjb-todaybtn{ font-size:11px; font-weight:600; color:var(--text2); text-decoration:none; border:1px solid var(--border); border-radius:7px; padding:5px 11px; }
+  .bjb-tmnote{ font-size:11px; color:#9a5b00; }
+  .bjb-card{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:28px 32px; max-width:980px; }
+  .bjb-meta{ font-size:11.5px; color:var(--text2); margin-bottom:4px; }
+  .bjb-dataday{ font-size:13px; color:var(--text); margin-bottom:16px; }
+  /* 1つの長文・フォント均一・タイプライター */
+  .bjb-body{ font-size:14px; line-height:2.05; color:var(--text); white-space:pre-wrap; min-height:3em; }
+  .bjb-body.typing{ cursor:pointer; }
+  .bjb-body.typing::after{ content:'▋'; margin-left:1px; color:var(--accent); animation:bjbBlink 0.9s steps(1) infinite; }
+  @keyframes bjbBlink{ 50%{ opacity:0; } }
+  .bjb-facts{ margin-top:20px; padding-top:16px; border-top:1px solid var(--border); }
+  .bjb-facts-h{ font-size:11px; font-weight:700; color:var(--text2); letter-spacing:.4px; margin-bottom:7px; }
+  .bjb-fact{ font-size:13px; line-height:1.95; color:var(--text); }
+  .bjb-headline{ font-size:17px; line-height:1.8; color:var(--text); }
+  .bjb-sect{ border-top:1px solid var(--border); margin-top:18px; padding-top:16px; font-size:13.5px; line-height:2.15; color:var(--text); }
+  .bjb-rowsub{ font-size:11.5px; color:var(--text2); margin-top:10px; }
+  .bjb-lbl{ font-size:11.5px; color:var(--text2); margin-right:14px; }
+  .bjb-foot{ border-top:1px solid var(--border); margin-top:18px; padding-top:12px; font-size:10.5px; color:var(--text2); line-height:1.8; }
+  .bjb-none{ font-size:12.5px; color:var(--text2); padding:6px 2px; }
   .bjp-modalbg{ display:none; position:fixed; inset:0; background:rgba(15,23,42,.45); z-index:200; align-items:flex-start; justify-content:center; padding:40px 20px; overflow:auto; }
   .bjp-modalbg.on{ display:flex; }
   .bjp-modal{ background:var(--card); border-radius:16px; max-width:720px; width:100%; padding:28px 32px 32px; box-shadow:0 20px 60px rgba(15,23,42,.3); position:relative; }
@@ -14044,6 +14068,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 <script>
 (function(){
   var ROOMS=[['basic','ベーシック'],['week','曜日＆特定日'],['post','ポストイット＆未来予測β'],['report','レポート'],['comp','コンパリゾン'],['payout','出玉配分の答合せ β']];
+  // AIの朝礼は開発中＝管理者(admin/ローカル)でのみ表示。法人ページ(USER_ID≠admin)には出さない＝未完成を配信しても見えない
+  if (typeof USER_ID !== 'undefined' && USER_ID === 'admin') { ROOMS.push(['briefing','AIの朝礼 β']); }
   var panels={};
   function _bjShowLoading(){
     var ov=document.getElementById('bjLoadingOverlay'); if(!ov) return;
@@ -14060,13 +14086,14 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     try{ _bjUpdateContext(); }catch(e){}
     if(room==='basic'){ setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); },80); return; }
     // 重い描画はローディング（熊）を挟んで1フレーム後に実行＝スピナーが必ず見える
-    var needHeavy = (room==='report'&&window._bjReportDirty) || (room==='post'&&window._bjReportDirty) || (room==='payout'&&window._bjPayoutDirty);
+    var needHeavy = (room==='report'&&window._bjReportDirty) || (room==='post'&&window._bjReportDirty) || (room==='payout'&&window._bjPayoutDirty) || (room==='briefing');
     var work=function(){
       if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); }
       if(room==='post'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } try{ renderAlertTiles(); }catch(e){} }   // ポストイットはrival依存→先にrival描画してキャッシュ確保
       if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
+      if(room==='briefing'){ _bjbRetry=0; try{ _bjbRender(); }catch(e){ console.error('briefing', e); } }   // AIの朝礼：開くたび生成（メモ化済みで軽い）
     };
-    if(needHeavy){ _bjShowLoading(); requestAnimationFrame(function(){ setTimeout(function(){ try{ work(); } finally { _bjHideLoading(); } }, 0); }); }
+    if(needHeavy){ _bjShowLoading(); setTimeout(function(){ try{ work(); } finally { _bjHideLoading(); } }, 60); }   // 60ms＝オーバーレイ描画を待ってから重い処理（rAFは裏タブで止まるため不使用）
     else { work(); }
   }
   window.bjShow=show;
@@ -14291,6 +14318,401 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(bg2)bg2.addEventListener('click',function(e){if(e.target===bg2)bg2.classList.remove('on');});
   }
 
+  // ═══ AIの朝礼（競合偵察レポート・ルールベース v2）═══
+  // 設計：①ヘッドライン＝その日一番のニュース（出玉面優先）②ご注進＝厳選2〜3件（機種別突出・増減台・新台・撤去・勝率）
+  // ③今日の構え＋一手 ④タイムマシン（過去日の朝礼を再現・未来情報は使わない） ⑤数字は全部実データ計算＝発明しない
+  var _bjbRetry=0,_bjbMemo=null,_bjbMemoKey='',_bjbDate=null,_bjbTypedKey='';   // _bjbDate=null → 今日。_bjbTypedKey＝最後にタイプライター演出した「店舗×日付」キー（同じ間は演出しない）
+  function _bjbTodayStr(){ var n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
+  function _bjbFmtD(ds){ return ds.slice(5).replace('-','/'); }
+  function _bjbAddDays(ds,n){ var d=new Date(ds+'T00:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function _bjbDiffDays(a,b){ return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000); }
+  function buildBriefingTab(panel){
+    if(!panel||document.getElementById('bjbBody'))return;
+    panel.innerHTML=''
+      +'<div class="bjp-head"><div class="bj-wordmark" style="font-size:21px;">MORNING BRIEFING</div></div>'
+      +'<div class="bjb-sub">AIの朝礼 ── 表示中の店舗の「昨日の答合せ」と「今日の構え」を自動生成</div>'
+      +'<div class="bjb-bar">朝礼の日付：<input type="date" id="bjbDateInp">'
+      +'<a href="javascript:void(0)" id="bjbToday" class="bjb-todaybtn">今日に戻る</a>'
+      +'<span id="bjbTmNote" class="bjb-tmnote"></span></div>'
+      +'<div class="bjb-card" id="bjbBody">タブを開くと生成します…</div>';
+    var di=document.getElementById('bjbDateInp');
+    if(di){ di.value=_bjbTodayStr(); di.addEventListener('change',function(){ _bjbDate=(di.value&&di.value!==_bjbTodayStr())?di.value:null; _bjbRenderLoading(); }); }
+    var tb=document.getElementById('bjbToday');
+    if(tb)tb.addEventListener('click',function(){ _bjbDate=null; if(di)di.value=_bjbTodayStr(); _bjbRenderLoading(); });
+  }
+  function _bjbRenderLoading(){ _bjShowLoading(); setTimeout(function(){ try{ _bjbRender(); }catch(e){ console.error('briefing',e); } finally { _bjHideLoading(); } },60); }
+  function _bjbStats(dates, vals){
+    var n=vals.length, mean=vals.reduce(function(a,b){return a+b;},0)/n;
+    var jou=[],chu=[],ka=[],mi=[],sal=[],pen=[],dw=[[],[],[],[],[],[],[]],hol=[];
+    dates.forEach(function(d,i){ var day=parseInt(d.slice(8)),mon=parseInt(d.slice(5,7)),v=vals[i];
+      if(day<=10)jou.push(v);else if(day<=20)chu.push(v);else ka.push(v);
+      if(day<=7)mi.push(v); if(day>=25&&day<=29)sal.push(v); if(mon%2===0&&day>=15&&day<=19)pen.push(v);
+      if(isHoliday(d))hol.push(v);else dw[new Date(d+'T00:00:00').getDay()].push(v); });
+    var a=function(x){return x.length?x.reduce(function(p,q){return p+q;},0)/x.length:null;};
+    return { mean:mean,
+      avgJou:a(jou)!=null?a(jou):mean, avgChu:a(chu)!=null?a(chu):mean, avgKa:a(ka)!=null?a(ka):mean,
+      avgMonthInit:a(mi)!=null?a(mi):mean, avgSalary:a(sal)!=null?a(sal):mean, avgPension:a(pen)!=null?a(pen):mean,
+      dowAvgs:dw.map(function(vs,dow){return {dow:dow, avg:vs.length>=2?vs.reduce(function(p,q){return p+q;},0)/vs.length:null};}).filter(function(x){return x.avg!=null;}),
+      avgHoliday:hol.length>=2?hol.reduce(function(p,q){return p+q;},0)/hol.length:mean };
+  }
+  function _bjbExpOf(stats, adopted, ds){ return _bjDayTypeExp(stats, ds) * _bjSpecialLift(adopted, ds); }
+  // 機種名の横に置く極小スパークライン（直近の台あたりアウト推移・最終日を強調）
+  function _bjbSpark(vals, hotCol){
+    if(!vals||vals.length<3)return '';
+    var w=66,h=15,n=vals.length,max=Math.max.apply(null,vals),min=Math.min.apply(null,vals); if(max<=min)max=min+1;
+    var bw=w/n, bars='';
+    for(var i=0;i<n;i++){ var bh=Math.max(1.5,(vals[i]-min)/(max-min)*(h-2));
+      bars+='<rect x="'+(i*bw+0.5).toFixed(1)+'" y="'+(h-bh).toFixed(1)+'" width="'+Math.max(1,bw-1).toFixed(1)+'" height="'+bh.toFixed(1)+'" rx="0.8" fill="'+(i===n-1?'#475569':'#c3ccd6')+'"/>'; }
+    return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="vertical-align:-2px;margin:0 4px;">'+bars+'</svg>';
+  }
+  function _bjbRender(){
+    var body=document.getElementById('bjbBody'); if(!body)return;
+    var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
+    if(!recs.length){
+      _bjbRetry++;
+      if(_bjbRetry<=15){ body.innerHTML='<div class="bjb-none">データ読み込み中…</div>';
+        setTimeout(function(){ if(window._bjRoom==='briefing'){ try{ _bjbRender(); }catch(e){} } },400); }
+      else body.innerHTML='<div class="bjb-none">この店舗にデータがありません。</div>';
+      return;
+    }
+    _bjbRetry=0;
+    var st0=(typeof getActiveStore==='function')?getActiveStore():null;
+    var sName=(st0&&st0.name)?st0.name:'この店舗';
+    // ── 全構造をメモ化（店舗×件数）：店全体日次＋機種×日次 ──
+    var key='v2|'+((st0&&st0.key)||'')+'|'+recs.length;
+    var M;
+    if(_bjbMemoKey===key&&_bjbMemo){ M=_bjbMemo; }
+    else {
+      var byD={}, byMD={};
+      for(var i=0;i<recs.length;i++){ var r=recs[i]; if(!r.date)continue;
+        var inv=(+r['IN枚数']||0), df=(+r['差枚']||0), pr=(+r['台粗利']||0), sl=(+r['台売上']||0), mn=r['機種名'];
+        if(!byD[r.date])byD[r.date]={in:0,c:0,p:0,df:0,s:0}; var bd=byD[r.date]; bd.in+=inv; bd.c++; bd.p+=pr; bd.df+=df; bd.s+=sl;
+        if(mn){ if(!byMD[mn])byMD[mn]={}; if(!byMD[mn][r.date])byMD[mn][r.date]={in:0,c:0,diff:0,w:0,p:0};
+          var o=byMD[mn][r.date]; o.in+=inv; o.c++; o.diff+=df; o.p+=pr; if(df>=0)o.w++; } }
+      M={byD:byD, byMD:byMD, allDates:Object.keys(byD).sort()};
+      _bjbMemo=M; _bjbMemoKey=key;
+    }
+    // ── タイムマシン：基準日target。使えるデータ＝target より前の日のみ（未来情報を使わない）──
+    var todayS=_bjbTodayStr();
+    var target=_bjbDate||todayS;
+    var isToday=!_bjbDate;
+    var tm=document.getElementById('bjbTmNote');
+    if(tm)tm.textContent=isToday?'':'タイムマシン再現中：'+_bjbFmtD(target)+' の朝（当時の情報のみで生成）';
+    var dates=M.allDates.filter(function(d){return d<target;});
+    if(dates.length<30){ body.innerHTML='<div class="bjb-none">'+( _bjbDate?('この日付の時点では履歴が'+dates.length+'日分しかありません（30日以上必要）。'):('履歴が'+dates.length+'日分のため、朝礼の生成には30日以上の蓄積が必要です。'))+'</div>'; return; }
+    var vals=dates.map(function(d){var o=M.byD[d];return o.c>0?o.in/o.c:0;});
+    var stats=_bjbStats(dates,vals);
+    var adopted=_bjDetectTokuteibi(dates,vals,stats);
+    var exp=function(ds){ return _bjbExpOf(stats,adopted,ds); };
+    var n=dates.length, ld=dates[n-1];
+    // 的中度（直近30日）
+    var s30=Math.max(0,n-30), errSum=0, errC=0;
+    for(var k=s30;k<n;k++){ var ev=exp(dates[k]); if(ev>0&&vals[k]>0){ errSum+=Math.abs(vals[k]-ev)/vals[k]; errC++; } }
+    var hit=errC?Math.max(0,Math.round(100-errSum/errC*100)):null;
+    // 店全体の乖離（最新日）
+    var lastE=exp(ld), lastV=vals[n-1];
+    var devStore=(lastE>0&&lastV>0)?Math.round((lastV/lastE-1)*100):null;
+    // 店全体の金額（推定粗利）：最新日が「大放出（赤字）」だったか＝率でなく円で判定
+    var profSeries=dates.map(function(d){return M.byD[d].p||0;});
+    var pMean=profSeries.reduce(function(a,b){return a+b;},0)/n;
+    var pStd=Math.sqrt(profSeries.reduce(function(a,b){return a+(b-pMean)*(b-pMean);},0)/n)||1;
+    var pLd=profSeries[n-1];
+    var storeBleed=(pLd<0 && pLd<pMean-1.2*pStd);
+    var _man=function(y){return Math.round(Math.abs(y)/10000).toLocaleString()+'万円';};
+    // ── 機種別ニュース検出 ──
+    var TAI_MIN=3, OUT_SPIKE=40, PAY_SPIKE=7, TAI_DELTA=2, NEW_DAYS=7, GONE_MIN=10, GONE_MAX=21;
+    var BLEED_ONE=-100000;   // 機種単位の放出（赤字）とみなす金額
+    var items=[], bleeders=[], dayModels=[], equipNew=[], equipTai=[];
+    // ── 前営業日（増減台はレポートと同じ前営業日比で見る）＋当日データの薄さ判定 ──
+    var _prevD=n>=2?dates[n-2]:null;
+    // 当日の総台数が前営業日比で10%以上欠けている＝公開ラグ等でデータが出揃っていない疑い→台数判定は信用しない（全機種いっせいの幻"減台"を防ぐ）
+    var ldPartial=(_prevD && M.byD[_prevD].c>0 && M.byD[ld].c < M.byD[_prevD].c*0.9);
+    Object.keys(M.byMD).forEach(function(mn){
+      var md=M.byMD[mn];
+      var mDates=Object.keys(md).filter(function(d){return d<target;}).sort();
+      if(!mDates.length)return;
+      var mLast=mDates[mDates.length-1];
+      // 撤去（最終データから10〜21日不在・実績のあった機種のみ）
+      var gone=_bjbDiffDays(mLast,ld);
+      if(gone>=GONE_MIN&&gone<=GONE_MAX&&mDates.length>=7){
+        var mc=md[mLast].c;
+        if(mc>=TAI_MIN) items.push({score:44, html:_bjEsc(mn)+'（'+mc+'台）が'+_bjbFmtD(mLast)+'を最後に姿を消しています——撤去の可能性。'});
+        return;
+      }
+      if(mLast!==ld)return;   // 最新日に存在する機種だけを以降の判定対象に
+      var cLd=md[ld].c;
+      // ── 機種ごとに全シグナルを集約し、最後に1機種1行にまとめる ──
+      var sig=[], score=0, badge='';   // sig=説明句の配列、score=その機種の最大スコア、badge=見出し用ラベル
+      function add(sc, txt, bd){ sig.push(txt); if(sc>score){score=sc; if(bd)badge=bd;} }
+      // 金額ベースの放出（最重要・円は円）
+      var pM=md[ld].p||0, isBleeder=(pM<=BLEED_ONE);
+      if(isBleeder)bleeders.push({mn:mn,p:pM});
+      // 新台（初登場がNEW_DAYS日以内）
+      var first=mDates[0], age=_bjbDiffDays(first,ld)+1, isNew=(age<=NEW_DAYS&&cLd>=2);
+      if(isNew){ add(52, '新台'+age+'日目（'+cLd+'台）', '新台'); equipNew.push({mn:mn,c:cLd,age:age}); }
+      // 増減台＝設置台数の段差（前営業日比）を検出。日目は朝礼当日(target)基準で数え、3日目まで継続表示（新台は7日、増減台は3日まで）。当日データが薄い日は判定しない
+      if(!ldPartial){
+        for(var _bi=n-1; _bi>=1 && _bi>=n-4; _bi--){   // 直近の境界を新しい順に見て、最新の段差1つを採用
+          var _dc=dates[_bi], _dp=dates[_bi-1];
+          var _cc=md[_dc]?md[_dc].c:0, _cp=md[_dp]?md[_dp].c:0;
+          if(_cc>0 && _cp>0 && Math.abs(_cc-_cp)>=TAI_DELTA && Math.max(_cc,_cp)>=TAI_MIN){
+            var _nth=_bjbDiffDays(_dc,target)+1;   // 変更日=1日目、朝礼当日まで
+            var _dT=cLd-_cp;
+            if(_nth>=1 && _nth<=3 && _dT!==0){
+              add(46, _cp+'台→'+cLd+'台に'+(_dT>0?'増台':'減台')+_nth+'日目', (_dT>0?'増台':'減台'));
+              equipTai.push({mn:mn,from:_cp,to:cLd,delta:_dT,nth:_nth});
+            }
+            break;
+          }
+        }
+      }
+      // 出玉面：判定の主軸は「その機種のアウトが"普段比"でどれだけ跳ねたか」（#03）。新台直後は除外
+      var oSeries=null, oLd=md[ld].c>0?md[ld].in/md[ld].c:0;
+      if(cLd>=TAI_MIN&&mDates.length>=6&&age>NEW_DAYS){
+        var prev=mDates.slice(-8,-1);
+        if(prev.length>=5){
+          oSeries=mDates.slice(-10).map(function(d){return md[d].c>0?md[d].in/md[d].c:0;});
+          var oBase=prev.reduce(function(a,d){return a+(md[d].c>0?md[d].in/md[d].c:0);},0)/prev.length;
+          var prevC=prev.reduce(function(a,d){return a+md[d].c;},0)/prev.length, reduced=cLd<=prevC-1;
+          // 出玉率は「アウト跳ね」に添える補助情報として用意
+          var pRate=md[ld].in>0?(md[ld].in+md[ld].diff)/md[ld].in*100:null;
+          var pPrevArr=prev.map(function(d){return md[d].in>0?(md[d].in+md[d].diff)/md[d].in*100:null;}).filter(function(x){return x!=null;});
+          var devPay=null;
+          if(pRate!=null&&pPrevArr.length>=5){ var pBase=pPrevArr.reduce(function(a,b){return a+b;},0)/pPrevArr.length; devPay=Math.round((pRate-pBase)*10)/10; }
+          if(oBase>0&&!reduced){
+            var devOut=Math.round((oLd/oBase-1)*100), mult=oLd/oBase;
+            if(devOut>=OUT_SPIKE){   // その機種が普段より大きく跳ねた＝確認しに行く価値がある
+              var jump=(mult>=2)
+                ? ('普段'+Math.round(oBase).toLocaleString()+'枚→'+Math.round(oLd).toLocaleString()+'枚（'+mult.toFixed(1)+'倍）')
+                : ('アウトが普段より＋'+devOut+'%（'+Math.round(oLd).toLocaleString()+'枚）');
+              var payNote=(devPay!=null&&devPay>=PAY_SPIKE)?('・出玉率も＋'+devPay.toFixed(1)+'pt（'+pRate.toFixed(1)+'%）＝放出'):'';
+              add(55+Math.min(40,devOut/3), jump+payNote, '高稼働');
+            }
+            // ※出玉率だけ高くアウトが跳ねてない機種は報告しない（#03ビッグドリーム対策：見に行ったらしょぼい、を防ぐ）
+          }
+        }
+      }
+      // 勝率（ポストイット基準：3台100%/4台75%/5台以上65%）。新台直後でも台数あれば拾う
+      if(cLd>=TAI_MIN){
+        var wr=md[ld].w/cLd*100, thW=cLd===3?100:cLd===4?75:65;
+        if(wr>=thW){ add(44, cLd+'台中'+md[ld].w+'台プラス（勝率'+Math.round(wr)+'%）', '高勝率'); }
+      }
+      // 軸別ソート用：当日の各機種の粗利・アウト・普段比を集約（利益軸＝黒字順／アウト軸＝アウト順）
+      var _pv=mDates.slice(-8,-1), _base=null, _dev=null;
+      if(_pv.length>=5){ _base=_pv.reduce(function(a,d){return a+(md[d].c>0?md[d].in/md[d].c:0);},0)/_pv.length; if(_base>0)_dev=Math.round((oLd/_base-1)*100); }
+      dayModels.push({mn:mn, p:md[ld].p||0, outTotal:md[ld].in||0, outAvg:oLd, dev:_dev, c:cLd});
+      // 1機種＝1行に集約
+      if(sig.length && !isBleeder){   // 金額放出は別枠（円）で報告するので二重にしない
+        items.push({score:score, html:_bjEsc(mn)+'は'+sig.join('、')+'（'+cLd+'台）。'});
+      } else if(sig.length && isBleeder){
+        // 放出（円）に勝率等の付加情報があれば、金額行に添えるためメモ
+        bleeders[bleeders.length-1].extra=sig.join('、');
+      }
+    });
+    // ── 主役/脇役の文（#05：1機種突出なら主役、拮抗なら並べる）。signed='＋'/'−' ──
+    function _causeList(list, signed){
+      if(!list.length) return '';
+      var tot=list.reduce(function(a,b){return a+b.p;},0), top=list[0];
+      if(list.length===1) return _bjEsc(top.mn)+'（'+signed+_man(Math.abs(top.p))+'）';
+      if(Math.abs(top.p) >= Math.abs(tot)*0.6) return _bjEsc(top.mn)+'（'+signed+_man(Math.abs(top.p))+'）が主役（ほか'+(list.length-1)+'機種で計'+signed+_man(Math.abs(tot-top.p))+'）';
+      return list.slice(0,3).map(function(b){return _bjEsc(b.mn)+'（'+signed+_man(Math.abs(b.p))+'）';}).join('・');
+    }
+    // ── 店全体の平常値 ──
+    var _WD=['日','月','火','水','木','金','土'];
+    var ldDow=isHoliday(ld)?7:new Date(ld+'T00:00:00').getDay();
+    var ldDowName=(ldDow===7?'祝日':_WD[ldDow]+'曜日');
+    var ldHighDay=(ldDow===0||ldDow===6||ldDow===7);
+    var ldRate=M.byD[ld].s>0?M.byD[ld].p/M.byD[ld].s*100:null;
+    var ldPay =M.byD[ld].in>0?(M.byD[ld].in+M.byD[ld].df)/M.byD[ld].in*100:null;
+    var sSumAll=0,pSumAll=0; dates.forEach(function(d){ sSumAll+=M.byD[d].s||0; pSumAll+=M.byD[d].p||0; });
+    var rateAvgAll=sSumAll>0?pSumAll/sSumAll*100:null;
+    var outDev=stats.mean>0?Math.round((lastV/stats.mean-1)*100):null;
+    var _sd=function(d){return isHoliday(d)?7:new Date(d+'T00:00:00').getDay();};
+    var sameDays=dates.filter(function(d){return d!==ld&&_sd(d)===ldDow;}).slice(-8);
+    var dowProfAvg=null, dowRateAvg=null;
+    if(sameDays.length>=2){ dowProfAvg=sameDays.reduce(function(a,d){return a+(M.byD[d].p||0);},0)/sameDays.length;
+      var rr=sameDays.map(function(d){return M.byD[d].s>0?M.byD[d].p/M.byD[d].s*100:null;}).filter(function(x){return x!=null;});
+      dowRateAvg=rr.length?rr.reduce(function(a,b){return a+b;},0)/rr.length:null; }
+    // ── 軸判定（#07/#08）：アウト軸 / 放出軸 / 利益軸 / 平常 ──
+    var earners=dayModels.filter(function(m){return m.p>0;}).sort(function(a,b){return b.p-a.p;});
+    var outLeaders=dayModels.slice().sort(function(a,b){return b.outTotal-a.outTotal;});
+    var risers=dayModels.filter(function(m){return m.dev!=null&&m.dev>=OUT_SPIKE&&m.outAvg>=Math.max(3000,stats.mean*0.8);}).sort(function(a,b){return b.dev-a.dev;});
+    bleeders.sort(function(a,b){return a.p-b.p;});
+    var profitHigh=(ldRate!=null&&rateAvgAll!=null&&ldRate>=rateAvgAll+5);
+    var bleedTrig=(dowProfAvg!=null)?(pLd<dowProfAvg-0.8*pStd):(pLd<0&&pLd<pMean-1.2*pStd);
+    var outHigh=(outDev!=null&&outDev>=25)||(devStore!=null&&devStore>=30);
+    var axis = outHigh?'out' : (bleedTrig&&pLd<pMean)?'bleed' : profitHigh?'profit' : 'flat';
+    function _pl(){ return (ldRate!=null?'利益率'+ldRate.toFixed(1)+'%'+(rateAvgAll!=null?'（普段'+rateAvgAll.toFixed(1)+'%）':''):''); }
+    function _topOut(){ return outLeaders.slice(0,3).filter(function(m){return m.outTotal>0;}).map(function(m){return _bjEsc(m.mn)+'（'+Math.round(m.outAvg).toLocaleString()+'枚）';}).join('・'); }
+    function _riserTxt(){ if(!risers.length)return''; return risers.slice(0,2).map(function(m){var mu=1+m.dev/100; return _bjEsc(m.mn)+'（'+(mu>=2?mu.toFixed(1)+'倍':'＋'+m.dev+'%')+'）';}).join('・'); }
+    // 軸ごとに storeHead(店全体サマリ) / mach(機種詳細) / axisVerdict(総評) を用意
+    var axisVerdict, storeHead='', mach='';
+    if(axis==='out'){
+      axisVerdict='アウトが大きく伸びた一日でした。';
+      var bw=(pLd>0)?('利益率は'+(ldRate!=null?ldRate.toFixed(1)+'%':'—')+(rateAvgAll!=null?'（普段'+rateAvgAll.toFixed(1)+'%）':'')+'で黒字＝出さずに伸ばした好調日です'):('一方で'+_pl()+'＝出して伸ばした、放出寄りの伸びです');
+      storeHead='店全体のアウトが'+(outDev!=null?'平常より＋'+outDev+'%':'大きく伸び')+'（'+Math.round(lastV).toLocaleString()+'枚／普段'+Math.round(stats.mean).toLocaleString()+'枚）。'+bw+'。';
+      mach=(_topOut()?'アウトを稼いだ主役は'+_topOut()+'。':'')+(risers.length?'中でも普段比で大きく伸ばしたのは'+_riserTxt()+'。':'');
+    } else if(axis==='bleed'){
+      axisVerdict=ldHighDay?('本来は利益を確保したい'+ldDowName+'に出していた、気になる一日でした。'):('普段より大きく出した一日でした。');
+      var hd=ldHighDay?('本来は利益を確保したい'+ldDowName+'なのに放出しています'):('普段の'+ldDowName+'より大きく出しています');
+      var ctx2=''; if(dowRateAvg!=null){ ctx2=(dowRateAvg<3)?'もっとも、この店の'+ldDowName+'は最近も利益率'+dowRateAvg.toFixed(1)+'%＝出す傾向で、昨日もその流れです。':'普段の'+ldDowName+'は利益率'+dowRateAvg.toFixed(1)+'%なので、昨日は大きく外して出した形です。'; }
+      storeHead=hd+'（'+_pl()+(pLd<0?'・店全体'+_man(pLd)+'の赤字':'')+'）。'+ctx2;
+      mach=(bleeders.length?'主因は'+_causeList(bleeders,'−')+'。':'');
+    } else if(axis==='profit'){
+      axisVerdict='しっかり利益を確保した一日でした。';
+      // 利益率だけでなく「客足（アウト）が普段より上/下/同じ」も必ず添える
+      var _av=Math.round(lastV).toLocaleString(), _mv=Math.round(stats.mean).toLocaleString(), keep='';
+      if(outDev!=null){
+        if(Math.abs(outDev)<15) keep='客足は普段どおり（アウト'+_av+'枚≒平常'+_mv+'枚）を保ちつつ、';
+        else if(outDev>0) keep='客足も普段より伸ばしつつ（アウト＋'+outDev+'%・'+_av+'枚／平常'+_mv+'枚）、';
+        else keep='客足は普段より少なめ（アウト'+outDev+'%・'+_av+'枚／平常'+_mv+'枚）ながら、';
+      }
+      storeHead=keep+_pl()+'まで利益率を上げ、しっかり回収しました。';
+      mach=(earners.length?'回収の主役は'+_causeList(earners.slice(0,3),'＋')+'。':'')+(bleeders.length?'一方で'+_causeList(bleeders,'−')+'は出していたものの、全体では大きく利益を確保しています。':'');
+    } else { axisVerdict='大きな動きはなく、おおむね平常な一日でした。'; }
+
+    // ── 特定日（#06）：あれば最優先。総評と本文の冒頭にする ──
+    var tokuLd=null; _bjDayPats(ld).forEach(function(p){ if(adopted[p]&&(!tokuLd||adopted[p]>tokuLd.m)) tokuLd={p:p,m:adopted[p]}; });
+    var tokuLead='', tokuVerdict='', tokuDir='', tokuProfBridge='';
+    if(tokuLd){
+      var pat=tokuLd.p, ldOut=M.byD[ld].c>0?M.byD[ld].in/M.byD[ld].c:0, lab=_bjPatLabel(pat);
+      var sameTk=dates.filter(function(d){return d!==ld && _bjDayPats(d).indexOf(pat)>=0;}).slice(-6);
+      var v2='', vs='';
+      if(sameTk.length>=2){
+        var tkOutAvg=sameTk.reduce(function(a,d){return a+(M.byD[d].c>0?M.byD[d].in/M.byD[d].c:0);},0)/sameTk.length;
+        var tkRArr=sameTk.map(function(d){return M.byD[d].s>0?M.byD[d].p/M.byD[d].s*100:null;}).filter(function(x){return x!=null;});
+        var tkRateAvg=tkRArr.length?tkRArr.reduce(function(a,b){return a+b;},0)/tkRArr.length:null;
+        var od=tkOutAvg>0?Math.round((ldOut/tkOutAvg-1)*100):0;
+        var rd=(ldRate!=null&&tkRateAvg!=null)?(ldRate-tkRateAvg):null;   // 利益率差(pt)。マイナス＝普段より出してる
+        // 強弱をグレード：利益率差±8pt以上＝「しっかり/大きく」、±3〜8pt＝「やや」
+        if(rd!=null&&rd>=3){            // 出し控え（黒字寄り）
+          tokuDir='keep';
+          if(rd>=8){ v2='いつものこの日よりしっかり利益を確保＝出し控えました'; vs='特定日なのに出し控えた一日でした。'; }
+          else     { v2='いつものこの日よりやや利益寄りで、控えめな出方でした'; vs='特定日として、やや出し控えた一日でした。'; }
+        } else if(od<=-25){            // 集客不発（アウトが大きく少ない）
+          tokuDir='miss';
+          v2='いつものこの日よりアウトが'+Math.abs(od)+'%少なく、集客は伸びませんでした'; vs='特定日なのに客が伸びなかった一日でした。';
+        } else if(rd!=null&&rd<=-3){   // 放出（普段より出してる）
+          tokuDir='release';
+          if(rd<=-8){ v2='いつものこの日より大きく放出しました'; vs='特定日にしっかり出した一日でした。'; }
+          else     { v2='いつものこの日よりやや出した形でした'; vs='特定日として、いつもよりやや出した一日でした。'; }
+        } else if(od>=25){            // アウト伸び
+          tokuDir='draw';
+          v2='いつものこの日よりアウト＋'+od+'%と大きく伸びました'; vs='特定日に客がよく伸びた一日でした。';
+        } else { v2='ほぼいつものこの日通りでした'; vs='特定日として例年並みの一日でした。'; tokuDir='normal'; }
+      } else { v2='過去の同じ日が少なく比較は参考値です'; vs='特定日にあたる一日でした。'; tokuDir='normal'; }
+      tokuLead='この日は'+lab+'でおそらく特定日。アウトは'+Math.round(ldOut).toLocaleString()+'枚で、'+v2+'。';
+      tokuVerdict=vs;
+      // 全体利益のブリッジ：機種利益の話に移る前に「店全体の利益」を挟む（全体アウト→全体利益→機種利益の流れ）
+      if(sameTk.length>=2 && (tokuDir==='release'||tokuDir==='miss'||tokuDir==='keep')){
+        var _tp=sameTk.map(function(d){return M.byD[d].p||0;}), tkProfAvg=_tp.reduce(function(a,b){return a+b;},0)/_tp.length;
+        var pLdTxt=pLd<0?(_man(pLd)+'の赤字'):_man(pLd), ratio=tkProfAvg!==0?pLd/tkProfAvg:1;
+        if(tokuDir==='keep'){
+          tokuProfBridge='店全体の粗利も、普段のこの日（'+_man(tkProfAvg)+'）に対し'+pLdTxt+'と、しっかり利益を確保しています。';
+        } else {
+          var w=pLd<0?'大きく放出しています':(ratio<0.4?'大きく下回り、放出気味です':(ratio<0.75?'やや放出気味です':'ほぼ普段並みです'));
+          tokuProfBridge='店全体の粗利は、普段のこの日（'+_man(tkProfAvg)+'）に対し'+pLdTxt+'と、'+w+'。';
+        }
+      }
+    }
+
+    // ── 総評と本文を確定（特定日があれば最優先）──
+    var verdict, head;
+    if(tokuLd){
+      verdict=tokuVerdict;
+      // 特定日の方向に合わせて「どこで出した/回収したか」を1行つける（店全体がflatでも機種を語る）
+      var tmach='';
+      if(tokuDir==='release'||tokuDir==='miss'){ if(bleeders.length) tmach='中でも'+_causeList(bleeders,'−')+'で出しています。'; }
+      else if(tokuDir==='draw'){ var to=_topOut(); tmach=(to?'アウトを稼いだ主役は'+to+'。':'')+(risers.length?'中でも普段比で大きく伸ばしたのは'+_riserTxt()+'。':''); }
+      else if(tokuDir==='keep'){ if(earners.length) tmach='中でも'+_causeList(earners.slice(0,3),'＋')+'で回収しています。'; }
+      else { if(bleeders.length) tmach='中でも'+_causeList(bleeders,'−')+'で出しています。'; else if(earners.length) tmach='中でも'+_causeList(earners.slice(0,3),'＋')+'で回収しています。'; }
+      head=tokuLead+(tokuProfBridge?' '+tokuProfBridge:'')+(tmach?' '+tmach:'');
+    }
+    else { verdict=axisVerdict; head=storeHead?('まず、'+storeHead+(mach||'')):(mach?'まず、'+mach:''); }
+    // ── 新台初日は特定日と同格の「大きな動き」。総評で「平常」と言わせない ──
+    // ただし台番だけ入ってアウト0＝導入済み・検査待ち（未稼働）と、実際に動いた「初日営業」を区別する
+    var _newToday=equipNew.filter(function(e){return e.age<=1;});
+    var hasNewRunning=_newToday.some(function(e){var o=M.byMD[e.mn]&&M.byMD[e.mn][ld];return o&&o.c&&o.in>0;});
+    var hasNewInstalled=_newToday.length>0;
+    if(hasNewRunning){
+      if(verdict==='大きな動きはなく、おおむね平常な一日でした。') verdict='新台入替初日営業でした。';
+      else verdict='新台入替初日営業で、'+verdict;
+    } else if(hasNewInstalled){
+      if(verdict==='大きな動きはなく、おおむね平常な一日でした。') verdict='新台が導入された一日でした。';
+      else verdict='新台が導入され、'+verdict;
+    }
+    // ── 機種ファクト（増台/新台/勝率含む。本文の下に列挙）──
+    items.sort(function(a,b){return b.score-a.score;});
+    function _raw(html){ var d=document.createElement('div'); d.innerHTML=html; return d.textContent.replace(/。\s*$/,'').replace(/^[・]/,''); }
+    // ── 今日の構え（target当日＋今後7日）──
+    var WD=['日','月','火','水','木','金','土'];
+    var tokuToday=null; _bjDayPats(target).forEach(function(p){ if(adopted[p]&&(!tokuToday||adopted[p]>tokuToday.m)) tokuToday={p:p,m:adopted[p]}; });
+    var days=[]; for(var h7=0;h7<7;h7++){ var ds7=_bjbAddDays(target,h7); days.push({ds:ds7, e:exp(ds7), wd:WD[new Date(ds7+'T00:00:00').getDay()]}); }
+    var hi=days.reduce(function(a,b){return b.e>a.e?b:a;},days[0]);
+    var lo=days.reduce(function(a,b){return b.e<a.e?b:a;},days[0]);
+    var kamae=(tokuToday?'本日'+_bjbFmtD(target)+'はこの店の特定日にあたり（'+_bjPatLabel(tokuToday.p)+'・平均＋'+Math.round((tokuToday.m-1)*100)+'%）、':'本日'+_bjbFmtD(target)+'は特定日ではなく、')+'今後7日では'+_bjbFmtD(hi.ds)+'（'+hi.wd+'）が最も強く、'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）が最も弱い見込みです。';
+    var move;
+    if(tokuToday){ move='本日は先方の特定日なので、正面からぶつけず、弱い見込みの'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）に自店イベントを当てるのが定石でしょう。'; }
+    else if(axis==='out'){ move='この伸びの正体（取材・全台系・イベント）を確認するのが先決です。詳しくは「出玉配分の答合せ」タブで全体像を。'; }
+    else if(axis==='bleed'){ move='どこを出したか「レポート」「出玉配分の答合せ」タブで確認を。先方が出した直後は客が流れやすいので、平常運転で様子を見るのが無難です。'; }
+    else if(axis==='profit'){ move='先方は利益を確保＝出していない日なので、こちらが出せば客を取りに行ける好機です。'; }
+    else { move='通常運転で問題ありません。仕掛けるなら、先方が弱そうな'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）が候補です。'; }
+    // ── 本文（1つの長文・段落・タイプライター）──
+    var hr=new Date().getHours(); var greet=isToday?(hr<11?'おはようございます。':hr<18?'こんにちは。':'こんばんは。'):(_bjbFmtD(target)+'の朝に戻って報告します。');
+    var _ldMD=parseInt(ld.slice(5,7),10)+'月'+parseInt(ld.slice(8),10)+'日（'+ldDowName+'）';
+    var p1=greet+'　'+_ldMD+'の'+sName+'は、'+verdict;
+    // ── 設備の動き（新台登場・増台・減台）：あれば独立した段落で、それぞれ言う（「設備面」とはまとめない）──
+    var equipPara='';
+    if(equipNew.length||equipTai.length){
+      var eParts=[];
+      if(equipNew.length){
+        var _fd=equipNew.filter(function(e){return e.age<=1;}), _og=equipNew.filter(function(e){return e.age>1;}).sort(function(a,b){return a.age-b.age;});
+        var _np=[];
+        if(_fd.length) _np.push(_fd.slice(0,3).map(function(e){return _bjEsc(e.mn);}).join('・')+'が新台登場。');
+        if(_og.length) _np.push(_og.slice(0,3).map(function(e){return _bjEsc(e.mn)+'は新台'+e.age+'日目';}).join('、')+'です。');
+        eParts.push(_np.join(''));
+      }
+      if(equipTai.length){
+        var inc=equipTai.filter(function(e){return e.delta>0;}).sort(function(a,b){return b.delta-a.delta;});
+        var dec=equipTai.filter(function(e){return e.delta<0;}).sort(function(a,b){return a.delta-b.delta;});
+        if(inc.length) eParts.push(inc.slice(0,3).map(function(e){return _bjEsc(e.mn)+'（'+e.from+'→'+e.to+'台）が増台'+e.nth+'日目';}).join('・')+'。');
+        if(dec.length) eParts.push(dec.slice(0,3).map(function(e){return _bjEsc(e.mn)+'（'+e.from+'→'+e.to+'台）が減台'+e.nth+'日目';}).join('・')+'。');
+      }
+      equipPara='それから、台の動きにも触れておきます。'+eParts.join('');
+    }
+    var p2html = head ? head : (equipPara?'昨日は出玉面では平常でした。':'昨日は機種・台数・配分とも平常通りで、特に取り上げるほどの動きはありませんでした。');
+    var p2=_raw(p2html);
+    var p3=kamae+'　今日の一手としては、'+move;
+    // 注目の新台（初日〜3日目）：実際に動いた（アウト>0）中で1台平均アウトが最大の1機種を深掘り。全部アウト0＝検査待ち
+    var newSpotPara='', _spot=null, _newInWin=equipNew.filter(function(e){return e.age<=3;});
+    _newInWin.forEach(function(e){ var o=M.byMD[e.mn]&&M.byMD[e.mn][ld]; if(!o||!o.c||o.in<=0)return; var oa=o.in/o.c; if(!_spot||oa>_spot.oa)_spot={mn:e.mn,age:e.age,oa:oa,pa:o.p/o.c}; });
+    if(_spot){ newSpotPara='注目の新台は'+_bjEsc(_spot.mn)+'。\nアウト '+Math.round(_spot.oa).toLocaleString()+'枚（'+_spot.age+'日目）\n台粗利 '+Math.round(_spot.pa).toLocaleString()+'円（'+_spot.age+'日目）\n続きは本機能にてご確認ください。'; }
+    else if(_newInWin.length){ newSpotPara='導入された新台はまだアウトが立っておらず、検査待ち等でこれから本格稼働とみられます。'; }
+    var paras=[p1,p2]; if(equipPara) paras.push(_raw(equipPara)); if(newSpotPara) paras.push(_raw(newSpotPara)); paras.push(p3);
+    var plain=paras.join('\n\n');
+    var facts=items.map(function(it){return it.html;});
+    var factsHtml = facts.length ? facts.slice(0,8).map(function(h){return '<div class="bjb-fact">・'+_bjEsc(_raw(h))+'</div>';}).join('') : '<div class="bjb-fact" style="color:var(--text2);">・特記事項なし</div>';
+    var foot='根拠：店舗データ '+_bjbFmtD(dates[0])+'〜'+_bjbFmtD(ld)+'（'+n+'日分）／予想の的中度 '+(hit!=null?'約'+hit+'%':'—')+'（直近30日）／突出判定＝設置3台以上・平常＝その機種の直前7営業日平均／放出は推定粗利の赤字額（円）を優先／数値は統計推定を含みます。この朝礼は期間フィルターの影響を受けません（常に「履歴×基準日」で生成。店舗を切り替えるとその店の朝礼になります）。';
+    body.innerHTML='<div class="bjb-body" id="bjbType"></div>'
+      +'<div class="bjb-facts" id="bjbFacts" style="display:none;"><div class="bjb-facts-h">ファクト</div>'+factsHtml+'</div>'
+      +'<div class="bjb-foot">'+foot+'</div>';
+    var _typeKey=key+'|'+target;   // 店舗×基準日。同じ間は演出を出さず即表示（初回のみタイプライター）
+    var _typeEl=document.getElementById('bjbType'), _showFacts=function(){ var f=document.getElementById('bjbFacts'); if(f)f.style.display='block'; };
+    if(_bjbTypedKey===_typeKey){ if(_typeEl){_typeEl.textContent=plain;_typeEl.classList.remove('typing');} _showFacts(); }
+    else { _bjbTypedKey=_typeKey; _bjbTypewriter(_typeEl, plain, _showFacts); }
+  }
+  // タイプライター演出（クリックで全文即表示・店舗/日付切替で都度リスタート・終了時onDone）
+  var _bjbTypeTimer=null;
+  function _bjbTypewriter(el, text, onDone){
+    if(!el)return;
+    if(_bjbTypeTimer){ clearInterval(_bjbTypeTimer); _bjbTypeTimer=null; }
+    el.textContent=''; el.classList.add('typing');
+    var i=0, done=false;
+    function finish(){ if(_bjbTypeTimer){clearInterval(_bjbTypeTimer);_bjbTypeTimer=null;} el.textContent=text; el.classList.remove('typing'); if(!done){done=true; if(onDone)try{onDone();}catch(e){}} }
+    el.onclick=finish;
+    _bjbTypeTimer=setInterval(function(){ i+=1; el.textContent=text.slice(0,i); if(i>=text.length) finish(); }, 24);   // 約42文字/秒（少しゆっくり）
+  }
+
   try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(e){}   // リロード時のスクロール位置復元を無効化（非同期描画で"変な位置スタート"になるのを防ぐ）
   function build(){
     if(document.getElementById('bjTabsNav'))return true;
@@ -14335,6 +14757,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     mv(byId('dateCompCard'),'comp');   // 「この日×この日」を救出してcompへ
     // ⑥ 出玉配分の答合せ（β）＝ 変化マップ（新規生成・遅延描画）
     try{ buildPayoutTab(panels.payout); }catch(e){ console.error('buildPayoutTab', e); }
+    // ⑦ AIの朝礼（偵察レポート・遅延生成）
+    try{ buildBriefingTab(panels.briefing); }catch(e){ console.error('buildBriefingTab', e); }
     var _psw=document.querySelector('.pin-section-wrapper'); if(_psw&&_psw.parentNode) _psw.parentNode.removeChild(_psw);  // ピンポイント分析＋ダーク帯を削除
     // 並び替え：比較期間を店舗A/B選択の上へ、指標チップをグラフの下へ
     (function(){
@@ -14826,6 +15250,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(window.bjDrawComp) setTimeout(window.bjDrawComp,120);
     window._bjPayoutDirty=true; _bjpMemoKey='';                          // 出玉配分：店舗変更で再計算
     if(window._bjRoom==='payout'){ try{ _bjpRender(); }catch(e){} }
+    _bjbMemoKey=''; _bjbMemo=null; _bjbRetry=0;                          // AIの朝礼：店舗変更で再生成
+    if(window._bjRoom==='briefing'){
+      _bjShowLoading();
+      setTimeout(function(){ try{ _bjbRender(); }catch(e){} finally { _bjHideLoading(); } },60);   // rAFは裏タブで止まるためsetTimeoutで確実に
+    }
   };
 
   // ===== 構成ドーナツ（非レスポンシブ・ベーシック表示時のみ描画・render非依存）=====
