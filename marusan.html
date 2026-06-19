@@ -15150,7 +15150,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var bubbles; try{ var FF=ctx.data(); bubbles=ctx.answer(q, FF); if(bubbles.length>=2 && ctx.comment){ var c=ctx.comment(q, FF); if(c) bubbles=bubbles.concat(['<span class="bjc-think">'+c+'</span>']); } }catch(e){ bubbles=['うまく集計できませんでした。']; }
     setTimeout(function(){ _bjReveal(ctx, bubbles, 0); }, 250);
   }
-  function bjResetChatCtx(ctx){ var log=ctx.log; if(!log) return; log.innerHTML=''; _bjReveal(ctx, ctx.greeting, 0, function(){ _bjChips(ctx, ''); }); }
+  function bjResetChatCtx(ctx){ var log=ctx.log; if(!log) return; _bjUserInit=false; log.innerHTML=''; _bjReveal(ctx, ctx.greeting, 0, function(){ _bjChips(ctx, ''); }); }   // 挨拶の再描画(店舗変更/クリア)ではページを動かさない＝_bjUserInitを必ずfalseに戻す
 
   // ===== 曜日・特定日チャット =====
   var BJWQ=['土日祝の利益確保機種は？','一番注力している特定日は？'];
