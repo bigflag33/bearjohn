@@ -1074,8 +1074,17 @@
 
   <div class="charts-grid">
     <div class="chart-card full">
-      <div class="chart-title"><div class="dot" style="background:var(--accent)"></div></div>
-      <div class="chart-wrapper"><canvas id="trendChart"></canvas></div>
+      <div class="chart-title" style="display:flex;align-items:center;gap:10px;">
+        <div class="dot" style="background:var(--accent)"></div>
+        <div style="flex:1"></div>
+        <div id="trendModeTabs" style="display:inline-flex;gap:6px;font-size:11px;">
+          <button type="button" class="bjp-info trend-mode on" data-mode="chart" onclick="bjTrendMode('chart')">グラフ</button>
+          <button type="button" class="bjp-info trend-mode" data-mode="table" onclick="bjTrendMode('table')">テーブル</button>
+          <button type="button" class="bjp-info" id="trendCsvBtn" style="display:none;" onclick="bjTrendCsv()">CSVダウンロード</button>
+        </div>
+      </div>
+      <div id="trendChartWrap" class="chart-wrapper"><canvas id="trendChart"></canvas></div>
+      <div id="trendTableWrap" style="display:none;max-height:520px;overflow:auto;padding:6px 4px 12px;"></div>
     </div>
     <div class="chart-card full" id="trendAnalysisCard">
       <div class="chart-title"><div class="dot" style="background:#a78bfa"></div>日次トレンド分析</div>
@@ -3426,7 +3435,7 @@ function pctLabel(curr, prev, elId) {
 // 日付比較機能
 // ══════════════════════════════════════════════════════════════════════
 // ── 状態変数 ──
-let _dcSortCol = 'profitDiff';
+let _dcSortCol = 'profitRatio';
 let _dcSortDir = -1;   // -1=降順, 1=昇順
 let _dcLastData = null;
 let _dcModelChart = null;
@@ -3611,6 +3620,9 @@ function runDateComparison() {
     const a = mA[k], b = mB[k];
     const safe  = (va, vb) => (va!=null && vb!=null) ? va-vb : null;
     const ratio = (va, vb) => (va!=null && vb!=null && vb!==0) ? (va/vb*100) : null;
+    // 1台1日平均の台粗利（=機種ごとの本来の「台粗利」）。aggModelPeriodの profit は1日平均合計／count は1日平均台数なので profit/count で1台1日平均
+    const profitPerA = (a && a.count>0) ? a.profit/a.count : null;
+    const profitPerB = (b && b.count>0) ? b.profit/b.count : null;
     return {
       name:        k,
       // 絶対値（グループドバーチャート用）
@@ -3618,6 +3630,7 @@ function runDateComparison() {
       profitA: a?.profit ?? null, profitB: b?.profit ?? null,
       inmaiA:  a?.inmai  ?? null, inmaiB:  b?.inmai  ?? null,
       countA:  a?.count  ?? null, countB:  b?.count  ?? null,
+      profitPerA, profitPerB,
       // 差・比率（テーブル用）
       countDiff:   safe(a?.count, b?.count),
       inmaiDiff:   safe(a?.inmai, b?.inmai),
@@ -3719,13 +3732,14 @@ function renderDcTable({ models }) {
 
   document.getElementById('dcModelHead').innerHTML = `<tr>
     <th style="${thSL}" onclick="dcSortBy('name')">機種名${arrow('name')}</th>
+    <th style="${thSR}" onclick="dcSortBy('countA')">期間A台数${arrow('countA')}</th>
+    <th style="${thSR}" onclick="dcSortBy('countB')">期間B台数${arrow('countB')}</th>
     <th style="${thSR}" onclick="dcSortBy('countDiff')">台数差${arrow('countDiff')}</th>
-    <th style="${thSR}" onclick="dcSortBy('countRatio')">台数(A÷B%)${arrow('countRatio')}</th>
-    <th style="${thSR}" onclick="dcSortBy('inmaiDiff')">アウト差${arrow('inmaiDiff')}</th>
+    <th style="${thSR}" onclick="dcSortBy('inmaiA')">期間Aアウト${arrow('inmaiA')}</th>
+    <th style="${thSR}" onclick="dcSortBy('inmaiB')">期間Bアウト${arrow('inmaiB')}</th>
     <th style="${thSR}" onclick="dcSortBy('inmaiRatio')">アウト(A÷B%)${arrow('inmaiRatio')}</th>
-    <th style="${thSR}" onclick="dcSortBy('salesDiff')">売上差${arrow('salesDiff')}</th>
-    <th style="${thSR}" onclick="dcSortBy('salesRatio')">売上(A÷B%)${arrow('salesRatio')}</th>
-    <th style="${thSR}" onclick="dcSortBy('profitDiff')">粗利差${arrow('profitDiff')}</th>
+    <th style="${thSR}" onclick="dcSortBy('profitPerA')">期間A台粗利${arrow('profitPerA')}</th>
+    <th style="${thSR}" onclick="dcSortBy('profitPerB')">期間B台粗利${arrow('profitPerB')}</th>
     <th style="${thSR}" onclick="dcSortBy('profitRatio')">粗利(A÷B%)${arrow('profitRatio')}</th>
   </tr>`;
 
@@ -3741,15 +3755,17 @@ function renderDcTable({ models }) {
   const ds = (v) => v == null ? '' : v >= 0 ? 'color:#34d399;font-weight:700;' : 'color:#f87171;font-weight:700;';
   const rs = (v) => v == null ? '' : v >= 100 ? 'color:#34d399;font-weight:700;' : 'color:#f87171;font-weight:700;';
 
+  const fmtVal = (v, unit) => (v == null) ? '-' : (Math.round(v).toLocaleString() + unit);
   document.getElementById('dcModelBody').innerHTML = sorted.map(m => `<tr>
     ${tdL(m.name)}
+    ${tdR(fmtVal(m.countA,'台'))}
+    ${tdR(fmtVal(m.countB,'台'))}
     ${tdR(fmtDiff(m.countDiff,'台'),  ds(m.countDiff))}
-    ${tdR(fmtRatio(m.countRatio),     rs(m.countRatio))}
-    ${tdR(fmtDiff(m.inmaiDiff,_inUnit()),  ds(m.inmaiDiff))}
+    ${tdR(fmtVal(m.inmaiA,_inUnit()))}
+    ${tdR(fmtVal(m.inmaiB,_inUnit()))}
     ${tdR(fmtRatio(m.inmaiRatio),     rs(m.inmaiRatio))}
-    ${tdR(fmtDiff(m.salesDiff,'円'),  ds(m.salesDiff))}
-    ${tdR(fmtRatio(m.salesRatio),     rs(m.salesRatio))}
-    ${tdR(fmtDiff(m.profitDiff,'円'), ds(m.profitDiff))}
+    ${tdR(fmtVal(m.profitPerA,'円'))}
+    ${tdR(fmtVal(m.profitPerB,'円'))}
     ${tdR(fmtRatio(m.profitRatio),    rs(m.profitRatio))}
   </tr>`).join('');
 }
@@ -8670,6 +8686,89 @@ function getThemeColors() {
   };
 }
 
+// ── 日次トレンド：5指標テーブル（グラフと同じ filtered データを使う）──
+let _trendTableRows = null;   // {date,inPerTai,profit,sales,win,payout}[] CSV用に保持
+function renderTrendTable(filteredDates) {
+  const wrap = document.getElementById('trendTableWrap'); if (!wrap) return;
+  // 1パスで日付ごとに集計（全機種＝大量データでも O(D+F) で重くならない）
+  const agg = {};
+  for (let i=0; i<filtered.length; i++) {
+    const r = filtered[i]; if (!r||!r.date) continue;
+    let a = agg[r.date]; if (!a) a = agg[r.date] = { inSum:0, dfSum:0, prof:0, sale:0, n:0, win:0 };
+    const inv = +r['IN枚数']||0, df = +r['差枚']||0;
+    a.inSum += inv; a.dfSum += df; a.prof += +r['台粗利']||0; a.sale += +r['台売上']||0; a.n++; if (df>=0) a.win++;
+  }
+  const rows = filteredDates.map(date => {
+    const a = agg[date] || { inSum:0, dfSum:0, prof:0, sale:0, n:0, win:0 };
+    return {
+      date,
+      inPerTai: a.n>0 ? a.inSum/a.n : 0,
+      profit:   a.prof,
+      sales:    a.sale,
+      win:      a.n>0 ? a.win/a.n*100 : 0,
+      payout:   a.inSum>0 ? (a.inSum+a.dfSum)/a.inSum*100 : 0,
+    };
+  }).reverse();   // 最新が上
+  _trendTableRows = rows;
+  const num = v => Math.round(v).toLocaleString();
+  const pct = v => v.toFixed(1) + '%';
+  const th = 'padding:7px 10px;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border);background:var(--card);position:sticky;top:0;text-align:right;white-space:nowrap;';
+  const thL = th + 'text-align:left;';
+  const td = 'padding:6px 10px;font-size:12px;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap;';
+  const tdL = 'padding:6px 10px;font-size:12px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;font-family:ui-monospace,Menlo,monospace;';
+  wrap.innerHTML = '<table style="width:100%;border-collapse:collapse;">'
+    + '<thead><tr>'
+    + `<th style="${thL}">日付</th>`
+    + `<th style="${th}">IN枚数（アウト）<br><span style="font-weight:500;font-size:10px;color:var(--text2);">台あたり平均</span></th>`
+    + `<th style="${th}">推定粗利<br><span style="font-weight:500;font-size:10px;color:var(--text2);">日次合計</span></th>`
+    + `<th style="${th}">推定売上<br><span style="font-weight:500;font-size:10px;color:var(--text2);">日次合計</span></th>`
+    + `<th style="${th}">勝率</th>`
+    + `<th style="${th}">出玉率</th>`
+    + '</tr></thead><tbody>'
+    + rows.map(r => `<tr>
+        <td style="${tdL}">${r.date}</td>
+        <td style="${td}">${num(r.inPerTai)} 枚</td>
+        <td style="${td};${r.profit<0?'color:#ef4444;':''}">${num(r.profit)} 円</td>
+        <td style="${td}">${num(r.sales)} 円</td>
+        <td style="${td};${r.win>=50?'color:#ef4444;':'color:#16a34a;'}">${pct(r.win)}</td>
+        <td style="${td};${r.payout>=100?'color:#ef4444;':'color:#16a34a;'}">${pct(r.payout)}</td>
+      </tr>`).join('')
+    + '</tbody></table>';
+}
+function bjTrendMode(mode) {
+  const cw = document.getElementById('trendChartWrap');
+  const tw = document.getElementById('trendTableWrap');
+  const cb = document.getElementById('trendCsvBtn');
+  if (!cw || !tw) return;
+  document.querySelectorAll('#trendModeTabs .trend-mode').forEach(b => b.classList.toggle('on', b.dataset.mode===mode));
+  if (mode === 'table') {
+    cw.style.display='none'; tw.style.display=''; if(cb)cb.style.display='';
+    // テーブル切替時に必ず計算する（全機種でデータ多くてもこの瞬間だけ重い）
+    const dates = window._trendLastDates || [...new Set((Array.isArray(filtered)?filtered:[]).map(d=>d.date))].sort();
+    try { renderTrendTable(dates); } catch(e) { console.warn('renderTrendTable', e); tw.innerHTML='<div style="padding:20px;color:var(--text2);font-size:12px;">テーブル生成中にエラーが発生しました。</div>'; }
+  } else {
+    cw.style.display='';     tw.style.display='none'; if(cb)cb.style.display='none';
+  }
+}
+function bjTrendCsv() {
+  if (!_trendTableRows || !_trendTableRows.length) return;
+  const head = ['日付','IN枚数（アウト・台あたり平均）','推定粗利（日次合計・円）','推定売上（日次合計・円）','勝率（%）','出玉率（%）'];
+  const lines = [head.join(',')].concat(_trendTableRows.map(r => [
+    r.date, Math.round(r.inPerTai), Math.round(r.profit), Math.round(r.sales), r.win.toFixed(1), r.payout.toFixed(1)
+  ].join(',')));
+  const csv = '﻿' + lines.join('\r\n');   // BOM付きUTF-8（Excel対応）
+  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const st = (typeof getActiveStore==='function') ? getActiveStore() : null;
+  const sName = (st && st.name) ? st.name.replace(/[\\/:*?"<>|]/g,'_') : 'store';
+  const a = document.createElement('a');
+  a.href = url; a.download = `bj_trend_${sName}_${_trendTableRows[_trendTableRows.length-1].date}_${_trendTableRows[0].date}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+window.bjTrendMode = bjTrendMode;
+window.bjTrendCsv = bjTrendCsv;
+
 function renderCharts() {
   const tc = getThemeColors();
   const metricKey = document.getElementById('metricFilter').value;
@@ -8762,6 +8861,12 @@ function renderCharts() {
 
   // 日次トレンド分析を描画
   renderTrendAnalysis(filteredDates, trendData, metricKey);
+
+  // 5指標テーブル用：filteredDatesだけ保存（重い集計はテーブル表示時に遅延実行）
+  window._trendLastDates = filteredDates;
+  if (document.getElementById('trendTableWrap') && document.getElementById('trendTableWrap').style.display === '') {
+    try { renderTrendTable(filteredDates); } catch(e) { console.warn('renderTrendTable', e); }
+  }
 
   // 機種別集計
   const modelAgg = {};
@@ -13917,6 +14022,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjp-bar select{ font-family:inherit; font-size:13px; padding:7px 11px; border:1px solid var(--border); border-radius:9px; background:var(--card); color:var(--text); }
   .bjp-info{ margin-left:auto; font-size:12px; font-weight:700; color:var(--accent); background:rgba(0,152,212,.10); border:1px solid rgba(0,152,212,.30); border-radius:9px; padding:8px 14px; cursor:pointer; font-family:inherit; }
   .bjp-info:hover{ background:rgba(0,152,212,.18); }
+  .trend-mode{ margin-left:0!important; padding:6px 12px!important; font-size:11px!important; }
+  .trend-mode.on{ background:var(--accent)!important; color:#fff!important; border-color:var(--accent)!important; }
   .bjp-dates{ font-size:12.5px; color:var(--text2); background:rgba(0,152,212,.06); border:1px solid rgba(0,152,212,.18); border-radius:9px; padding:9px 13px; margin:2px 0 10px; }
   .bjp-dates b{ color:var(--accent); font-weight:800; }
   .bjp-status{ font-size:12px; color:var(--text2); margin:4px 0 14px; }
@@ -14203,6 +14310,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     dg.innerHTML=chips+(rows||'<div style="font-size:12px;color:var(--text2);padding:10px 2px;">このセグメントに該当機種なし</div>');
   }
   window._bjpFilterSeg=function(seg){_bjpRenderCards(seg);};
+  var _bjpAnchor=null;   // 分析窓の終点（YYYY-MM-DD）。null=最新日。◀▶で1週ずつスライド
+  function _bjpAddDaysStr(s,d){var x=new Date(s+'T00:00:00'); x.setDate(x.getDate()+d); var y=x.getFullYear(),m=String(x.getMonth()+1).padStart(2,'0'),dd=String(x.getDate()).padStart(2,'0'); return y+'-'+m+'-'+dd;}
   function _bjpRender(){
     var panel=panels.payout;if(!panel||!document.getElementById('bjpCA'))return;
     var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
@@ -14225,13 +14334,19 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var minTai=+((document.getElementById('bjpMin')||{}).value)||1;
     var minDays=21;   // 内部固定の足切り（履歴21日以上）。UIから出さない＝期間との混同を防ぐ
     var topN=+((document.getElementById('bjpTop')||{}).value)||12;
+    // ── アンカー処理：_bjpAnchorが指定されていれば、その日以前のレコードだけで計算（◀▶でスライド） ──
+    var anchorLabel='';
+    if(_bjpAnchor){ recs=recs.filter(function(r){return r.date && r.date<=_bjpAnchor;}); anchorLabel=' ／ 終点：'+_bjpAnchor.slice(5).replace('-','/'); }
     // 具体的な分析期間（店舗全体のユニーク日付から）
     var datesEl=document.getElementById('bjpDates');
     if(datesEl){ var ad=[],sn={}; for(var di=0;di<recs.length;di++){var dd=recs[di]&&recs[di].date; if(dd&&!sn[dd]){sn[dd]=1;ad.push(dd);}} ad.sort(); var dl=ad.length;
       if(dl>=8){ var md=function(s){return s?s.slice(5).replace('-','/'):'';};
-        datesEl.innerHTML='分析期間（自動・直近2週間）：<b>今 '+md(ad[Math.max(0,dl-7)])+'〜'+md(ad[dl-1])+'</b> ⟷ <b>2週間前 '+md(ad[Math.max(0,dl-20)])+'〜'+md(ad[Math.max(0,dl-14)])+'</b>'; }
+        datesEl.innerHTML='分析期間（直近2週間'+(_bjpAnchor?'・スライド中':'・自動')+'）：<b>今 '+md(ad[Math.max(0,dl-7)])+'〜'+md(ad[dl-1])+'</b> ⟷ <b>2週間前 '+md(ad[Math.max(0,dl-20)])+'〜'+md(ad[Math.max(0,dl-14)])+'</b>'+anchorLabel; }
       else { datesEl.textContent='直近データが少なく分析できません（'+dl+'日）'; } }
-    var key=((st&&st.key)||'')+'|'+recs.length+'|'+minTai+'|'+minDays;
+    // スライドボタンの活性状態を更新
+    var btnBack=document.getElementById('bjpBack'), btnFwd=document.getElementById('bjpFwd'), btnNow=document.getElementById('bjpNow');
+    if(btnNow) btnNow.disabled=!_bjpAnchor;
+    var key=((st&&st.key)||'')+'|'+recs.length+'|'+minTai+'|'+minDays+'|'+(_bjpAnchor||'');
     var M;
     if(_bjpMemoKey===key&&_bjpMemo){M=_bjpMemo;}else{M=_bjpBuild(recs,minTai,minDays);_bjpMemo=M;_bjpMemoKey=key;}
     var stt=M._stats||{total:0,fewDays:0,fewTai:0,fewPath:0};
@@ -14299,7 +14414,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<div class="bjp-head"><div class="bj-wordmark" style="font-size:21px;">PAYOUT ALLOCATION CHECK</div></div>'
       +'<div class="bjp-bar"><label>対象機種：<select id="bjpMin"><option value="1">全機種</option><option value="2">2台以上</option><option value="4" selected>4台以上（主力）</option></select></label>'
       +'<label>ラベル表示 <select id="bjpTop"><option value="8">上位8</option><option value="12" selected>上位12</option><option value="999">全部</option></select></label>'
-      +'<button class="bjp-info" id="bjpInfoBtn2">日付と足切りの考え方</button>'
+      +'<span style="display:inline-flex;gap:6px;margin-left:8px;align-items:center;">'
+      +'<button class="bjp-info" id="bjpBack" title="分析窓を1週間前へ">◀ 1週前</button>'
+      +'<button class="bjp-info" id="bjpFwd" title="分析窓を1週間後へ">1週後 ▶</button>'
+      +'<button class="bjp-info" id="bjpNow" title="最新日に戻す" disabled>最新へ戻る</button>'
+      +'</span>'
+      +'<button class="bjp-info" id="bjpInfoBtn2" style="margin-left:8px;">日付と足切りの考え方</button>'
       +'<button class="bjp-info" id="bjpInfoBtn" style="margin-left:8px;">数値の計算方法と考え方</button></div>'
       +'<div class="bjp-dates" id="bjpDates"></div>'
       +'<div class="bjp-status" id="bjpStatus">タブを開くと計算します…</div>'
@@ -14308,6 +14428,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<div class="bjp-card"><div class="bjp-ch">DIAGNOSIS ／ 動きの内訳＋診断</div><div class="bjp-csub">稼働・出玉率(量)・勝率(配り方)の2週間の変化＋組み合わせ診断（↑↓は7日トレイリング）。</div><div class="bjp-diag" id="bjpDiag"></div></div>'
       +_bjpModal2HTML()+_bjpModalHTML();
     ['bjpMin','bjpTop'].forEach(function(id){var e=document.getElementById(id);if(e)e.addEventListener('change',function(){ if(id!=='bjpTop'){_bjpMemoKey='';} _bjpRender(); });});
+    // スライドボタン
+    function _bjpLatestDate(){ var rs=(typeof loadAllData==='function')?(loadAllData()||[]):[]; var x=''; for(var i=0;i<rs.length;i++){ if(rs[i].date&&rs[i].date>x) x=rs[i].date; } return x; }
+    var bb=document.getElementById('bjpBack'); if(bb)bb.addEventListener('click',function(){ var base=_bjpAnchor||_bjpLatestDate(); if(!base)return; _bjpAnchor=_bjpAddDaysStr(base,-7); _bjpMemoKey=''; _bjpRender(); });
+    var bf=document.getElementById('bjpFwd'); if(bf)bf.addEventListener('click',function(){ if(!_bjpAnchor)return; var ld=_bjpLatestDate(); var nx=_bjpAddDaysStr(_bjpAnchor,7); if(!ld||nx>=ld) _bjpAnchor=null; else _bjpAnchor=nx; _bjpMemoKey=''; _bjpRender(); });
+    var bn=document.getElementById('bjpNow'); if(bn)bn.addEventListener('click',function(){ _bjpAnchor=null; _bjpMemoKey=''; _bjpRender(); });
     var bg=document.getElementById('bjpInfoBg');
     var ib=document.getElementById('bjpInfoBtn'); if(ib)ib.addEventListener('click',function(){bg.classList.add('on');});
     var ix=document.getElementById('bjpInfoX'); if(ix)ix.addEventListener('click',function(){bg.classList.remove('on');});
@@ -15248,7 +15373,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     _bjChats.forEach(function(ctx){ try{ bjResetChatCtx(ctx); }catch(e){} });
     try{ _bjUpdateContext(); }catch(e){}
     if(window.bjDrawComp) setTimeout(window.bjDrawComp,120);
-    window._bjPayoutDirty=true; _bjpMemoKey='';                          // 出玉配分：店舗変更で再計算
+    window._bjPayoutDirty=true; _bjpMemoKey=''; _bjpAnchor=null;          // 出玉配分：店舗変更で再計算＆スライド位置を最新に戻す
     if(window._bjRoom==='payout'){ try{ _bjpRender(); }catch(e){} }
     _bjbMemoKey=''; _bjbMemo=null; _bjbRetry=0;                          // AIの朝礼：店舗変更で再生成
     if(window._bjRoom==='briefing'){
