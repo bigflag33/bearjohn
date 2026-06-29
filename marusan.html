@@ -2764,12 +2764,18 @@ async function handleUpload(event) {
 
   if (files.length > 1) showMsg(`${files.length}ファイルを処理中...`, 'ok');
 
-  // ファイルごとに保存先店舗を判定
-  const fileStoreMap = files.map(f => {
+  // ファイルごとに保存先店舗を判定。**ファイル名から店舗を特定できないものは「現在の店舗」へのフォールバックを廃止して中止**
+  // （別店舗を開いているときに誤って上書きしてしまう事故を防ぐ）
+  const fileStoreMap = [];
+  const rejectedFiles = [];
+  for (const f of files) {
     const detected = detectStoreNameFromFilename(f.name);
-    const store = detected ? findOrCreateStore(detected) : _activeStore();
-    return { file: f, store };
-  });
+    if (detected) {
+      fileStoreMap.push({ file: f, store: findOrCreateStore(detected) });
+    } else {
+      rejectedFiles.push(f.name);
+    }
+  }
 
   // 店舗ごとにグループ化して処理
   const storeGroups = {};
@@ -2781,6 +2787,10 @@ async function handleUpload(event) {
   let totalAdded = 0;
   const summaries = []; // { storeName, dates, count }
   const errors = [];
+  // ファイル名で店舗が判別できなかったファイルをエラーリストに追加（処理は一切行わない）
+  for (const fn of rejectedFiles) {
+    errors.push(`${fn}: ファイル名から店舗を判別できません。ファイル名の先頭を店舗名にしてください（例：${getStores().filter(s=>s.name&&s.name!=='業界ベンチマーク')[0]?.name||'店舗名'}_YYYYMMDD.xlsx）。アップロードを中止しました。`);
+  }
   let lastStore = _activeStore();
 
   for (const { store, files: groupFiles } of Object.values(storeGroups)) {
