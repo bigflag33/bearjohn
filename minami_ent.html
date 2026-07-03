@@ -8845,6 +8845,19 @@ function renderCharts() {
     options: {
       responsive: true, maintainAspectRatio: false,
       animation: false,
+      // 日付クリック → 期間フィルターをその1日（D〜D）にしてベーシック分析へ絞り込み
+      onClick: (evt, els, chart) => {
+        try {
+          const pts = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
+          if (!pts.length) return;
+          const ds = filteredDates[pts[0].index];
+          if (!ds) return;
+          const f = document.getElementById('dateFrom'), t = document.getElementById('dateTo');
+          if (f) f.value = ds;
+          if (t) t.value = ds;
+          applyFilter();
+        } catch(e) { console.warn('trend day click', e); }
+      },
       plugins: {
         legend: { labels: { color: tc.tick, font: { size: 11 } } },
         tooltip: { mode: 'index', intersect: false }
@@ -8864,7 +8877,7 @@ function renderCharts() {
   });
   const _tc = document.getElementById('trendChart');
   _tc.style.cursor = 'pointer';
-  _tc.title = '日付クリックでピンポイント分析へ';
+  _tc.title = '日付をクリックすると、その日1日だけの分析に絞り込みます（期間の再指定で戻せます）';
   _tc.classList.remove('chart-animate');
   void _tc.offsetWidth; // reflow で animation をリセット
   _tc.classList.add('chart-animate');
