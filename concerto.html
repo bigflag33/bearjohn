@@ -1619,9 +1619,9 @@
 
   <!-- 日付比較ボックス -->
   <div class="table-card" id="dateCompCard" style="padding:18px;">
-    <div class="table-title" style="margin-bottom:16px;">
-      <div class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--accent3)"></div>
-      この日とこの日を比較
+    <div style="margin-bottom:16px;">
+      <div class="cmp-hero-sub">Date Comparison</div>
+      <div class="cmp-hero-title">この日とこの日を比較</div>
     </div>
     <!-- 日付選択UI -->
     <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:18px;">
@@ -14203,6 +14203,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bj-ctx:hover .bj-ctx-edit{ text-decoration:underline; }
   .bj-ctx:hover span:not(.bj-ctx-edit){ border:1px solid var(--accent); }
   /* 構成ドーナツ3つのグリッド */
+  .bj-cmp-switch{display:flex;gap:12px;margin:0 0 16px;}
+  .bj-cmp-switch button{flex:1;max-width:360px;text-align:left;border:1.5px solid var(--border);background:var(--card);border-radius:14px;padding:14px 18px;cursor:pointer;font-family:inherit;transition:border-color .15s;}
+  .bj-cmp-switch button .en{display:block;font-family:'Hiragino Mincho ProN','Yu Mincho','YuMincho','Noto Serif JP',Georgia,'Times New Roman',serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--text);}
+  .bj-cmp-switch button .ja{display:block;font-size:11px;color:var(--text2);font-weight:600;margin-top:3px;}
+  .bj-cmp-switch button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
+  .bj-cmp-switch button.on .en{color:var(--accent);}
   .bj-comp-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:16px; margin-bottom:16px; }
   .bj-comp-grid > .chart-card{ margin-bottom:0; }
   .bj-comp-grid .chart-wrapper{ height:300px; }
@@ -14927,12 +14933,16 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var hi=days.reduce(function(a,b){return b.e>a.e?b:a;},days[0]);
     var lo=days.reduce(function(a,b){return b.e<a.e?b:a;},days[0]);
     var kamae=(tokuToday?'本日'+_bjbFmtD(target)+'はこの店の特定日にあたり（'+_bjPatLabel(tokuToday.p)+'・平均＋'+Math.round((tokuToday.m-1)*100)+'%）、':'本日'+_bjbFmtD(target)+'は特定日ではなく、')+'今後7日では'+_bjbFmtD(hi.ds)+'（'+hi.wd+'）が最も強く、'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）が最も弱い見込みです。';
+    // 偵察の文章化（#20）：攻め＝締め機種／守り＝出し機種を両方出す
+    var reconAtk=reconTight?('先方は'+reconTight.mn+'をここ1週間締め気味です（出玉率'+reconTight.from.toFixed(1)+'%→'+reconTight.to.toFixed(1)+'%）。自店の同系機種を強化するなら好機です。'):'';
+    var reconDef=reconLoose?('一方で'+reconLoose.mn+'は出し気味（出玉率'+reconLoose.from.toFixed(1)+'%→'+reconLoose.to.toFixed(1)+'%）＝客を取られやすいので警戒を。'):'';
+    var reconDefSolo=reconLoose?('先方は'+reconLoose.mn+'をここ1週間出し気味です（出玉率'+reconLoose.from.toFixed(1)+'%→'+reconLoose.to.toFixed(1)+'%）。客を取られやすいタイミングなので警戒を。'):'';
     var move;
     if(tokuToday){ move='本日は先方の特定日なので、正面からぶつけず、弱い見込みの'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）に自店イベントを当てるのが定石でしょう。'; }
     else if(axis==='out'){ move='この伸びの正体（取材・全台系・イベント）を確認するのが先決です。詳しくは「出玉配分の答合せ」タブで全体像を。'; }
     else if(axis==='bleed'){ move='どこを出したか「レポート」「出玉配分の答合せ」タブで確認を。先方が出した直後は客が流れやすいので、平常運転で様子を見るのが無難です。'; }
-    else if(axis==='profit'){ move='先方は利益を確保＝出していない日なので、こちらが出せば客を取りに行ける好機です。'+(reconTight?('特に先方は'+reconTight.mn+'をここ1週間締め気味（出玉率'+reconTight.from.toFixed(1)+'%→'+reconTight.to.toFixed(1)+'%）で、同系機種が狙い目です。'):''); }
-    else { move=(reconTight?('先方は'+reconTight.mn+'をここ1週間締め気味です（出玉率'+reconTight.from.toFixed(1)+'%→'+reconTight.to.toFixed(1)+'%）。自店の同系機種を強化するなら好機です。'):(reconLoose?('先方は'+reconLoose.mn+'をここ1週間出し気味です（出玉率'+reconLoose.from.toFixed(1)+'%→'+reconLoose.to.toFixed(1)+'%）。客を取られやすいタイミングなので注意を。'):'通常運転で問題ありません。'))+'仕掛けるなら、先方が弱そうな'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）が候補です。'; }
+    else if(axis==='profit'){ move='先方は利益を確保＝出していない日なので、こちらが出せば客を取りに行ける好機です。'+reconAtk+reconDef; }
+    else { move=(reconAtk?(reconAtk+reconDef):(reconDefSolo||'通常運転で問題ありません。'))+'仕掛けるなら、先方が弱そうな'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）が候補です。'; }
     // ── 昨日の朝礼の答え合わせ（#19）：当時のデータだけで見立てを再現し、実績と突き合わせる ──
     var ansPara='';
     if(n>=31){
@@ -15044,6 +15054,19 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // ⑤ コンパリゾン（ピンポイント分析・濃いダーク帯は撤去、この日×この日は残す）
     mv(byId('storeCmpCard'),'comp');
     mv(byId('dateCompCard'),'comp');   // 「この日×この日」を救出してcompへ
+    // コンパリゾンは2機能（店舗比較／日付比較）＝最上部に切替スイッチを置いて両方を対等に見せる（2026/07/03）
+    (function(){
+      var cp=panels.comp, sc=byId('storeCmpCard'), dcc=byId('dateCompCard');
+      if(!cp||!sc||!dcc)return;
+      var sw=document.createElement('div'); sw.className='bj-cmp-switch'; sw.id='bjCmpSwitch';
+      sw.innerHTML='<button type="button" class="on" data-m="store"><span class="en">STORE COMPARISON</span><span class="ja">店舗どうしを比較（A店 vs B店）</span></button>'
+        +'<button type="button" data-m="date"><span class="en">DATE COMPARISON</span><span class="ja">この日とこの日を比較（期間A vs 期間B）</span></button>';
+      cp.insertBefore(sw, cp.firstChild);
+      var showM=function(m){ sc.style.display=(m==='store')?'':'none'; dcc.style.display=(m==='date')?'':'none';
+        sw.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-m')===m); }); };
+      sw.querySelectorAll('button').forEach(function(b){ b.addEventListener('click', function(){ showM(b.getAttribute('data-m')); }); });
+      showM('store');
+    })();
     // ⑥ 出玉配分の答合せ（β）＝ 変化マップ（新規生成・遅延描画）
     try{ buildPayoutTab(panels.payout); }catch(e){ console.error('buildPayoutTab', e); }
     // ⑦ AIの朝礼（偵察レポート・遅延生成）
