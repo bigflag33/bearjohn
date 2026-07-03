@@ -1671,7 +1671,7 @@
           </div>
         </div>
         <!-- テーブルビュー -->
-        <div id="dcTableView" style="overflow-x:auto;">
+        <div id="dcTableView" class="bj-sticky-tbl" style="overflow:auto;">
           <table id="dcModelTable" style="width:100%;border-collapse:collapse;font-size:12px;">
             <thead id="dcModelHead"></thead>
             <tbody id="dcModelBody"></tbody>
@@ -3445,7 +3445,7 @@ function pctLabel(curr, prev, elId) {
 // 日付比較機能
 // ══════════════════════════════════════════════════════════════════════
 // ── 状態変数 ──
-let _dcSortCol = 'profitRatio';
+let _dcSortCol = 'profitPerA';
 let _dcSortDir = -1;   // -1=降順, 1=昇順
 let _dcLastData = null;
 let _dcModelChart = null;
@@ -3626,6 +3626,8 @@ function runDateComparison() {
   const mB = aggModelPeriod(rawB, datesB);
   const modelSet = new Set([...Object.keys(mA), ...Object.keys(mB)]);
 
+  const richA = _dcRichStats(rawA);
+  const richB = _dcRichStats(rawB);
   const models = [...modelSet].map(k => {
     const a = mA[k], b = mB[k];
     const safe  = (va, vb) => (va!=null && vb!=null) ? va-vb : null;
@@ -3633,6 +3635,7 @@ function runDateComparison() {
     // 1台1日平均の台粗利（=機種ごとの本来の「台粗利」）。aggModelPeriodの profit は1日平均合計／count は1日平均台数なので profit/count で1台1日平均
     const profitPerA = (a && a.count>0) ? a.profit/a.count : null;
     const profitPerB = (b && b.count>0) ? b.profit/b.count : null;
+    const ra = richA[k] || {}, rb = richB[k] || {};
     return {
       name:        k,
       // 絶対値（グループドバーチャート用）
@@ -3641,6 +3644,7 @@ function runDateComparison() {
       inmaiA:  a?.inmai  ?? null, inmaiB:  b?.inmai  ?? null,
       countA:  a?.count  ?? null, countB:  b?.count  ?? null,
       profitPerA, profitPerB,
+      profitPerRatio: ratio(profitPerA, profitPerB),
       // 差・比率（テーブル用）
       countDiff:   safe(a?.count, b?.count),
       inmaiDiff:   safe(a?.inmai, b?.inmai),
@@ -3650,6 +3654,13 @@ function runDateComparison() {
       inmaiRatio:  ratio(a?.inmai, b?.inmai),
       salesRatio:  ratio(a?.sales, b?.sales),
       profitRatio: ratio(a?.profit,b?.profit),
+      // 追加統計：利益率・勝率・PPM・前半→後半傾向
+      rateA: ra.rate ?? null, rateB: rb.rate ?? null, rateRatio: ratio(ra.rate, rb.rate),
+      winA:  ra.win  ?? null, winB:  rb.win  ?? null, winRatio:  ratio(ra.win,  rb.win),
+      ppmA:  ra.ppm  || null, ppmB:  rb.ppm  || null,
+      ppmRankA: ra.ppm ? ra.ppm.rank : null, ppmRankB: rb.ppm ? rb.ppm.rank : null,
+      inTrA: ra.inTr ?? null, inTrB: rb.inTr ?? null,
+      prTrA: ra.prTr ?? null, prTrB: rb.prTr ?? null,
     };
   });
 
@@ -3715,68 +3726,132 @@ function runDateComparison() {
   document.getElementById('dcResult').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 
-// ── テーブル描画（ソート対応） ──
+// ── 「この日とこの日を比較」用の追加統計（利益率・勝率・PPM・前半→後半傾向）──
+function _dcRichStats(rows) {
+  const by = {}; let stIn = 0, stProf = 0, stCnt = 0;
+  rows.forEach(r => {
+    const k = r['機種名'] || '不明';
+    const o = by[k] = by[k] || { sales:0, profit:0, inSum:0, cnt:0, win:0, byD:{} };
+    o.sales += r['台売上']||0; o.profit += r['台粗利']||0; o.inSum += r['IN枚数']||0; o.cnt++;
+    if ((r['差枚']||0) >= 0) o.win++;
+    const dd = o.byD[r.date] = o.byD[r.date] || { in:0, profit:0, c:0 };
+    dd.in += r['IN枚数']||0; dd.profit += r['台粗利']||0; dd.c++;
+    stIn += r['IN枚数']||0; stProf += r['台粗利']||0; stCnt++;
+  });
+  const stAvgIn = stCnt ? stIn/stCnt : 0, stAvgProf = stCnt ? stProf/stCnt : 0;
+  const quad = (ai, ap) => {   // PPM判定（店舗比較 PPM & TREND と同じ4象限）
+    const hi = ai >= stAvgIn, hp = ap >= stAvgProf;
+    if ( hi &&  hp) return { label:'金のなる木', rank:4, color:'#34d399' };
+    if ( hi && !hp) return { label:'花形',       rank:3, color:'#60a5fa' };
+    if (!hi &&  hp) return { label:'負け犬',     rank:2, color:'#f59e0b' };
+    return              { label:'問題児',       rank:1, color:'#f87171' };
+  };
+  const res = {};
+  Object.entries(by).forEach(([k, o]) => {
+    const ds = Object.keys(o.byD).sort();
+    const tr = (metric) => {   // 前半→後半の%変化（店舗比較と同じく5日以上で算出）
+      if (ds.length < 5) return null;
+      const h = Math.floor(ds.length / 2);
+      const avg = arr => arr.reduce((s,d) => { const dd = o.byD[d]; return s + (dd.c ? dd[metric]/dd.c : 0); }, 0) / arr.length;
+      const f = avg(ds.slice(0, h)), l = avg(ds.slice(ds.length - h));
+      if (!f) return null;
+      return (l - f) / Math.abs(f) * 100;
+    };
+    res[k] = {
+      rate: o.sales > 0 ? o.profit/o.sales*100 : null,
+      win:  o.cnt   > 0 ? o.win/o.cnt*100      : null,
+      ppm:  o.cnt   > 0 ? quad(o.inSum/o.cnt, o.profit/o.cnt) : null,
+      inTr: tr('in'), prTr: tr('profit'),
+    };
+  });
+  return res;
+}
+
+// ── テーブル描画（ソート対応・2段グループヘッダー） ──
 function renderDcTable({ models }) {
   const sorted = [...models].sort((x, y) => {
+    if (_dcSortCol === 'name') return _dcSortDir * String(y.name).localeCompare(String(x.name), 'ja');
     const va = x[_dcSortCol] ?? (_dcSortDir > 0 ? Infinity : -Infinity);
     const vb = y[_dcSortCol] ?? (_dcSortDir > 0 ? Infinity : -Infinity);
     return _dcSortDir * (vb - va);
   });
 
-  const cols = [
-    { key:'name',        label:'機種名',    diff:false, ratio:false },
-    { key:'countDiff',   label:'台数差',    diff:true,  ratio:false, ratioKey:'countRatio',  unit:'台' },
-    { key:'countRatio',  label:'台数比%',   diff:false, ratio:true  },
-    { key:'inmaiDiff',   label:'アウト差',  diff:true,  ratio:false, ratioKey:'inmaiRatio',  unit:_inUnit() },
-    { key:'inmaiRatio',  label:'アウト比%', diff:false, ratio:true  },
-    { key:'salesDiff',   label:'売上差',    diff:true,  ratio:false, ratioKey:'salesRatio',  unit:'円' },
-    { key:'salesRatio',  label:'売上比%',   diff:false, ratio:true  },
-    { key:'profitDiff',  label:'粗利差',    diff:true,  ratio:false, ratioKey:'profitRatio', unit:'円' },
-    { key:'profitRatio', label:'粗利比%',   diff:false, ratio:true  },
-  ];
-
   const arrow = (key) => _dcSortCol === key ? (_dcSortDir < 0 ? ' ▼' : ' ▲') : '';
-  const thS = `padding:7px 10px;font-size:11px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;`;
-  const thSL = thS + 'text-align:left;';
-  const thSR = thS + 'text-align:right;';
+  const cA = 'color:#06b6d4;', cB = 'color:#f59e0b;', cR = 'color:#a78bfa;';
+  const bl = 'border-left:1px solid var(--border);';
+  const thG  = `padding:6px 8px;font-size:10px;font-weight:700;color:var(--text2);border-bottom:1px solid var(--border);text-align:center;white-space:nowrap;${bl}`;
+  const th2  = (key, label, extra='') => `<th onclick="dcSortBy('${key}')" style="cursor:pointer;user-select:none;padding:5px 8px;font-size:10px;font-weight:700;border-bottom:2px solid var(--border);text-align:center;white-space:nowrap;${extra}">${label}${arrow(key)}</th>`;
 
-  document.getElementById('dcModelHead').innerHTML = `<tr>
-    <th style="${thSL}" onclick="dcSortBy('name')">機種名${arrow('name')}</th>
-    <th style="${thSR}" onclick="dcSortBy('countA')">期間A台数${arrow('countA')}</th>
-    <th style="${thSR}" onclick="dcSortBy('countB')">期間B台数${arrow('countB')}</th>
-    <th style="${thSR}" onclick="dcSortBy('countDiff')">台数差${arrow('countDiff')}</th>
-    <th style="${thSR}" onclick="dcSortBy('inmaiA')">期間Aアウト${arrow('inmaiA')}</th>
-    <th style="${thSR}" onclick="dcSortBy('inmaiB')">期間Bアウト${arrow('inmaiB')}</th>
-    <th style="${thSR}" onclick="dcSortBy('inmaiRatio')">アウト(A÷B%)${arrow('inmaiRatio')}</th>
-    <th style="${thSR}" onclick="dcSortBy('profitPerA')">期間A台粗利${arrow('profitPerA')}</th>
-    <th style="${thSR}" onclick="dcSortBy('profitPerB')">期間B台粗利${arrow('profitPerB')}</th>
-    <th style="${thSR}" onclick="dcSortBy('profitRatio')">粗利(A÷B%)${arrow('profitRatio')}</th>
+  document.getElementById('dcModelHead').innerHTML = `
+  <tr>
+    <th onclick="dcSortBy('name')" rowspan="2" style="cursor:pointer;user-select:none;padding:6px 10px;font-size:11px;font-weight:700;color:var(--text2);border-bottom:2px solid var(--border);text-align:left;white-space:nowrap;vertical-align:bottom;">機種名${arrow('name')}</th>
+    <th style="${thG}" colspan="3">台数</th>
+    <th style="${thG}" colspan="3">アウト（IN枚数/台）</th>
+    <th style="${thG}" colspan="3">台粗利（1台1日平均）</th>
+    <th style="${thG}" colspan="3">利益率</th>
+    <th style="${thG}" colspan="3">勝率</th>
+    <th style="${thG}" colspan="2">PPMポジション</th>
+    <th style="${thG}" colspan="2">アウト傾向（前半→後半）</th>
+    <th style="${thG}" colspan="2">台粗利傾向（前半→後半）</th>
+  </tr>
+  <tr>
+    ${th2('countA','A', cA+bl)}${th2('countB','B', cB)}${th2('countDiff','差','color:var(--text2);')}
+    ${th2('inmaiA','A', cA+bl)}${th2('inmaiB','B', cB)}${th2('inmaiRatio','A÷B', cR)}
+    ${th2('profitPerA','A', cA+bl)}${th2('profitPerB','B', cB)}${th2('profitPerRatio','A÷B', cR)}
+    ${th2('rateA','A', cA+bl)}${th2('rateB','B', cB)}${th2('rateRatio','A÷B', cR)}
+    ${th2('winA','A', cA+bl)}${th2('winB','B', cB)}${th2('winRatio','A÷B', cR)}
+    ${th2('ppmRankA','A', cA+bl)}${th2('ppmRankB','B', cB)}
+    ${th2('inTrA','A', cA+bl)}${th2('inTrB','B', cB)}
+    ${th2('prTrA','A', cA+bl)}${th2('prTrB','B', cB)}
   </tr>`;
 
-  const tdR = (v, style='') => `<td style="padding:6px 10px;text-align:right;font-size:11px;border-bottom:1px solid var(--border);${style}">${v}</td>`;
-  const tdL = (v)            => `<td style="padding:6px 10px;text-align:left;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;">${v}</td>`;
+  const tdR = (v, style='') => `<td style="padding:6px 8px;text-align:right;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;${style}">${v}</td>`;
+  const tdC = (v, style='') => `<td style="padding:6px 8px;text-align:center;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;${style}">${v}</td>`;
+  const tdL = (v)           => `<td style="padding:6px 10px;text-align:left;font-size:11px;border-bottom:1px solid var(--border);white-space:nowrap;">${v}</td>`;
   const fmtDiff = (v, unit) => {
     if (v == null) return '-';
     const sign = v >= 0 ? '+' : '';
-    const fmt  = unit === '円' ? Math.round(v).toLocaleString()+'円' : unit === '台' ? Math.round(v).toLocaleString()+'台' : Math.round(v).toLocaleString()+unit;
-    return sign + fmt;
+    return sign + Math.round(v).toLocaleString() + unit;
   };
   const fmtRatio = (v) => v == null ? '-' : v.toFixed(1) + '%';
+  const fmtPct1  = (v) => v == null ? '-' : v.toFixed(1) + '%';
+  const fmtVal   = (v, unit) => (v == null) ? '-' : (Math.round(v).toLocaleString() + unit);
   const ds = (v) => v == null ? '' : v >= 0 ? 'color:#34d399;font-weight:700;' : 'color:#f87171;font-weight:700;';
   const rs = (v) => v == null ? '' : v >= 100 ? 'color:#34d399;font-weight:700;' : 'color:#f87171;font-weight:700;';
+  const pn = (v) => v == null ? '' : v >= 0 ? '' : 'color:#f87171;';
+  const ppmHtml = (p) => p ? `<span style="color:${p.color};font-weight:700;font-size:10.5px;">${p.label}</span>` : '<span style="color:var(--text2);">—</span>';
+  const trHtml = (pct) => {
+    if (pct == null) return '<span style="color:var(--text2);">—</span>';
+    const up = pct >= 0, abs = Math.abs(pct);
+    const str = (up ? '+' : '') + Math.round(pct) + '%';
+    if (abs < 5) return `<span style="color:var(--text2);font-weight:700;">-- ${str}</span>`;
+    const col = up ? '#16a34a' : '#dc2626';
+    return `<span style="color:${col};font-weight:800;">${up ? '▲' : '▼'} ${str}</span>`;
+  };
 
-  const fmtVal = (v, unit) => (v == null) ? '-' : (Math.round(v).toLocaleString() + unit);
   document.getElementById('dcModelBody').innerHTML = sorted.map(m => `<tr>
     ${tdL(m.name)}
     ${tdR(fmtVal(m.countA,'台'))}
     ${tdR(fmtVal(m.countB,'台'))}
-    ${tdR(fmtDiff(m.countDiff,'台'),  ds(m.countDiff))}
+    ${tdR(fmtDiff(m.countDiff,'台'), ds(m.countDiff))}
     ${tdR(fmtVal(m.inmaiA,_inUnit()))}
     ${tdR(fmtVal(m.inmaiB,_inUnit()))}
-    ${tdR(fmtRatio(m.inmaiRatio),     rs(m.inmaiRatio))}
-    ${tdR(fmtVal(m.profitPerA,'円'))}
-    ${tdR(fmtVal(m.profitPerB,'円'))}
-    ${tdR(fmtRatio(m.profitRatio),    rs(m.profitRatio))}
+    ${tdR(fmtRatio(m.inmaiRatio), rs(m.inmaiRatio))}
+    ${tdR(fmtVal(m.profitPerA,'円'), pn(m.profitPerA))}
+    ${tdR(fmtVal(m.profitPerB,'円'), pn(m.profitPerB))}
+    ${tdR(fmtRatio(m.profitPerRatio), rs(m.profitPerRatio))}
+    ${tdR(fmtPct1(m.rateA), pn(m.rateA))}
+    ${tdR(fmtPct1(m.rateB), pn(m.rateB))}
+    ${tdR(fmtRatio(m.rateRatio), rs(m.rateRatio))}
+    ${tdR(fmtPct1(m.winA))}
+    ${tdR(fmtPct1(m.winB))}
+    ${tdR(fmtRatio(m.winRatio), rs(m.winRatio))}
+    ${tdC(ppmHtml(m.ppmA))}
+    ${tdC(ppmHtml(m.ppmB))}
+    ${tdC(trHtml(m.inTrA))}
+    ${tdC(trHtml(m.inTrB))}
+    ${tdC(trHtml(m.prTrA))}
+    ${tdC(trHtml(m.prTrB))}
   </tr>`).join('');
 }
 
@@ -12900,7 +12975,7 @@ function _renderCmpModelTable(keyA, keyB, nameA, nameB) {
       BASIC
       <span style="font-size:11px;font-weight:500;color:var(--text2);margin-left:10px;">●A優位 / ●B優位 / A÷B比率（105%↑=A優位・95%↓=B優位）｜機種名クリックでグラフ反映</span>
     </div>
-    <div style="overflow-x:auto;">
+    <div class="bj-sticky-tbl" style="overflow:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead>
           <tr style="border-bottom:1px solid var(--border);color:var(--text2);font-size:10px;font-weight:700;">
@@ -13154,7 +13229,7 @@ function _renderCmpPPMTable(keyA, keyB, nameA, nameB) {
       PPM &amp; TREND
       <span style="font-size:11px;font-weight:500;color:var(--text2);margin-left:10px;">金のなる木＝アウト↑粗利↑ / 花形＝アウト↑粗利↓ / 負け犬＝アウト↓粗利↑ / 問題児＝アウト↓粗利↓ ／ 前半後半比（5日以上）</span>
     </div>
-    <div style="overflow-x:auto;">
+    <div class="bj-sticky-tbl" style="overflow:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead>
           <tr style="border-bottom:1px solid var(--border);color:var(--text2);font-size:10px;font-weight:700;">
@@ -14047,6 +14122,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjp-info:hover{ background:rgba(0,152,212,.18); }
   .trend-mode{ margin-left:0!important; padding:6px 12px!important; font-size:11px!important; }
   .trend-mode.on{ background:var(--accent)!important; color:#fff!important; border-color:var(--accent)!important; }
+  .bjp-row.bjp-hl{ outline:2px solid var(--accent); background:rgba(0,152,212,.08); border-radius:8px; transition:background .3s; }
+  /* コンパリゾン系の横長テーブル：縦スクロールしてもヘッダーが常に見える */
+  .bj-sticky-tbl{ max-height:72vh; }
+  .bj-sticky-tbl thead{ position:sticky; top:0; z-index:5; }
+  .bj-sticky-tbl thead th{ background:var(--card); }
   .bjp-dates{ font-size:12.5px; color:var(--text2); background:rgba(0,152,212,.06); border:1px solid rgba(0,152,212,.18); border-radius:9px; padding:9px 13px; margin:2px 0 10px; }
   .bjp-dates b{ color:var(--accent); font-weight:800; }
   .bjp-status{ font-size:12px; color:var(--text2); margin:4px 0 14px; }
@@ -14199,7 +14279,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 (function(){
   var ROOMS=[['basic','ベーシック'],['week','曜日＆特定日'],['post','ポストイット＆未来予測β'],['report','レポート'],['comp','コンパリゾン'],['payout','出玉配分の答合せ β']];
   // AIの朝礼は開発中＝管理者(admin/ローカル)でのみ表示。法人ページ(USER_ID≠admin)には出さない＝未完成を配信しても見えない
-  if (typeof USER_ID !== 'undefined' && USER_ID === 'admin') { ROOMS.push(['briefing','AIの朝礼 β']); }
+  ROOMS.push(['briefing','AIの朝礼 β']);   // 2026/07/03 台帳#19の改修完了をもって法人ページにも開放（旧: admin限定）
   var panels={};
   function _bjShowLoading(){
     var ov=document.getElementById('bjLoadingOverlay'); if(!ov) return;
@@ -14311,6 +14391,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       pointBackgroundColor:list.map(function(m){return _BJPDCOL[m.d]||'#cbd5e1';}),pointBorderColor:'#fff',pointBorderWidth:1.3,
       pointRadius:list.map(function(m){return Math.min(17,Math.max(4,Math.abs(m.dOutPct)*55));}),pointHoverRadius:list.map(function(m){return Math.min(19,Math.max(6,Math.abs(m.dOutPct)*55+3));})}]},
       options:{responsive:false,animation:false,layout:{padding:8},
+        onClick:function(e,els,ch){ try{ var pts=ch.getElementsAtEventForMode(e,'nearest',{intersect:true},true); if(!pts.length)return; var m=ch.data.datasets[0].data[pts[0].index]._m; if(m)_bjpJumpToCard(m.n); }catch(err){} },
+        onHover:function(e,els,ch){ try{ var pts=ch.getElementsAtEventForMode(e,'nearest',{intersect:true},true); ch.canvas.style.cursor=pts.length?'pointer':'default'; }catch(err){} },
         plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){var m=c.raw._m;
           return [m.n,'アウト '+(m.dOutPct>=0?'+':'')+(m.dOutPct*100).toFixed(0)+'% ／ 出玉率 '+(m.dPay>=0?'+':'')+m.dPay.toFixed(1)+'pt ／ 勝率 '+(m.dWin>=0?'+':'')+m.dWin.toFixed(0)+'pt',m.t?(''+m.t):''];}}}},
         scales:{x:{type:'linear',min:-maxP,max:maxP,title:{display:true,text:'← 締めた  Δ出玉率(量)  出した →',color:'#64748b',font:{size:11,weight:'700'}},grid:{display:false},ticks:{color:'#94a3b8'}},
@@ -14328,7 +14410,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +allSeg.map(function(s){return '<button class="bjp-chip'+(seg===s?' on':'')+'" onclick="_bjpFilterSeg(\''+s+'\')">'+s+' '+counts[s]+'</button>';}).join('')+'</div>';
     var list=(seg&&seg!=='all')?cards.filter(function(m){return m.seg===seg;}):cards;
     function dlt(v,dp,u){var up=v>=0;return '<b class="'+(up?'bjpu':'bjpd')+'">'+(up?'↑ +':'↓ −')+Math.abs(v).toFixed(dp)+u+'</b>';}
-    var rows=list.map(function(m){return '<div class="bjp-row">'
+    var rows=list.map(function(m){return '<div class="bjp-row" data-mn="'+encodeURIComponent(m.n)+'">'
       +'<div class="bjp-nm"><span class="bjp-seg">'+m.seg+'</span>'+_bjEsc(m.n)+'<small>'+m.verdict+'</small></div>'
       +'<div class="bjp-metrics">'
       +'<div>稼働 '+dlt(m.dOutPct*100,0,'%')+' <span class="bjp-now">今 '+Math.round(m.o).toLocaleString()+'</span></div>'
@@ -14338,6 +14420,19 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     dg.innerHTML=chips+(rows||'<div style="font-size:12px;color:var(--text2);padding:10px 2px;">このセグメントに該当機種なし</div>');
   }
   window._bjpFilterSeg=function(seg){_bjpRenderCards(seg);};
+  // グラフの点クリック → 下部テーブルの該当機種へスクロール＋ハイライト
+  function _bjpJumpToCard(name){
+    var cards=window._bjpCards||[];
+    if(!cards.some(function(c){return c.n===name;}))return;   // 診断カードの無い機種（動きが小さい）は対象外
+    _bjpRenderCards('all');   // セグメント絞り込みで隠れていても必ず出す
+    var dg=document.getElementById('bjpDiag');if(!dg)return;
+    var hit=null;
+    dg.querySelectorAll('.bjp-row').forEach(function(r){ if(decodeURIComponent(r.getAttribute('data-mn')||'')===name)hit=r; });
+    if(!hit)return;
+    hit.scrollIntoView({behavior:'smooth',block:'center'});
+    hit.classList.add('bjp-hl');
+    setTimeout(function(){ if(hit)hit.classList.remove('bjp-hl'); },2200);
+  }
   var _bjpAnchor=null;   // 分析窓の終点（YYYY-MM-DD）。null=最新日。◀▶で1週ずつスライド
   function _bjpAddDaysStr(s,d){var x=new Date(s+'T00:00:00'); x.setDate(x.getDate()+d); var y=x.getFullYear(),m=String(x.getMonth()+1).padStart(2,'0'),dd=String(x.getDate()).padStart(2,'0'); return y+'-'+m+'-'+dd;}
   function _bjpRender(){
@@ -14532,8 +14627,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     _bjbRetry=0;
     var st0=(typeof getActiveStore==='function')?getActiveStore():null;
     var sName=(st0&&st0.name)?st0.name:'この店舗';
-    // ── 全構造をメモ化（店舗×件数）：店全体日次＋機種×日次 ──
-    var key='v2|'+((st0&&st0.key)||'')+'|'+recs.length;
+    // ── 全構造をメモ化（店舗×件数×最終日）：店全体日次＋機種×日次 ──
+    var _lastRec=''; for(var _li=0;_li<recs.length;_li++){ var _ld0=recs[_li]&&recs[_li].date; if(_ld0&&_ld0>_lastRec)_lastRec=_ld0; }
+    var key='v3|'+((st0&&st0.key)||'')+'|'+recs.length+'|'+_lastRec;
     var M;
     if(_bjbMemoKey===key&&_bjbMemo){ M=_bjbMemo; }
     else {
@@ -14572,10 +14668,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var pStd=Math.sqrt(profSeries.reduce(function(a,b){return a+(b-pMean)*(b-pMean);},0)/n)||1;
     var pLd=profSeries[n-1];
     var storeBleed=(pLd<0 && pLd<pMean-1.2*pStd);
+    // ── 店舗適応しきい値の材料（#19：固定値をやめ、その店のばらつきでスケール）──
+    var rateSeries=dates.map(function(d){var o=M.byD[d];return o.s>0?o.p/o.s*100:null;}).filter(function(x){return x!=null;});
+    var rMean=rateSeries.length?rateSeries.reduce(function(a,b){return a+b;},0)/rateSeries.length:0;
+    var rStd=rateSeries.length?Math.sqrt(rateSeries.reduce(function(a,b){return a+(b-rMean)*(b-rMean);},0)/rateSeries.length):0;
+    var vStd=Math.sqrt(vals.reduce(function(a,b){return a+(b-stats.mean)*(b-stats.mean);},0)/n);
+    var cvPct=stats.mean>0?vStd/stats.mean*100:20;   // アウトの日次変動係数%
     var _man=function(y){return Math.round(Math.abs(y)/10000).toLocaleString()+'万円';};
+    var _seed=parseInt(ld.slice(8,10),10)+parseInt(ld.slice(5,7),10)*31;   // 日付シード：文面ローテはMath.random禁止（タイムマシンの再現性を守る）(#19)
+    var _pick=function(arr){return arr[_seed%arr.length];};
     // ── 機種別ニュース検出 ──
     var TAI_MIN=3, OUT_SPIKE=40, PAY_SPIKE=7, TAI_DELTA=2, NEW_DAYS=7, GONE_MIN=10, GONE_MAX=21;
-    var BLEED_ONE=-100000;   // 機種単位の放出（赤字）とみなす金額
+    var BLEED_ONE=-Math.round(Math.min(300000,Math.max(50000,pStd*0.10)));   // 機種単位の放出しきい値＝店の日次粗利σの10%（5万円床・30万円天井）。固定-10万円を店舗適応化(#19)
     var items=[], bleeders=[], dayModels=[], equipNew=[], equipTai=[];
     // ── 前営業日（増減台はレポートと同じ前営業日比で見る）＋当日データの薄さ判定 ──
     var _prevD=n>=2?dates[n-2]:null;
@@ -14687,14 +14791,31 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(sameDays.length>=2){ dowProfAvg=sameDays.reduce(function(a,d){return a+(M.byD[d].p||0);},0)/sameDays.length;
       var rr=sameDays.map(function(d){return M.byD[d].s>0?M.byD[d].p/M.byD[d].s*100:null;}).filter(function(x){return x!=null;});
       dowRateAvg=rr.length?rr.reduce(function(a,b){return a+b;},0)/rr.length:null; }
+    // ── 偵察（#19）：直近7日 vs その前7日で「締めている／出している」機種を特定（今日の一手の材料）──
+    var reconTight=null, reconLoose=null;
+    Object.keys(M.byMD).forEach(function(mn){
+      var md=M.byMD[mn]; var ds2=Object.keys(md).filter(function(d){return d<target;}).sort();
+      if(ds2.length<14 || ds2[ds2.length-1]!==ld)return;   // 現役＆履歴14日以上のみ
+      var r7=ds2.slice(-7), p7=ds2.slice(-14,-7);
+      var pay=function(arr){var iS=0,dS=0;arr.forEach(function(d){iS+=md[d].in;dS+=md[d].diff;});return iS>0?(iS+dS)/iS*100:null;};
+      var pR=pay(r7), pP=pay(p7); if(pR==null||pP==null)return;
+      var oS=0,oC=0; r7.forEach(function(d){oS+=md[d].in;oC+=md[d].c;});
+      if(oC<=0 || oS/oC<Math.max(3000,stats.mean*0.5))return;   // 死に台は偵察対象外(#03)
+      if(r7.reduce(function(a,d){return a+md[d].c;},0)/7<TAI_MIN)return;
+      var dPay7=pR-pP;
+      if(dPay7<=-2&&(!reconTight||dPay7<reconTight.dP))reconTight={mn:mn,dP:dPay7,from:pP,to:pR};
+      if(dPay7>=2&&(!reconLoose||dPay7>reconLoose.dP))reconLoose={mn:mn,dP:dPay7,from:pP,to:pR};
+    });
     // ── 軸判定（#07/#08）：アウト軸 / 放出軸 / 利益軸 / 平常 ──
     var earners=dayModels.filter(function(m){return m.p>0;}).sort(function(a,b){return b.p-a.p;});
     var outLeaders=dayModels.slice().sort(function(a,b){return b.outTotal-a.outTotal;});
     var risers=dayModels.filter(function(m){return m.dev!=null&&m.dev>=OUT_SPIKE&&m.outAvg>=Math.max(3000,stats.mean*0.8);}).sort(function(a,b){return b.dev-a.dev;});
     bleeders.sort(function(a,b){return a.p-b.p;});
-    var profitHigh=(ldRate!=null&&rateAvgAll!=null&&ldRate>=rateAvgAll+5);
+    var profThr=Math.min(10,Math.max(3,0.8*rStd));   // 利益軸の発火＝その店の利益率σの0.8倍（3〜10ptに制限）(#19)
+    var outThr=Math.min(40,Math.max(15,Math.round(1.2*cvPct)));   // アウト軸の発火＝その店のアウト変動係数の1.2倍（15〜40%に制限）(#19)
+    var profitHigh=(ldRate!=null&&rateAvgAll!=null&&ldRate>=rateAvgAll+profThr);
     var bleedTrig=(dowProfAvg!=null)?(pLd<dowProfAvg-0.8*pStd):(pLd<0&&pLd<pMean-1.2*pStd);
-    var outHigh=(outDev!=null&&outDev>=25)||(devStore!=null&&devStore>=30);
+    var outHigh=(outDev!=null&&outDev>=outThr)||(devStore!=null&&devStore>=30);
     var axis = outHigh?'out' : (bleedTrig&&pLd<pMean)?'bleed' : profitHigh?'profit' : 'flat';
     function _pl(){ return (ldRate!=null?'利益率'+ldRate.toFixed(1)+'%'+(rateAvgAll!=null?'（普段'+rateAvgAll.toFixed(1)+'%）':''):''); }
     function _topOut(){ return outLeaders.slice(0,3).filter(function(m){return m.outTotal>0;}).map(function(m){return _bjEsc(m.mn)+'（'+Math.round(m.outAvg).toLocaleString()+'枚）';}).join('・'); }
@@ -14702,7 +14823,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // 軸ごとに storeHead(店全体サマリ) / mach(機種詳細) / axisVerdict(総評) を用意
     var axisVerdict, storeHead='', mach='';
     if(axis==='out'){
-      axisVerdict='アウトが大きく伸びた一日でした。';
+      axisVerdict=_pick(['アウトが大きく伸びた一日でした。','客が大きく動いた一日でした。']);
       var bw=(pLd>0)?('利益率は'+(ldRate!=null?ldRate.toFixed(1)+'%':'—')+(rateAvgAll!=null?'（普段'+rateAvgAll.toFixed(1)+'%）':'')+'で黒字＝出さずに伸ばした好調日です'):('一方で'+_pl()+'＝出して伸ばした、放出寄りの伸びです');
       storeHead='店全体のアウトが'+(outDev!=null?'平常より＋'+outDev+'%':'大きく伸び')+'（'+Math.round(lastV).toLocaleString()+'枚／普段'+Math.round(stats.mean).toLocaleString()+'枚）。'+bw+'。';
       mach=(_topOut()?'アウトを稼いだ主役は'+_topOut()+'。':'')+(risers.length?'中でも普段比で大きく伸ばしたのは'+_riserTxt()+'。':'');
@@ -14713,7 +14834,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       storeHead=hd+'（'+_pl()+(pLd<0?'・店全体'+_man(pLd)+'の赤字':'')+'）。'+ctx2;
       mach=(bleeders.length?'主因は'+_causeList(bleeders,'−')+'。':'');
     } else if(axis==='profit'){
-      axisVerdict='しっかり利益を確保した一日でした。';
+      axisVerdict=_pick(['しっかり利益を確保した一日でした。','利益をきっちり回収した一日でした。','回収に徹した一日でした。']);
       // 利益率だけでなく「客足（アウト）が普段より上/下/同じ」も必ず添える
       var _av=Math.round(lastV).toLocaleString(), _mv=Math.round(stats.mean).toLocaleString(), keep='';
       if(outDev!=null){
@@ -14723,7 +14844,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       }
       storeHead=keep+_pl()+'まで利益率を上げ、しっかり回収しました。';
       mach=(earners.length?'回収の主役は'+_causeList(earners.slice(0,3),'＋')+'。':'')+(bleeders.length?'一方で'+_causeList(bleeders,'−')+'は出していたものの、全体では大きく利益を確保しています。':'');
-    } else { axisVerdict='大きな動きはなく、おおむね平常な一日でした。'; }
+    } else { axisVerdict=_pick(['大きな動きはなく、おおむね平常な一日でした。','機種・配分とも落ち着いた、平常運転の一日でした。','特筆する動きのない、静かな一日でした。']); }
 
     // ── 特定日（#06）：あれば最優先。総評と本文の冒頭にする ──
     var tokuLd=null; _bjDayPats(ld).forEach(function(p){ if(adopted[p]&&(!tokuLd||adopted[p]>tokuLd.m)) tokuLd={p:p,m:adopted[p]}; });
@@ -14788,11 +14909,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var _newToday=equipNew.filter(function(e){return e.age<=1;});
     var hasNewRunning=_newToday.some(function(e){var o=M.byMD[e.mn]&&M.byMD[e.mn][ld];return o&&o.c&&o.in>0;});
     var hasNewInstalled=_newToday.length>0;
+    var isCalm=(!tokuLd && axis==='flat');   // 文面バリエーション導入により文字列比較は不可→軸フラグで判定(#19)
     if(hasNewRunning){
-      if(verdict==='大きな動きはなく、おおむね平常な一日でした。') verdict='新台入替初日営業でした。';
+      if(isCalm) verdict='新台入替初日営業でした。';
       else verdict='新台入替初日営業で、'+verdict;
     } else if(hasNewInstalled){
-      if(verdict==='大きな動きはなく、おおむね平常な一日でした。') verdict='新台が導入された一日でした。';
+      if(isCalm) verdict='新台が導入された一日でした。';
       else verdict='新台が導入され、'+verdict;
     }
     // ── 機種ファクト（増台/新台/勝率含む。本文の下に列挙）──
@@ -14809,8 +14931,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(tokuToday){ move='本日は先方の特定日なので、正面からぶつけず、弱い見込みの'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）に自店イベントを当てるのが定石でしょう。'; }
     else if(axis==='out'){ move='この伸びの正体（取材・全台系・イベント）を確認するのが先決です。詳しくは「出玉配分の答合せ」タブで全体像を。'; }
     else if(axis==='bleed'){ move='どこを出したか「レポート」「出玉配分の答合せ」タブで確認を。先方が出した直後は客が流れやすいので、平常運転で様子を見るのが無難です。'; }
-    else if(axis==='profit'){ move='先方は利益を確保＝出していない日なので、こちらが出せば客を取りに行ける好機です。'; }
-    else { move='通常運転で問題ありません。仕掛けるなら、先方が弱そうな'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）が候補です。'; }
+    else if(axis==='profit'){ move='先方は利益を確保＝出していない日なので、こちらが出せば客を取りに行ける好機です。'+(reconTight?('特に先方は'+reconTight.mn+'をここ1週間締め気味（出玉率'+reconTight.from.toFixed(1)+'%→'+reconTight.to.toFixed(1)+'%）で、同系機種が狙い目です。'):''); }
+    else { move=(reconTight?('先方は'+reconTight.mn+'をここ1週間締め気味です（出玉率'+reconTight.from.toFixed(1)+'%→'+reconTight.to.toFixed(1)+'%）。自店の同系機種を強化するなら好機です。'):(reconLoose?('先方は'+reconLoose.mn+'をここ1週間出し気味です（出玉率'+reconLoose.from.toFixed(1)+'%→'+reconLoose.to.toFixed(1)+'%）。客を取られやすいタイミングなので注意を。'):'通常運転で問題ありません。'))+'仕掛けるなら、先方が弱そうな'+_bjbFmtD(lo.ds)+'（'+lo.wd+'）が候補です。'; }
+    // ── 昨日の朝礼の答え合わせ（#19）：当時のデータだけで見立てを再現し、実績と突き合わせる ──
+    var ansPara='';
+    if(n>=31){
+      var datesY=dates.slice(0,n-1), valsY=vals.slice(0,n-1);
+      var statsY=_bjbStats(datesY,valsY), adoptedY=_bjDetectTokuteibi(datesY,valsY,statsY);
+      var expY=_bjbExpOf(statsY,adoptedY,ld);
+      if(expY>0&&lastV>0){
+        var devY=Math.round((lastV/expY-1)*100), aY=Math.abs(devY);
+        var gY=aY<=10?'ほぼ見立て通りでした':(devY>0?(aY<=30?'見立てよりやや上振れました':'見立てを大きく上回りました'):(aY<=30?'見立てよりやや下振れました':'見立てを大きく下回りました'));
+        ansPara='昨日の朝礼の答え合わせ：アウトの見立て'+Math.round(expY).toLocaleString()+'枚に対し、実績は'+Math.round(lastV).toLocaleString()+'枚（'+(devY>=0?'+':'')+devY+'%）。'+gY+'。';
+      }
+    }
     // ── 本文（1つの長文・段落・タイプライター）──
     var hr=new Date().getHours(); var greet=isToday?(hr<11?'おはようございます。':hr<18?'こんにちは。':'こんばんは。'):(_bjbFmtD(target)+'の朝に戻って報告します。');
     var _ldMD=parseInt(ld.slice(5,7),10)+'月'+parseInt(ld.slice(8),10)+'日（'+ldDowName+'）';
@@ -14834,15 +14968,16 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       }
       equipPara='それから、台の動きにも触れておきます。'+eParts.join('');
     }
-    var p2html = head ? head : (equipPara?'昨日は出玉面では平常でした。':'昨日は機種・台数・配分とも平常通りで、特に取り上げるほどの動きはありませんでした。');
+    var p2html = head ? head : (equipPara?'昨日は出玉面では平常でした。':_pick(['昨日は機種・台数・配分とも平常通りで、特に取り上げるほどの動きはありませんでした。','昨日は各機種とも普段どおりの動きで、目立った仕掛けは見られませんでした。']));
     var p2=_raw(p2html);
+    if(ldPartial) p2+='　※昨日分のデータはまだ出揃っていない可能性があります（登録台数が前日より大きく少ないため）。本日の判定は暫定です。';
     var p3=kamae+'　今日の一手としては、'+move;
     // 注目の新台（初日〜3日目）：実際に動いた（アウト>0）中で1台平均アウトが最大の1機種を深掘り。全部アウト0＝検査待ち
     var newSpotPara='', _spot=null, _newInWin=equipNew.filter(function(e){return e.age<=3;});
     _newInWin.forEach(function(e){ var o=M.byMD[e.mn]&&M.byMD[e.mn][ld]; if(!o||!o.c||o.in<=0)return; var oa=o.in/o.c; if(!_spot||oa>_spot.oa)_spot={mn:e.mn,age:e.age,oa:oa,pa:o.p/o.c}; });
     if(_spot){ newSpotPara='注目の新台は'+_bjEsc(_spot.mn)+'。\nアウト '+Math.round(_spot.oa).toLocaleString()+'枚（'+_spot.age+'日目）\n台粗利 '+Math.round(_spot.pa).toLocaleString()+'円（'+_spot.age+'日目）\n続きは本機能にてご確認ください。'; }
     else if(_newInWin.length){ newSpotPara='導入された新台はまだアウトが立っておらず、検査待ち等でこれから本格稼働とみられます。'; }
-    var paras=[p1,p2]; if(equipPara) paras.push(_raw(equipPara)); if(newSpotPara) paras.push(_raw(newSpotPara)); paras.push(p3);
+    var paras=[p1,p2]; if(equipPara) paras.push(_raw(equipPara)); if(newSpotPara) paras.push(_raw(newSpotPara)); if(ansPara) paras.push(ansPara); paras.push(p3);
     var plain=paras.join('\n\n');
     var facts=items.map(function(it){return it.html;});
     var factsHtml = facts.length ? facts.slice(0,8).map(function(h){return '<div class="bjb-fact">・'+_bjEsc(_raw(h))+'</div>';}).join('') : '<div class="bjb-fact" style="color:var(--text2);">・特記事項なし</div>';
