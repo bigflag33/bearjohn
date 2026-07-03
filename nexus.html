@@ -14222,14 +14222,19 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var _bjpCharts={}, _bjpMemo=null, _bjpMemoKey='', _bjpRetry=0;
   function _bjpTrail(a,k){var o=[];for(var i=0;i<a.length;i++){var s=0,c=0;for(var j=Math.max(0,i-k+1);j<=i;j++){if(a[j]!=null){s+=a[j];c++;}}o.push(c?s/c:null);}return o;}
   function _bjpBuild(recs,minTaiDay,minDays){
-    var byM={};
+    var byM={}, storeEnd='';
     recs.forEach(function(r){var m=r['機種名'];if(!m||!r.date)return;var tai=String(r['台番']||'').trim()||'_';
+      if(r.date>storeEnd)storeEnd=r.date;
       (byM[m]=byM[m]||{})[r.date]=byM[m][r.date]||{u:{}};
       var u=byM[m][r.date].u[tai]||(byM[m][r.date].u[tai]={in:0,diff:0});
       u.in+=(+r['IN枚数']||0);u.diff+=(+r['差枚']||0);});
-    var res=[],st={total:0,fewDays:0,fewTai:0,fewPath:0};
+    // 撤去済み除外：店舗の最新日から3日以上データが途絶えた機種は「今の2週間」の分析対象にしない
+    // （古い最終日を持つ機種は自分の最終日基準の窓が固定され、スライドしても動かない亡霊になるため）
+    var goneCutoff=storeEnd?_bjpAddDaysStr(storeEnd,-3):'';
+    var res=[],st={total:0,fewDays:0,fewTai:0,fewPath:0,gone:0};
     Object.keys(byM).forEach(function(m){st.total++;
       var dts=Object.keys(byM[m]).sort();if(dts.length<minDays){st.fewDays++;return;}
+      if(goneCutoff && dts[dts.length-1]<goneCutoff){st.gone++;return;}
       var oA=[],pA=[],wA=[],taiDays=0;
       dts.forEach(function(d){var us=Object.values(byM[m][d].u),n=us.length;taiDays+=n;
         var inS=us.reduce(function(a,b){return a+b.in;},0),dfS=us.reduce(function(a,b){return a+b.diff;},0);
@@ -14372,7 +14377,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     window._bjpCards=cards;
     if(cards.length){ _bjpRenderCards('all'); }
     else if(dg){ dg.innerHTML='<div style="font-size:12px;color:var(--text2);">大きな動きなし（安定）</div>'; }
-    if(statusEl)statusEl.textContent='店舗「'+sName+'」／対象'+M.length+'機種（稼働↑'+A.length+'／↓'+B.length+'）／全'+stt.total+'機種中（除外:日数'+stt.fewDays+'・台数'+stt.fewTai+'・軌跡'+stt.fewPath+'）';
+    if(statusEl)statusEl.textContent='店舗「'+sName+'」／対象'+M.length+'機種（稼働↑'+A.length+'／↓'+B.length+'）／全'+stt.total+'機種中（除外:日数'+stt.fewDays+'・台数'+stt.fewTai+'・軌跡'+stt.fewPath+'・撤去済み'+(stt.gone||0)+'）';
     window._bjPayoutDirty=false;
   }
   window._bjpRender=_bjpRender;
@@ -14386,7 +14391,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     +'<p>常に「最新データの直近≒2週間でどう動いたか」を見ます。<b>"最新日"＝今日ではなく、アップ済みデータの一番新しい日</b>（例：6/3まで入っていれば6/3基準で2週間前と比較）。</p>'
     +'<h3>② 「対象機種」は期間じゃなく"絞り込み"</h3>'
     +'<ul><li><b>対象機種（◯台以上）</b>：ノイズの多い少台数機種を除き、主力だけで見るための絞り込み。<b>期間とは無関係</b>です。</li>'
-    +'<li>※ 履歴が極端に短い機種（21日未満）は、トレンドがブレるため<b>自動的に除外</b>しています（内部固定・操作不要）。</li></ul>'
+    +'<li>※ 履歴が極端に短い機種（21日未満）は、トレンドがブレるため<b>自動的に除外</b>しています（内部固定・操作不要）。</li>'
+    +'<li>※ 店舗の最新日から<b>3日以上データが途絶えた機種＝撤去済み</b>として除外します（撤去前の古い2週間が「今の動き」として居座るのを防ぐため）。スライドで過去に戻ると、当時設置されていた機種はちゃんと現れます。</li></ul>'
     +'<h3>③ まとめ</h3><table>'
     +'<tr><th>項目</th><th>意味</th></tr>'
     +'<tr><td>分析する期間</td><td>固定：直近≒2週間の動き（自動・最新データ基準）</td></tr>'
