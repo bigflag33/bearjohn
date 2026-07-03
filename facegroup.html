@@ -14888,11 +14888,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(sameTk.length>=2 && (tokuDir==='release'||tokuDir==='miss'||tokuDir==='keep')){
         var _tp=sameTk.map(function(d){return M.byD[d].p||0;}), tkProfAvg=_tp.reduce(function(a,b){return a+b;},0)/_tp.length;
         var pLdTxt=pLd<0?(_man(pLd)+'の赤字'):_man(pLd), ratio=tkProfAvg!==0?pLd/tkProfAvg:1;
+        var tkTxt=(tkProfAvg<0?_man(tkProfAvg)+'の赤字':_man(tkProfAvg));   // #21: _manはMath.absなので赤字は必ず明記（符号握りつぶしバグの修正）
         if(tokuDir==='keep'){
-          tokuProfBridge='店全体の粗利も、普段のこの日（'+_man(tkProfAvg)+'）に対し'+pLdTxt+'と、しっかり利益を確保しています。';
+          var kw=(pLd>=tkProfAvg)?'しっかり利益を確保しています':'率の上では締めていますが、金額は普段に届いていません';
+          tokuProfBridge='店全体の粗利'+(pLd>=tkProfAvg?'も':'は')+'、普段のこの日（直近6回平均・'+tkTxt+'）に対し'+pLdTxt+'と、'+kw+'。';
         } else {
-          var w=pLd<0?'大きく放出しています':(ratio<0.4?'大きく下回り、放出気味です':(ratio<0.75?'やや放出気味です':'ほぼ普段並みです'));
-          tokuProfBridge='店全体の粗利は、普段のこの日（'+_man(tkProfAvg)+'）に対し'+pLdTxt+'と、'+w+'。';
+          var w;
+          if(tkProfAvg<0){ w=(pLd<tkProfAvg)?'いつも以上に踏み込んで放出しています':(pLd<0?'いつも通りの放出です':'放出は普段より控えめです'); }
+          else { w=pLd<0?'大きく放出しています':(ratio<0.4?'大きく下回り、放出気味です':(ratio<0.75?'やや放出気味です':'ほぼ普段並みです')); }
+          tokuProfBridge='店全体の粗利は、普段のこの日（直近6回平均・'+tkTxt+'）に対し'+pLdTxt+'と、'+w+'。';
         }
       }
     }
