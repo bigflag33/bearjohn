@@ -6577,7 +6577,7 @@ function renderRivalAnalysis() {
         ${varietySpice.length > 12 ? `<span style="color:var(--text2);font-size:10.5px;align-self:center;">他${varietySpice.length-12}機種</span>` : ''}
       </div>
     </div>
-  ${modelTableHTML((function(){ const ms = new Set(varietyModels.map(x=>x.name)); return all.filter(r => r['機種名'] && ms.has(r['機種名'])); })(), { title: 'バラエティ 機種別集計' })}
+  ${modelTableHTML((function(){ const ms = new Set(varietyModels.map(x=>x.name)); return all.filter(r => r['機種名'] && ms.has(r['機種名'])); })(), { title: 'バラエティ 機種別集計', totalRecords: all })}
   </div>`;
 
   // ④ ジャグラー/海物語シリーズ分析
@@ -6963,7 +6963,7 @@ function renderRivalAnalysis() {
           ${detailHtml}
         </div>`;
       })()}
-    ${modelTableHTML(all.filter(r => r['機種名'] && r['機種名'].includes(_seriesKeyword())), { title: _seriesLabel() + ' 機種別集計' })}
+    ${modelTableHTML(all.filter(r => r['機種名'] && r['機種名'].includes(_seriesKeyword())), { title: _seriesLabel() + ' 機種別集計', totalRecords: all })}
     </div>`;
   }
 
@@ -7311,7 +7311,7 @@ function renderRivalAnalysis() {
             ${detailHtml}
           </div>`;
         })()}
-      ${modelTableHTML(all.filter(r => r['機種名'] && _kw.some(kw => r['機種名'].includes(kw))), { title: _short + 'シリーズ 機種別集計' })}
+      ${modelTableHTML(all.filter(r => r['機種名'] && _kw.some(kw => r['機種名'].includes(kw))), { title: _short + 'シリーズ 機種別集計', totalRecords: all })}
       </div>`;
     }
   }
@@ -7451,7 +7451,7 @@ function renderRivalAnalysis() {
           ${okiDetailSer.length>25?`<tr><td colspan="4" style="padding:6px 8px;color:var(--text2);font-size:10.5px;">… 他 ${okiDetailSer.length-25} 件</td></tr>`:''}
         </table></div>
       </div>` : ''}
-    ${modelTableHTML(all.filter(r => r['機種名'] && r['機種名'].includes(serKeyword)), { title: serLabel + ' 機種別集計' })}
+    ${modelTableHTML(all.filter(r => r['機種名'] && r['機種名'].includes(serKeyword)), { title: serLabel + ' 機種別集計', totalRecords: all })}
     </div>`;
     };
 
@@ -7840,7 +7840,7 @@ function renderRivalAnalysis() {
 
         ${mainPatternHtml}
 
-      ${modelTableHTML((function(){ const ms = new Set(mainModels.map(x=>x.name)); return all.filter(r => r['機種名'] && ms.has(r['機種名'])); })(), { title: 'メイン機種 機種別集計' })}
+      ${modelTableHTML((function(){ const ms = new Set(mainModels.map(x=>x.name)); return all.filter(r => r['機種名'] && ms.has(r['機種名'])); })(), { title: 'メイン機種 機種別集計', totalRecords: all })}
       </div>`;
     }
   }
@@ -11480,6 +11480,33 @@ function _modelTrendBadge(trend){
   if (abs < 15){ const col = up?'#34d399':'#f87171', bg = up?'rgba(52,211,153,0.10)':'rgba(248,113,113,0.10)', brd = up?'rgba(52,211,153,0.35)':'rgba(248,113,113,0.35)'; return `<span style="background:${bg};border:1px solid ${brd};color:${col};border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;white-space:nowrap;">${up?'▲':'▼'} ${pct}</span>`; }
   const bg = up ? '#16a34a' : '#dc2626'; return `<span style="background:${bg};color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:800;white-space:nowrap;">${up?'▲':'▼'} ${pct}</span>`;
 }
+function _aggSummaryRow(records){
+  if (!records || !records.length) return null;
+  const r = { profit:0, sales:0, inmai:0, count:0, days:new Set(), dateData:{} };
+  records.forEach(d => { if (!d) return;
+    r.profit += d['台粗利']||0; r.sales += d['台売上']||0; r.inmai += d['IN枚数']||0; r.count++;
+    r.days.add(d.date);
+    const dd = r.dateData[d.date] = r.dateData[d.date] || { inmai:0, count:0 };
+    dd.inmai += d['IN枚数']||0; dd.count++;
+  });
+  const days = r.days.size;
+  const avgMachines = days > 0 ? r.count / days : 0;
+  const avgIn = r.count > 0 ? r.inmai / r.count : 0;
+  const avgProfit = r.count > 0 ? r.profit / r.count : 0;
+  const profitRate = r.sales !== 0 ? r.profit / r.sales * 100 : 0;
+  const coinTanka = r.inmai > 0 ? r.sales / r.inmai : 0;
+  const coinProfit = r.inmai > 0 ? r.profit / r.inmai : 0;
+  let trend = null;
+  const sortedDates = Object.keys(r.dateData).sort();
+  if (sortedDates.length >= 5) {
+    const half = Math.floor(sortedDates.length / 2);
+    const fD = sortedDates.slice(0, half), lD = sortedDates.slice(sortedDates.length - half);
+    const avgF = fD.reduce((s,dt)=>{const dd=r.dateData[dt];return s+(dd.count>0?dd.inmai/dd.count:0);},0)/fD.length;
+    const avgL = lD.reduce((s,dt)=>{const dd=r.dateData[dt];return s+(dd.count>0?dd.inmai/dd.count:0);},0)/lD.length;
+    if (avgF > 0) trend = (avgL - avgF) / avgF * 100;
+  }
+  return { days, avgMachines, avgIn, avgProfit, profit:r.profit, sales:r.sales, profitRate, coinTanka, coinProfit, trend };
+}
 function modelTableHTML(records, opts){
   opts = opts || {};
   const sortKey = opts.sortKey || 'avgProfit';
@@ -11494,6 +11521,28 @@ function modelTableHTML(records, opts){
     <th style="text-align:center;">傾向</th><th>推定粗利合計</th><th>1台平均粗利</th>
     <th>推定売上合計</th><th>利益率</th><th>${coinLabel}単価</th><th>${coinLabel}粗利</th>
   </tr></thead>`;
+  const sumRow = (s, label, bg) => `<tr style="background:${bg};font-weight:800;border-top:2px solid var(--border);">
+    <td>${label}</td>
+    <td>${s.days}日</td>
+    <td>${s.avgMachines.toFixed(1)}台</td>
+    <td class="highlight">${fmtAbs(Math.round(s.avgIn))}</td>
+    <td style="text-align:center;">${_modelTrendBadge(s.trend)}</td>
+    <td class="${colorClass(s.profit)}">${fmt(s.profit)}円</td>
+    <td class="${colorClass(s.avgProfit)}">${fmt(s.avgProfit)}円</td>
+    <td>${fmtAbs(s.sales)}円</td>
+    <td class="${colorClass(s.profitRate)}">${s.profitRate.toFixed(1)}%</td>
+    <td>${s.coinTanka.toFixed(2)}円</td>
+    <td>${s.coinProfit.toFixed(2)}円</td>
+  </tr>`;
+  // シリーズ合計（アウト系は台日加重の平均・金額系は合計）＋店舗全体（同じ期間フィルターの全機種）
+  let footRows = '';
+  const groupLabel = title.replace(/\s*機種別集計\s*$/, '');
+  const sAgg = _aggSummaryRow(records);
+  if (sAgg && rows.length >= 2) footRows += sumRow(sAgg, groupLabel + ' 合計（' + rows.length + '機種）', 'rgba(0,152,212,.07)');
+  if (opts.totalRecords && opts.totalRecords.length) {
+    const tAgg = _aggSummaryRow(opts.totalRecords);
+    if (tAgg) footRows += sumRow(tAgg, '店舗全体（全機種）', 'rgba(100,116,139,.10)');
+  }
   const body = '<tbody>' + rows.map(r => `<tr>
     <td>${r.name}</td>
     <td>${r.days}日</td>
@@ -11506,7 +11555,7 @@ function modelTableHTML(records, opts){
     <td class="${colorClass(r.profitRate)}">${r.profitRate.toFixed(1)}%</td>
     <td>${r.coinTanka.toFixed(2)}円</td>
     <td>${r.coinProfit.toFixed(2)}円</td>
-  </tr>`).join('') + '</tbody>';
+  </tr>`).join('') + footRows + '</tbody>';
   return `<div style="margin-top:20px;border-top:1px solid var(--border);padding-top:18px;">
     <div style="font-size:11.5px;font-weight:700;color:var(--text2);margin-bottom:10px;letter-spacing:.4px;">${title}（台粗利順・${rows.length}機種）</div>
     <div class="table-wrapper"><table class="rival-modeltable">${head}${body}</table></div>
