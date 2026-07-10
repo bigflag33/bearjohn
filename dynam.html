@@ -11420,6 +11420,56 @@ function renderModelTable() {
     ${_th(coinLabel+'粗利','coinProfit')}
   </tr>`;
 
+  // ── 合計行（レポートの機種別集計と同じ流儀）：表示中の合計＋店舗全体 ──
+  const _sumRowB = (s, label, bg) => `<tr style="background:${bg};font-weight:800;border-top:2px solid var(--border);">
+    <td>${label}</td>
+    <td>${s.days}日</td>
+    <td>${s.avgMachines.toFixed(1)}台</td>
+    <td class="highlight">${fmtAbs(Math.round(s.avgIn))}</td>
+    <td style="text-align:center;">${_trendBadge(s.trend)}</td>
+    <td class="${colorClass(s.profit)}">${fmt(s.profit)}円</td>
+    <td class="${colorClass(s.avgProfit)}">${fmt(s.avgProfit)}円</td>
+    <td>${fmtAbs(s.sales)}円</td>
+    <td class="${colorClass(s.profitRate)}">${s.profitRate.toFixed(1)}%</td>
+    <td>${s.coinTanka.toFixed(2)}円</td>
+    <td>${s.coinProfit.toFixed(2)}円</td>
+  </tr>`;
+  // ── 合計行：各シリーズ合計（レポートと同じキーワード判定）＋店舗全体。機種フィルターは無視し期間フィルターのみ適用 ──
+  let footB = '';
+  const _f = (document.getElementById('dateFrom')||{}).value || '';
+  const _t = (document.getElementById('dateTo')||{}).value || '';
+  const _allRecs = (typeof loadAllData === 'function' ? (loadAllData()||[]) : []).filter(r => r.date && (!_f || r.date >= _f) && (!_t || r.date <= _t));
+  const _seriesDefs = _isPachinkoStore()
+    ? [['海物語シリーズ', ['海物語']], ['エヴァシリーズ', ['エヴァ']], ['北斗の拳シリーズ', ['北斗の拳']]]
+    : [['ジャグラーシリーズ', ['ジャグラー']], ['ハナハナシリーズ', ['ハナハナ']], ['沖ドキシリーズ', ['沖ドキ','オキドキ']]];
+  _seriesDefs.forEach(def => {
+    const lb = def[0], kws = def[1];
+    const rs = _allRecs.filter(r => r['機種名'] && kws.some(k => r['機種名'].includes(k)));
+    if (!rs.length) return;
+    const a = _aggSummaryRow(rs);
+    if (a) footB += _sumRowB(a, lb + ' 合計', 'rgba(0,152,212,.07)');
+  });
+  // メイン機種（シリーズを除く総アウト上位5）とバラエティ（推定1〜2台・5日以上）＝レポートと同じ基準
+  const _mm = {};
+  _allRecs.forEach(r => { const k = r['機種名']; if (!k) return;
+    const o = _mm[k] = _mm[k] || { in:0, c:0, days:new Set(), tais:new Set() };
+    o.in += r['IN枚数']||0; o.c++; o.days.add(r.date); if (r['台番'] != null) o.tais.add(String(r['台番']));
+  });
+  const _est = o => { const am = o.days.size > 0 ? o.c/o.days.size : 0; return Math.max(Math.round(am), o.tais.size > 0 ? Math.min(o.tais.size, Math.round(am)+1) : Math.round(am)); };
+  const _kwMain = _seriesKeyword();
+  const _mainNames = new Set(Object.keys(_mm).filter(k => !k.includes(_kwMain)).sort((a,b) => _mm[b].in - _mm[a].in).slice(0, 5));
+  if (_mainNames.size) {
+    const aM = _aggSummaryRow(_allRecs.filter(r => _mainNames.has(r['機種名'])));
+    if (aM) footB += _sumRowB(aM, 'メイン機種 合計（総' + ((typeof _inLabel==='function')?_inLabel(true):'アウト') + '上位' + _mainNames.size + '機種）', 'rgba(0,152,212,.07)');
+  }
+  const _varNames = new Set(Object.keys(_mm).filter(k => _est(_mm[k]) <= 2 && _mm[k].days.size >= 5));
+  if (_varNames.size) {
+    const aV = _aggSummaryRow(_allRecs.filter(r => _varNames.has(r['機種名'])));
+    if (aV) footB += _sumRowB(aV, 'バラエティ 合計（' + _varNames.size + '機種）', 'rgba(0,152,212,.07)');
+  }
+  const _tAgg = _aggSummaryRow(_allRecs);
+  if (_tAgg) footB += _sumRowB(_tAgg, '店舗全体（全機種）', 'rgba(100,116,139,.10)');
+
   tbody.innerHTML = rows.map(r => `<tr>
     <td>${r.name}</td>
     <td>${r.days}日</td>
@@ -11432,7 +11482,7 @@ function renderModelTable() {
     <td class="${colorClass(r.profitRate)}">${r.profitRate.toFixed(1)}%</td>
     <td>${r.coinTanka.toFixed(2)}円</td>
     <td>${r.coinProfit.toFixed(2)}円</td>
-  </tr>`).join('');
+  </tr>`).join('') + footB;
 }
 
 
