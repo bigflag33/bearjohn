@@ -14226,6 +14226,49 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bj-sticky-tbl{ max-height:72vh; }
   .bj-sticky-tbl thead{ position:sticky; top:0; z-index:5; }
   .bj-sticky-tbl thead th{ background:var(--card); }
+  /* AIの週報 β */
+  .bjwk-sec{ margin:0 0 16px; }
+  .bjwk-ttl{ font-size:11px; font-weight:800; color:var(--accent); letter-spacing:1.6px; margin-bottom:5px; font-family:'Hiragino Mincho ProN','Yu Mincho',Georgia,serif; }
+  .bjwk-p{ font-size:13.5px; line-height:2.05; color:var(--text); }
+  .bjwk-p b{ font-weight:800; }
+  .bjwk-note{ font-size:11px; color:var(--text2); margin-top:3px; }
+  .bjwk-tbl{ border-collapse:collapse; font-size:12px; margin:6px 0 2px; }
+  .bjwk-tbl th,.bjwk-tbl td{ border:1px solid var(--border); padding:4px 10px; text-align:right; white-space:nowrap; }
+  .bjwk-tbl th{ background:rgba(0,152,212,.07); font-weight:800; }
+  .bjwk-tbl th:first-child,.bjwk-tbl td:first-child{ text-align:left; }
+  .bjwk-newtbl td:first-child{ white-space:normal; min-width:150px; max-width:250px; line-height:1.5; }
+  .bjwk-p.typing{ cursor:pointer; }
+  .bjwk-p.typing::after{ content:'▋'; margin-left:1px; color:var(--accent); animation:bjbBlink 0.9s steps(1) infinite; }
+  /* 週報レポートシート（#04 PDF風・常に白い紙＝テーマ/印刷非依存） */
+  .bjwk-sheet{ background:#fff; color:#1e293b; border:1px solid var(--border); border-radius:14px; max-width:860px; padding-bottom:16px; overflow:hidden; }
+  .bjwk-sheet .bjb-none{ display:block; padding:18px; }
+  .bjwk-hero{ background:#173a7a; color:#fff; padding:13px 22px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .bjwk-hero-l{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; min-width:0; }
+  .bjwk-hero-en{ font-size:9.5px; letter-spacing:2px; opacity:.7; font-family:'Hiragino Mincho ProN','Yu Mincho',Georgia,serif; white-space:nowrap; }
+  .bjwk-hero-t{ font-size:17.5px; font-weight:800; white-space:nowrap; }
+  .bjwk-hero-s{ font-size:12px; opacity:.85; }
+  .bjwk-hero-k{ font-size:11.5px; opacity:.9; white-space:nowrap; }
+  .bjwk-kpis{ display:flex; gap:10px; padding:14px 18px 0; flex-wrap:wrap; }
+  .bjwk-kpi{ flex:1; min-width:150px; background:#f4f7fb; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; }
+  .bjwk-kpi .k-l{ font-size:10.5px; color:#64748b; }
+  .bjwk-kpi .k-v{ font-size:21px; font-weight:800; color:#0f172a; margin:1px 0; }
+  .bjwk-kpi .k-u{ font-size:11px; font-weight:600; color:#475569; margin-left:2px; }
+  .bjwk-kpi .k-s{ font-size:10.5px; color:#64748b; }
+  .bjwk-kpi .k-s.up{ color:#0f7a4f; } .bjwk-kpi .k-s.dn{ color:#b3261e; }
+  .bjwk-band{ margin:12px 18px 0; background:#fff8e6; border:1px solid #f0e2b6; color:#7a5b00; border-radius:8px; padding:8px 14px; font-size:12px; }
+  .bjwk-sheet .bjwk-sec{ margin:16px 18px 0; }
+  .bjwk-sheet .bjwk-ttl{ color:#173a7a; border-left:4px solid #173a7a; padding-left:8px; }
+  .bjwk-sheet .bjwk-p{ color:#1e293b; }
+  .bjwk-sheet .bjwk-note{ color:#94a3b8; }
+  .bjwk-charts{ display:flex; gap:14px; flex-wrap:wrap; margin:8px 0 6px; }
+  .bjwk-foot{ margin:18px 18px 0; font-size:10px; color:#94a3b8; border-top:1px solid #e2e8f0; padding-top:8px; }
+  @media print{
+    body *{ visibility:hidden; }
+    #bjwkSheet, #bjwkSheet *{ visibility:visible; }
+    #bjwkSheet{ position:absolute; left:0; top:0; width:100%; max-width:none; border:none; border-radius:0; }
+    .bjwk-sec{ break-inside:avoid; }
+    @page{ size:A4; margin:10mm; }
+  }
   .bjp-dates{ font-size:12.5px; color:var(--text2); background:rgba(0,152,212,.06); border:1px solid rgba(0,152,212,.18); border-radius:9px; padding:9px 13px; margin:2px 0 10px; }
   .bjp-dates b{ color:var(--accent); font-weight:800; }
   .bjp-status{ font-size:12px; color:var(--text2); margin:4px 0 14px; }
@@ -14385,6 +14428,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var ROOMS=[['basic','ベーシック'],['week','曜日＆特定日'],['post','ポストイット＆未来予測β'],['report','レポート'],['comp','コンパリゾン'],['payout','出玉配分の答合せ β']];
   // AIの朝礼は開発中＝管理者(admin/ローカル)でのみ表示。法人ページ(USER_ID≠admin)には出さない＝未完成を配信しても見えない
   ROOMS.push(['briefing','AIの朝礼 β']);   // 2026/07/03 台帳#19の改修完了をもって法人ページにも開放（旧: admin限定）
+  ROOMS.push(['weekly','AIの週報 β']);   // 2026/07/17 台帳#07までの磨き込みをもって法人ページにも開放（旧: admin限定）
   var panels={};
   function _bjShowLoading(){
     var ov=document.getElementById('bjLoadingOverlay'); if(!ov) return;
@@ -14401,12 +14445,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     try{ _bjUpdateContext(); }catch(e){}
     if(room==='basic'){ setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); },80); return; }
     // 重い描画はローディング（熊）を挟んで1フレーム後に実行＝スピナーが必ず見える
-    var needHeavy = (room==='report'&&window._bjReportDirty) || (room==='post'&&window._bjReportDirty) || (room==='payout'&&window._bjPayoutDirty) || (room==='briefing');
+    var needHeavy = (room==='report'&&window._bjReportDirty) || (room==='post'&&window._bjReportDirty) || (room==='payout'&&window._bjPayoutDirty) || (room==='briefing') || (room==='weekly');
     var work=function(){
       if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); }
       if(room==='post'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } try{ renderAlertTiles(); }catch(e){} }   // ポストイットはrival依存→先にrival描画してキャッシュ確保
       if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
       if(room==='briefing'){ _bjbRetry=0; try{ _bjbRender(); }catch(e){ console.error('briefing', e); } }   // AIの朝礼：開くたび生成（メモ化済みで軽い）
+      if(room==='weekly'){ _bjwkRetry=0; try{ _bjwkRender(); }catch(e){ console.error('weekly', e); } }   // AIの週報：開くたび生成
     };
     if(needHeavy){ _bjShowLoading(); setTimeout(function(){ try{ work(); } finally { _bjHideLoading(); } }, 60); }   // 60ms＝オーバーレイ描画を待ってから重い処理（rAFは裏タブで止まるため不使用）
     else { work(); }
@@ -15115,6 +15160,615 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     _bjbTypeTimer=setInterval(function(){ i+=1; el.textContent=text.slice(0,i); if(i>=text.length) finish(); }, 24);   // 約42文字/秒（少しゆっくり）
   }
 
+
+
+  // ===== AIの週報 β（admin専用・ルールベース）=====
+  // 週＝月曜〜日曜。月所属＝その週の木曜が属する月（過半数ルール・ISO 8601と同思想）。
+  // 例: 6/29(月)〜7/5(日)は木曜7/2→「7月第1週」。7/27(月)〜8/2(日)は木曜7/30→「7月第5週」。6月に第5週は無い。
+  // 数字はすべてここで独自計算。文面ローテは週シード（Math.random禁止＝タイムマシン再現性）。設計の育成は 週報ラーニング台帳.md。
+  var _bjwkDate=null, _bjwkRetry=0, _bjwkMemo=null, _bjwkMemoKey='';
+  function _bjwkD(ds){ return new Date(ds+'T00:00:00'); }
+  function _bjwkS(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function _bjwkAddD(ds,n){ var d=_bjwkD(ds); d.setDate(d.getDate()+n); return _bjwkS(d); }
+  function _bjwkMonday(ds){ var d=_bjwkD(ds), dow=(d.getDay()+6)%7; d.setDate(d.getDate()-dow); return _bjwkS(d); }
+  function _bjwkWeekOf(ds){ var mon=_bjwkMonday(ds), thu=_bjwkAddD(mon,3);
+    return { mon:mon, sun:_bjwkAddD(mon,6), thu:thu, month:thu.slice(0,7), idx:Math.floor((parseInt(thu.slice(8),10)-1)/7)+1 }; }
+  // 「monthの第n週」を返す。その月に第n週が無ければ最終週（fell=true）
+  function _bjwkNthWeek(month, n){
+    var d=_bjwkD(month+'-01'), dow=d.getDay(), firstThu=1+((4-dow)+7)%7;
+    var lastDay=new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
+    var thuDay=firstThu+(n-1)*7, fell=false;
+    while(thuDay>lastDay){ thuDay-=7; fell=true; }
+    var w=_bjwkWeekOf(month+'-'+String(thuDay).padStart(2,'0')); w.fell=fell; return w;
+  }
+  function _bjwkFmtW(w){ return parseInt(w.month.slice(5),10)+'月第'+w.idx+'週（'+_bjbFmtD(w.mon)+'〜'+_bjbFmtD(w.sun)+'）'; }
+  function _bjwkAgg(M, mon, sun){
+    var days=[], inn=0, tai=0, prof=0, sales=0, df=0;
+    for(var ds=mon; ds<=sun; ds=_bjwkAddD(ds,1)){ var o=M.byD[ds]; if(!o||!o.c)continue;
+      days.push({date:ds, dow:_bjwkD(ds).getDay(), outPT:o.in/o.c, prof:o.p, rate:o.in>0?(o.in+o.df)/o.in*100:null, tai:o.c, inSum:o.in});
+      inn+=o.in; tai+=o.c; prof+=o.p; sales+=o.s; df+=o.df; }
+    if(!days.length||!tai)return null;
+    return { days:days, nDays:days.length, outPT:inn/tai, profPerDay:prof/days.length, profTotal:prof,
+      rate:inn>0?(inn+df)/inn*100:null, profRate:sales>0?prof/sales*100:null, taiAvg:tai/days.length };
+  }
+  function _bjwkMachAgg(M, mon, sun){
+    var res={};
+    Object.keys(M.byMD).forEach(function(mn){ var o=null, md=M.byMD[mn];
+      for(var ds=mon; ds<=sun; ds=_bjwkAddD(ds,1)){ var d=md[ds]; if(!d)continue;
+        if(!o)o={in:0,c:0,df:0,p:0,nd:0}; o.in+=d.in; o.c+=d.c; o.df+=d.diff; o.p+=d.p; o.nd++; }
+      if(o&&o.c)res[mn]={outPT:o.in/o.c, rate:o.in>0?(o.in+o.df)/o.in*100:null, profPT:o.p/o.c, taiAvg:o.c/o.nd, nd:o.nd, in:o.in, sa:o.df, prof:o.p, c:o.c}; });
+    return res;
+  }
+  // ── 計算コア（純関数・DOMなし）: M=朝礼と同じメモ構造, target=基準日（この日より前の情報のみ使う） ──
+  function _bjwkCompute(M, target){
+    var dates=M.allDates.filter(function(d){return d<target;});
+    if(dates.length<35) return {err:'履歴が'+dates.length+'日分のため、週報の生成には35日以上の蓄積が必要です。'};
+    // 対象週＝基準日から見て「日曜まで閉じた」直近の週。データが薄ければ1週ずつ遡る
+    var W=_bjwkWeekOf(_bjwkAddD(_bjwkMonday(target),-1)), cur=null, steps=0;
+    while(steps<12){ cur=_bjwkAgg(M,W.mon,W.sun); if(cur&&cur.nDays>=4)break; W=_bjwkWeekOf(_bjwkAddD(W.mon,-7)); steps++; }
+    if(!cur||cur.nDays<4) return {err:'直近に4日以上データのある完結週（月〜日）が見つかりません。'};
+    // 比較3種
+    var PW=_bjwkWeekOf(_bjwkAddD(W.mon,-7)), prev=_bjwkAgg(M,PW.mon,PW.sun);
+    var pd=_bjwkD(W.month+'-15'); pd.setMonth(pd.getMonth()-1);
+    var MW=_bjwkNthWeek(_bjwkS(pd).slice(0,7), W.idx), lastM=_bjwkAgg(M,MW.mon,MW.sun);
+    var YW=_bjwkNthWeek((parseInt(W.month.slice(0,4),10)-1)+W.month.slice(4), W.idx), lastY=_bjwkAgg(M,YW.mon,YW.sun);
+    // 週次履歴（対象週の前まで）→ 普段の週と店舗適応しきい値
+    var hist=[], m0=_bjwkMonday(dates[0]); if(m0<dates[0])m0=_bjwkAddD(m0,7);
+    for(var mm=m0; _bjwkAddD(mm,6)<W.mon; mm=_bjwkAddD(mm,7)){ var a=_bjwkAgg(M,mm,_bjwkAddD(mm,6)); if(a&&a.nDays>=5){ a.month=_bjwkWeekOf(mm).month; hist.push(a); } }
+    // 年初からの順位（#01・対象週を含むその年の週の中で何番目か）
+    var _yr=W.month.slice(0,4);
+    var _pool=hist.filter(function(h){return h.month.slice(0,4)===_yr;});
+    var nWeeksYear=_pool.length+1;
+    var rankOut=1+_pool.filter(function(h){return h.outPT>cur.outPT;}).length;
+    var rankProf=1+_pool.filter(function(h){return h.profPerDay>cur.profPerDay;}).length;
+    var rec=hist.slice(-8);
+    var usualOut=rec.length?rec.reduce(function(s,x){return s+x.outPT;},0)/rec.length:cur.outPT;
+    var usualProf=rec.length?rec.reduce(function(s,x){return s+x.profPerDay;},0)/rec.length:cur.profPerDay;
+    function sdPct(key){ var pcs=[]; for(var i=1;i<hist.length;i++){ var p=hist[i-1][key],c=hist[i][key]; if(p>0&&c!=null)pcs.push((c-p)/p*100); }
+      if(pcs.length<4)return null; var mu=pcs.reduce(function(a,b){return a+b;},0)/pcs.length;
+      return Math.sqrt(pcs.reduce(function(a,b){return a+(b-mu)*(b-mu);},0)/pcs.length); }
+    var sdO=sdPct('outPT');
+    var thrOut=Math.min(12,Math.max(3, sdO!=null?0.6*sdO:5));                            // アウト週次変化のしきい値(%)
+    var thrYen=Math.max(30000, Math.abs(usualProf)*0.15);                                // 利益変化のしきい値(円・符号安全 #21)
+    // 型判定（先週比）
+    var dOut=(prev&&prev.outPT)?(cur.outPT-prev.outPT)/prev.outPT*100:null;
+    var dProfY=prev?cur.profPerDay-prev.profPerDay:null;
+    var dRate=(cur.rate!=null&&prev&&prev.rate!=null)?cur.rate-prev.rate:null;
+    var kata='平常運転';
+    if(dOut!=null&&dProfY!=null){
+      var oU=dOut>=thrOut, oD=dOut<=-thrOut, pU=dProfY>=thrYen, pD=dProfY<=-thrYen;
+      if(oU&&pU)kata='両取り'; else if(oU&&pD)kata='集客投資'; else if(oU)kata='客数増';
+      else if(oD&&pU)kata='回収'; else if(oD&&pD)kata=(dRate!=null&&dRate>=0.3)?'無駄放出の疑い':(dRate!=null&&dRate<=-0.3)?'締めすぎの疑い':'客離れ注意';
+      else if(oD)kata='客数減'; else if(pU)kata='静かな回収'; else if(pD)kata='利益減';
+    }
+    // 特定日（朝礼と同じ検出器）＋ベースと山
+    var vals=dates.map(function(d){var o=M.byD[d];return o.c>0?o.in/o.c:0;});
+    var stats=_bjbStats(dates,vals), adopted=_bjDetectTokuteibi(dates,vals,stats);
+    function isYama(ds){ var dw=_bjwkD(ds).getDay(); return dw===0||dw===6||isHoliday(ds)||_bjSpecialLift(adopted,ds)>1; }
+    function split(agg){ if(!agg)return null; var b={in:0,t:0},y={in:0,t:0};
+      agg.days.forEach(function(d){ var o=isYama(d.date)?y:b; o.in+=d.inSum; o.t+=d.tai; });
+      return { base:b.t?b.in/b.t:null, yama:y.t?y.in/y.t:null }; }
+    var spCur=split(cur), spPrev=split(prev);
+    cur.days.forEach(function(d){ d.yama=isYama(d.date); });   // 日次グラフの色分け用（#05）
+    // メリハリ収支＋週内ピーク
+    var red=cur.days.filter(function(d){return d.prof<0;});
+    var peak=cur.days.slice().sort(function(a,b){return b.outPT-a.outPT;})[0];
+    var best=cur.days.slice().sort(function(a,b){return b.prof-a.prof;})[0];
+    // 特定日の週間成績（約束を守ったか）
+    var toku=cur.days.filter(function(d){return _bjSpecialLift(adopted,d.date)>1;}).map(function(d){
+      var bp=null,bl=1; _bjDayPats(d.date).forEach(function(p){ if(adopted[p]&&adopted[p]>bl){bl=adopted[p];bp=p;} });
+      var e=_bjbExpOf(stats,adopted,d.date);
+      // 過去6回の同じ特定日と比較（#05・朝礼#10「直近6回平均」と同じ物差し。対象週より前のみ＝タイムマシン安全）
+      var past=bp?dates.filter(function(pd){ return pd<W.mon && _bjDayPats(pd).indexOf(bp)>=0; }).slice(-6):[];
+      var aOut=null, aProf=null;
+      if(past.length>=3){ var so=0, sp=0; past.forEach(function(pd){ var o=M.byD[pd]; so+=o.c?o.in/o.c:0; sp+=o.p; });
+        aOut=so/past.length; aProf=sp/past.length; }
+      return {date:d.date, dow:d.dow, label:bp?_bjPatLabel(bp):'特定日', outPT:d.outPT, exp:e, ratio:e>0?d.outPT/e:null, prof:d.prof,
+        past:past.length, avgOut:aOut, avgProf:aProf}; });
+    // 機種：締め/出し（週比・稼働2台以上＆死に台除外）＋新台通信簿
+    var mc=_bjwkMachAgg(M,W.mon,W.sun), mp=_bjwkMachAgg(M,PW.mon,PW.sun);
+    // 機種ピックアップの共通ゲート（#06: ある程度アウトが入っている機種だけ＝朝礼#03死に台ゲートの週版）
+    // 3台以上×両週とも設置、かつどちらかの週で「max(3,000枚, 店の週平均アウトの35%)」以上動いていること
+    var minOut=Math.max(3000, cur.outPT*0.35);
+    function _mGate(c,p){ return !!(c&&p&&c.taiAvg>=3&&p.taiAvg>=3&&Math.max(c.outPT,p.outPT)>=minOut); }
+    var tight=[], loose=[];
+    Object.keys(mc).forEach(function(mn){ var c=mc[mn],p=mp[mn];
+      if(!_mGate(c,p))return; if(c.rate==null||p.rate==null)return;
+      var dr=c.rate-p.rate; var row={name:mn, dr:dr, rate:c.rate, pRate:p.rate, outPT:c.outPT, profPT:c.profPT, taiAvg:c.taiAvg};
+      if(dr<=-2)tight.push(row); if(dr>=2)loose.push(row); });
+    tight.sort(function(a,b){return a.dr-b.dr;}); loose.sort(function(a,b){return b.dr-a.dr;});
+    // 新台（#02: 今週登場と継続を分ける。全履歴の初出日ベース＝期間指定に依存しない。
+    //        データ蓄積の初期は全機種が「初出」に見えるため、データ開始から14日間は判定しない）
+    var debut=[], cont=[], debutSet={};
+    var _newOK=(W.mon>_bjwkAddD(dates[0],13));
+    if(_newOK)Object.keys(mc).forEach(function(mn){ var md=M.byMD[mn]; var first=null;
+      for(var k in md){ if(!first||k<first)first=k; }
+      if(!first||first<_bjwkAddD(W.mon,-14)||first>W.sun)return;
+      var wk=Math.floor((_bjwkD(W.sun)-_bjwkD(first))/864e5/7)+1;
+      var row={name:mn, first:first, week:wk, outPT:mc[mn].outPT, rate:mc[mn].rate, profPT:mc[mn].profPT, taiAvg:mc[mn].taiAvg};
+      // #11: 登場からの週ごとの成績（初週→2週目→…。7日刻み・対象週の日曜まで＝タイムマシン安全）
+      var wks=[], md2=M.byMD[mn];
+      for(var k=1;k<=wk;k++){
+        var f2=_bjwkAddD(first,(k-1)*7), t2=_bjwkAddD(first,k*7-1); if(t2>W.sun)t2=W.sun;
+        var o2=null;
+        for(var ds2=f2; ds2<=t2; ds2=_bjwkAddD(ds2,1)){ var d2=md2[ds2]; if(!d2)continue;
+          if(!o2)o2={in:0,c:0,df:0,p:0,nd:0}; o2.in+=d2.in; o2.c+=d2.c; o2.df+=d2.diff; o2.p+=d2.p; o2.nd++; }
+        if(o2&&o2.c)wks.push({k:k, outPT:o2.in/o2.c, rate:o2.in>0?(o2.in+o2.df)/o2.in*100:null, profPT:o2.p/o2.c, taiAvg:o2.c/o2.nd});
+      }
+      row.weeks=wks;
+      if(first>=W.mon){ debut.push(row); debutSet[mn]=1; } else cont.push(row); });
+    debut.sort(function(a,b){return b.outPT-a.outPT;}); cont.sort(function(a,b){return b.outPT-a.outPT;});
+    // アウト急増・急減（#06: 台あたりアウトが前週比±20%以上。新台は除外・死に台ゲート適用）
+    var contSet={}; cont.forEach(function(n){contSet[n.name]=1;});
+    var surge=[], drop=[];
+    Object.keys(mc).forEach(function(mn){ if(debutSet[mn]||contSet[mn])return;
+      var c=mc[mn],p=mp[mn]; if(!_mGate(c,p))return;
+      var dpc=(c.outPT-p.outPT)/p.outPT*100;
+      var row={name:mn, pOut:p.outPT, cOut:c.outPT, dPct:dpc, taiAvg:c.taiAvg, rate:c.rate, profPT:c.profPT};
+      if(dpc>=20)surge.push(row); if(dpc<=-20)drop.push(row); });
+    surge.sort(function(a,b){return b.dPct-a.dPct;}); drop.sort(function(a,b){return a.dPct-b.dPct;});
+    // シリーズ別の週間動向（#07: ベーシック/レポートの合計行と同じ分類。パチンコ店は海・エヴァ・北斗に自動切替）
+    var isP=(typeof _isPachinkoStore==='function')?!!_isPachinkoStore():false;
+    var sDefs=isP?[['海物語シリーズ',['海物語']],['エヴァシリーズ',['エヴァ']],['北斗の拳シリーズ',['北斗の拳']]]
+                 :[['ジャグラーシリーズ',['ジャグラー']],['ハナハナシリーズ',['ハナハナ']],['沖ドキシリーズ',['沖ドキ','オキドキ']]];
+    function _serAgg(names, agg){ var t={in:0,sa:0,prof:0,c:0,tai:0};
+      names.forEach(function(mn){ var a=agg[mn]; if(!a)return; t.in+=a.in; t.sa+=a.sa; t.prof+=a.prof; t.c+=a.c; t.tai+=a.taiAvg; });
+      if(!t.c)return null;
+      return {outPT:t.in/t.c, rate:t.in>0?(t.in+t.sa)/t.in*100:null, profPT:t.prof/t.c, tai:t.tai}; }
+    var allNames=Object.keys(mc), usedSer={}, series=[];
+    sDefs.forEach(function(def){
+      var names=allNames.filter(function(mn){ return def[1].some(function(k){return mn.indexOf(k)>=0;}); });
+      if(!names.length)return;
+      names.forEach(function(n){usedSer[n]=1;});
+      var cS=_serAgg(names,mc); if(!cS)return;
+      series.push({label:def[0], models:names.length, names:names, cur:cS, prev:_serAgg(names,mp)}); });
+    // メイン機種群＝シリーズを除く今週の総アウト上位5（前週も同じ顔ぶれで比較）
+    var mainNames=allNames.filter(function(mn){return !usedSer[mn];})
+      .sort(function(a,b){return mc[b].in-mc[a].in;}).slice(0,5);
+    if(mainNames.length){ var cM=_serAgg(mainNames,mc);
+      if(cM)series.push({label:'メイン機種群', note:'総アウト上位'+mainNames.length+'機種', models:mainNames.length, names:mainNames, cur:cM, prev:_serAgg(mainNames,mp)}); }
+    // バラエティ＝推定1〜2台・週4日以上（シリーズ・メインを除く）
+    var varNames=allNames.filter(function(mn){ var a=mc[mn];
+      return Math.round(a.taiAvg)<=2 && a.nd>=4 && !usedSer[mn] && mainNames.indexOf(mn)<0; });
+    if(varNames.length>=3){ var cV=_serAgg(varNames,mc);
+      if(cV)series.push({label:'バラエティ', note:varNames.length+'機種', models:varNames.length, names:varNames, cur:cV, prev:_serAgg(varNames,mp)}); }
+    // 設備の動き（#02: 前営業日比の段差＝朝礼#11と同じ考え方。増減台=|Δ|>=2かつmax>=3、台移動=台数同じで台番が2台以上入替）
+    var equip=[], moved=[];
+    Object.keys(M.byMD).forEach(function(mn){ if(debutSet[mn])return;
+      var md=M.byMD[mn], mdays=Object.keys(md).sort();
+      for(var di=1; di<mdays.length; di++){ var dc=mdays[di]; if(dc<W.mon)continue; if(dc>W.sun)break;
+        var dp=mdays[di-1]; if(_bjwkD(dc)-_bjwkD(dp)>7*864e5)continue;
+        var cc=md[dc].c, cp=md[dp].c;
+        if(Math.abs(cc-cp)>=2 && Math.max(cc,cp)>=3){ equip.push({mn:mn, date:dc, from:cp, to:cc, kind:cc>cp?'増台':'減台',
+          outPT:mc[mn]?mc[mn].outPT:null, profPT:mc[mn]?mc[mn].profPT:null}); break; }
+        if(cc===cp && md[dc].t && md[dp].t){ var sp={}; md[dp].t.forEach(function(x){sp[x]=1;});
+          var diffN=md[dc].t.filter(function(x){return !sp[x];}).length;
+          if(diffN>=2 && cc>=3){ moved.push({mn:mn, date:dc, n:diffN, c:cc,
+            outPT:mc[mn]?mc[mn].outPT:null, profPT:mc[mn]?mc[mn].profPT:null}); break; } }
+      } });
+    // 来週の見どころ
+    var NW=_bjwkWeekOf(_bjwkAddD(W.mon,7));
+    var nToku=[]; for(var ds=NW.mon; ds<=NW.sun; ds=_bjwkAddD(ds,1)){
+      var bl2=1,bp2=null; _bjDayPats(ds).forEach(function(p){ if(adopted[p]&&adopted[p]>bl2){bl2=adopted[p];bp2=p;} });
+      if(bp2)nToku.push({date:ds, label:_bjPatLabel(bp2)}); }
+    // 今週の深掘り（#09: 最も動いたシリーズ1つ。スコア=|店内日次粗利の変化(円)|/1万+|アウト変化率(%)|＝円主義）
+    var deep=null;
+    (function(){ var best=null, bestScore=-1;
+      series.forEach(function(s){ if(!s.prev||!s.prev.outPT)return;
+        var dPr=(s.cur.profPT*s.cur.tai)-(s.prev.profPT*s.prev.tai);
+        var score=Math.abs(dPr)/10000+Math.abs((s.cur.outPT-s.prev.outPT)/s.prev.outPT*100);
+        if(score>bestScore){ bestScore=score; best={s:s, dPr:dPr}; } });
+      if(!best)return;
+      var rowsD=best.s.names.map(function(mn){ var c=mc[mn], p=mp[mn]; if(!c)return null;
+        var contrib=p?Math.abs((c.prof/(c.nd||1))-(p.prof/(p.nd||1))):Math.abs(c.prof/(c.nd||1));
+        return {name:mn, c:c, p:p, contrib:contrib}; }).filter(Boolean)
+        .sort(function(a,b){return b.contrib-a.contrib;}).slice(0,3);
+      if(rowsD.length)deep={label:best.s.label, dPr:best.dPr, hasPrev:!!best.s.prev, rows:rowsD};
+    })();
+    // 4象限マップ用（#08: ゲート通過の全機種。新台は除外・多すぎる場合は変化の大きい40機種）
+    var quad=[];
+    Object.keys(mc).forEach(function(mn){ if(debutSet[mn]||contSet[mn])return;
+      var c=mc[mn], p=mp[mn]; if(!_mGate(c,p))return; if(c.rate==null||p.rate==null||!p.outPT)return;
+      quad.push({name:mn, dr:c.rate-p.rate, dPct:(c.outPT-p.outPT)/p.outPT*100,
+        cOut:c.outPT, pOut:p.outPT, cRate:c.rate, pRate:p.rate, cProf:c.profPT, pProf:p.profPT,
+        impact:Math.abs(c.in/(c.nd||1)-p.in/(p.nd||1))+Math.abs(c.prof/(c.nd||1)-p.prof/(p.nd||1))}); });
+    if(quad.length>40)quad=quad.sort(function(a,b){return (Math.abs(b.dr)+Math.abs(b.dPct)/10)-(Math.abs(a.dr)+Math.abs(a.dPct)/10);}).slice(0,40);
+    return { W:W, cur:cur, PW:PW, prev:prev, MW:MW, lastM:lastM, YW:YW, lastY:lastY,
+      histN:hist.length, nWeeksYear:nWeeksYear, rankOut:rankOut, rankProf:rankProf, yr:_yr, usualOut:usualOut, usualProf:usualProf, thrOut:thrOut, thrYen:thrYen,
+      dOut:dOut, dProfY:dProfY, dRate:dRate, kata:kata, spCur:spCur, spPrev:spPrev,
+      red:{n:red.length, total:red.reduce(function(s,d){return s+d.prof;},0)}, peak:peak, best:best,
+      toku:toku, hasToku:Object.keys(adopted).length>0, tight:tight.slice(0,2), loose:loose.slice(0,2),
+      surge:surge.slice(0,2), drop:drop.slice(0,2), series:series, deep:deep, quad:quad,
+      debut:debut.slice(0,3), cont:cont.slice(0,3), equip:equip.slice(0,5), moved:moved, NW:NW, nToku:nToku,
+      dataFrom:dates[0], dataTo:dates[dates.length-1] };
+  }
+  // ── 文章化（週シードでローテ・符号誠実・円主義） ──
+  function _bjwkPct(v){ return (v>=0?'+':'')+v.toFixed(1)+'%'; }
+  function _bjwkYen(v){ return v<0?_man(-v)+'の赤字':_man(v); }
+  function _bjwkDeltaOut(cur, prev){ if(!prev||prev<=0)return null; var d=cur-prev;
+    if(Math.abs(d)<1)return '横ばい';
+    return Math.abs(Math.round(d)).toLocaleString()+'枚'+(d>=0?'増':'減')+'・'+_bjwkPct(d/prev*100); }
+  function _bjwkDeltaYen(cur, prev){ if(prev==null)return null; var d=cur-prev;
+    if(Math.abs(d)<1000)return 'ほぼ横ばい';
+    var s=_man(Math.abs(d))+'の'+(d>=0?'増加':'減少');
+    if(prev>0)s+='・'+_bjwkPct(d/prev*100);
+    return s; }
+  function _bjwkFmtWY(w){ return w.month.slice(0,4)+'年'+_bjwkFmtW(w); }
+  function _bjwkProse(C, sName){
+    var W=C.W, cur=C.cur;
+    var _ws=parseInt(W.mon.slice(8),10)+parseInt(W.mon.slice(5,7),10)*31;
+    var _pk=function(arr){return arr[_ws%arr.length];};
+    var H=[];
+    var kataTxt={'両取り':'客数を増やしながら利益も伸ばす「両取り」','集客投資':'利益を先払いして客数を買う「集客投資」','客数増':'客数がじわりと増えた','回収':'客数を落としてでも利益を取りにいく「回収」','無駄放出の疑い':'出しているのに客数が減る「無駄放出」の疑いがある','締めすぎの疑い':'締めた分だけ客が抜けた「締めすぎ」の疑いがある','客離れ注意':'客数・利益ともに沈んだ要注意の','客数減':'客数が細った','静かな回収':'客数を保ったまま利益を積んだ「静かな回収」の','利益減':'客数横ばいのまま利益が痩せた','平常運転':'大きな動きのない平常運転の'};
+    // ① 総評
+    var _dO=C.prev?_bjwkDeltaOut(cur.outPT,C.prev.outPT):null;
+    var _dP=C.prev?_bjwkDeltaYen(cur.profPerDay,C.prev.profPerDay):null;
+    var p1=_pk(['おはようございます。','週明けの整理です。','先週のまとめです。'])+_bjwkFmtW(W)+'の'+sName+'は、'
+      +'台あたりアウトが週平均<b>'+Math.round(cur.outPT).toLocaleString()+'枚</b>'+(_dO?'（前週から'+_dO+'）':'')
+      +'、店の粗利は日あたり<b>'+_bjwkYen(cur.profPerDay)+'</b>'+(_dP?'（前週から'+_dP+'）':'')+'。'
+      +'型で言えば<b>'+kataTxt[C.kata]+'</b>一週間でした。'
+      +(cur.rate!=null?'出玉率は'+cur.rate.toFixed(1)+'%'+(C.dRate!=null?'（前週比'+(C.dRate>=0?'+':'')+C.dRate.toFixed(1)+'pt）':'')+'。':'')
+      +(cur.nDays<7?'<span class="bjwk-note">※この週のデータは'+cur.nDays+'日分です。</span>':'');
+    H.push(['総評', p1]);
+    // ② ものさし（先月同週・前年同週）
+    var p2='先月同週比較（'+_bjwkFmtW(C.MW)+'）→ ';
+    if(C.lastM){ p2+='アウトは<b>'+_bjwkDeltaOut(cur.outPT,C.lastM.outPT)+'</b>、日あたり粗利は<b>'+_bjwkDeltaYen(cur.profPerDay,C.lastM.profPerDay)+'</b>。';
+      if(C.MW.fell)p2+='<span class="bjwk-note">※先月に第'+W.idx+'週は無いため最終週（第'+C.MW.idx+'週）と比較。</span>'; }
+    else p2+='データなし。';
+    p2+='<br>前年同週比較（'+_bjwkFmtWY(C.YW)+'）→ ';
+    if(C.lastY){ p2+='アウトは<b>'+_bjwkDeltaOut(cur.outPT,C.lastY.outPT)+'</b>、日あたり粗利は<b>'+_bjwkDeltaYen(cur.profPerDay,C.lastY.profPerDay)+'</b>。'; }
+    else p2+='データなし（52週分たまると自動で出ます）。';
+    H.push(['ものさし（先月同週・前年同週）', p2]);
+    // ③ ベースと山
+    if(C.spCur&&C.spCur.base!=null){
+      var p3='平日のベース稼働（土日祝・特定日を除く）は台あたり<b>'+Math.round(C.spCur.base).toLocaleString()+'枚</b>';
+      if(C.spPrev&&C.spPrev.base)p3+='（前週から'+_bjwkDeltaOut(C.spCur.base,C.spPrev.base)+'）';
+      if(C.spCur.yama!=null){ p3+='、山の日（土日祝・特定日）は<b>'+Math.round(C.spCur.yama).toLocaleString()+'枚</b>';
+        if(C.spPrev&&C.spPrev.yama)p3+='（同'+_bjwkDeltaOut(C.spCur.yama,C.spPrev.yama)+'）'; }
+      p3+='。'+_pk(['ベースは店の体力、山は集客力です。','ベースが痩せずに山が伸びるのが理想の形です。','山だけ崩れる週は競合のイベントに客を取られたサインです。']);
+      if(C.peak)p3+=' 週内のピークは'+_bjbFmtD(C.peak.date)+'（'+'日月火水木金土'[C.peak.dow]+'）の'+Math.round(C.peak.outPT).toLocaleString()+'枚でした。';
+      H.push(['ベースと山', p3]);
+    }
+    // ④ メリハリ収支（#05: 月〜日の日次グラフつき・特定日は通信簿セグへ独立）
+    var p4='';
+    if(C.red.n>0)p4+='この週は<b>赤字の日が'+C.red.n+'日</b>（合計'+_man(-C.red.total)+'の持ち出し）。';
+    else p4+='この週に赤字の日はありませんでした。';
+    if(C.best&&C.best.prof>0)p4+='一番稼いだ日は'+_bjbFmtD(C.best.date)+'（'+'日月火水木金土'[C.best.dow]+'）の'+_man(C.best.prof)+'です。';
+    H.push(['メリハリ収支（月〜日）', p4]);
+    // ⑤ 特定日の通信簿（#05: 特定日パターンは長期履歴から検出、成績は過去6回の同じ特定日の平均と比較）
+    var p4b='';
+    if(C.toku.length){
+      p4b=C.toku.map(function(t){
+        var line=_bjbFmtD(t.date)+'（'+'日月火水木金土'[t.dow]+'）<b>'+t.label+'</b> → アウト<b>'+Math.round(t.outPT).toLocaleString()+'枚</b>';
+        var g=null;
+        if(t.avgOut&&t.avgProf!=null){
+          line+='（過去'+t.past+'回平均'+Math.round(t.avgOut).toLocaleString()+'枚と比べ'+_bjwkDeltaOut(t.outPT,t.avgOut)+'）・店粗利'+_bjwkYen(Math.round(t.prof))+'（同平均'+_bjwkYen(Math.round(t.avgProf))+'）';
+          var orr=t.outPT/t.avgOut, pdf=t.prof-t.avgProf, thr=Math.max(30000,Math.abs(t.avgProf)*0.15);
+          if(orr>=1.08&&pdf>=thr)g='集めながら取れた満点の特定日';
+          else if(orr>=1.08&&pdf<=-thr)g='出して集めた投資日';
+          else if(orr<0.92&&pdf>=thr)g='客減を締めて補填';
+          else if(orr<0.92)g='集客不発';
+          else if(pdf>=thr)g='普段の客で静かに回収';
+          else if(pdf<=-thr)g='集客は普段どおり・利益は薄め';
+          else g='ほぼ普段どおり';
+        } else {
+          line+='・店粗利'+_bjwkYen(Math.round(t.prof))+'<span class="bjwk-note">（過去の同じ特定日がまだ'+t.past+'回のため通信簿は付けられません）</span>';
+        }
+        return line+(g?' → <b>'+g+'</b>':'');
+      }).join('<br>');
+    } else if(C.hasToku){ p4b='この週に、この店の特定日パターン（長期履歴から検出）に該当する日はありませんでした。'; }
+    else { p4b='この店にはまだ明確な特定日パターンが検出されていません。履歴がたまると自動で検出されます。'; }
+    H.push(['特定日の通信簿', p4b]);
+    // ⑤ 新台（#02独立・#10テーブル化・#11週推移＝初週→2週目→3週目を行で積む。最下行=今回の週）
+    function _newTrs(n){
+      var wks=(n.weeks&&n.weeks.length)?n.weeks:[{k:n.week, outPT:n.outPT, rate:n.rate, profPT:n.profPT, taiAvg:n.taiAvg}];
+      return wks.map(function(w,i){
+        var wait=(w.outPT<500), cur=(i===wks.length-1);
+        return '<tr'+((cur&&wks.length>1)?' style="background:rgba(0,152,212,.07);font-weight:700;"':'')+'>'
+          +'<td>'+(i===0?n.name:'')+'</td><td>'+(i===0?_bjbFmtD(n.first):'')+'</td>'
+          +'<td>'+Math.round(w.taiAvg)+'台</td><td>'+(w.k===1?'初週':'第'+w.k+'週目')+'</td>'
+          +'<td>'+(wait?'検査待ち':Math.round(w.outPT).toLocaleString()+'枚')+'</td>'
+          +'<td>'+((!wait&&w.rate!=null)?w.rate.toFixed(1)+'%':'-')+'</td>'
+          +'<td>'+(!wait?_bjwkYen(Math.round(w.profPT))+'/日':'-')+'</td></tr>';
+      }).join('');
+    }
+    var _ntr=C.debut.map(_newTrs).concat(C.cont.map(_newTrs));
+    var p5n=_ntr.length
+      ?'<div style="overflow-x:auto;"><table class="bjwk-tbl bjwk-newtbl"><thead><tr><th>機種名</th><th>登場</th><th>台数</th><th>週</th><th>台あたりアウト</th><th>出玉率</th><th>台粗利</th></tr></thead><tbody>'+_ntr.join('')+'</tbody></table></div>'
+      :'この週に新しい機種の登場はありませんでした。';
+    H.push(['新台', p5n]);
+    // ⑥ 増台・減台・レイアウト変更（#02新設・#03「設備」表現廃止＋ダイジェスト行・日付順）
+    function _eqNum(e){ return (e.outPT!=null)?('・週のアウト'+Math.round(e.outPT).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(e.profPT))+'/日'):''; }
+    var _er=C.equip.map(function(e){return {d:e.date, t:_bjbFmtD(e.date)+' <b>'+e.mn+'</b> → '+e.from+'台→'+e.to+'台（'+e.kind+'）'+_eqNum(e)};})
+      .concat(C.moved.slice(0,5).map(function(e){return {d:e.date, t:_bjbFmtD(e.date)+' <b>'+e.mn+'</b> → '+e.n+'台入替（レイアウト変更）'+_eqNum(e)};}));
+    _er.sort(function(a,b){return a.d<b.d?-1:1;});
+    var p6e=_er.length?_er.map(function(x){return x.t;}).join('<br>')+(C.moved.length>5?'<br>ほかレイアウト変更'+(C.moved.length-5)+'機種':''):'この週に増台・減台・レイアウト変更はありませんでした。';
+    H.push(['増台・減台・レイアウト変更', p6e]);
+    // ⑦ シリーズ別の週間動向（#07: 面の話。ミニ型判定つき）
+    var pSer='';
+    if(C.series&&C.series.length){
+      pSer=C.series.map(function(s){
+        var line='<b>'+s.label+'</b>（'+(s.note?s.note+'・':'')+Math.round(s.cur.tai)+'台）→ アウト<b>'+Math.round(s.cur.outPT).toLocaleString()+'枚</b>';
+        if(s.prev&&s.prev.outPT)line+='（前週から'+_bjwkDeltaOut(s.cur.outPT,s.prev.outPT)+'）';
+        if(s.cur.rate!=null){ line+='・出玉率'+s.cur.rate.toFixed(1)+'%';
+          if(s.prev&&s.prev.rate!=null)line+='（'+((s.cur.rate-s.prev.rate)>=0?'+':'')+(s.cur.rate-s.prev.rate).toFixed(1)+'pt）'; }
+        line+='・台粗利'+_bjwkYen(Math.round(s.cur.profPT))+'/日';
+        if(s.prev&&s.prev.outPT&&s.prev.rate!=null&&s.cur.rate!=null){
+          var dO=(s.cur.outPT-s.prev.outPT)/s.prev.outPT*100, dR=s.cur.rate-s.prev.rate;
+          var oU=dO>=5, oD=dO<=-5, rU=dR>=0.4, rD=dR<=-0.4, g;
+          if(oU&&rU)g='開けて集客中'; else if(oU)g='率据え置きで客増の理想形';
+          else if(oD&&rD)g='締めた分だけ客が抜けた'; else if(oD)g='客離れ注意（率は据え置き）';
+          else if(rD)g='客を保って静かに回収'; else if(rU)g='還元中（客はまだ横ばい）'; else g='平常運転';
+          line+=' — '+g;
+        }
+        return line;
+      }).join('<br>');
+    } else pSer='シリーズとして集計できる機種群がありませんでした。';
+    if(C.deep){
+      pSer+='<br><br><b>今週の深掘り：'+C.deep.label+'</b>　'
+        +_pk(['この週いちばん動いた顔ぶれです。','シリーズの中で最も数字が動いた持ち場です。','数字が一番動いた持ち場です。']);
+      if(C.deep.hasPrev)pSer+='<br>店内の日次粗利は前週から'+(C.deep.dPr>=0?_man(C.deep.dPr)+'の増加':_man(-C.deep.dPr)+'の減少')+'。中身を機種で分解すると：';
+      pSer+='<br>'+C.deep.rows.map(function(r){ var c=r.c, p=r.p;
+        var line='<b>'+r.name+'</b>（'+Math.round(c.taiAvg)+'台）→ ';
+        if(p){ line+='アウト'+Math.round(p.outPT).toLocaleString()+'→'+Math.round(c.outPT).toLocaleString()+'枚';
+          if(p.rate!=null&&c.rate!=null)line+='・出玉率'+p.rate.toFixed(1)+'%→'+c.rate.toFixed(1)+'%';
+          line+='・台粗利'+_bjwkYen(Math.round(p.profPT))+'→'+_bjwkYen(Math.round(c.profPT))+'/日'; }
+        else line+='アウト'+Math.round(c.outPT).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(c.profPT))+'/日（前週データなし）';
+        return line; }).join('<br>');
+      if(C.deep.rows.length&&C.deep.rows[0].p){ var _r0=C.deep.rows[0], _d0=(_r0.c.prof/(_r0.c.nd||1))-(_r0.p.prof/(_r0.p.nd||1));
+        pSer+='<br>動きの主役は<b>'+_r0.name+'</b>（店内の日次粗利を'+(_d0>=0?_man(_d0)+'押し上げ':_man(-_d0)+'押し下げ')+'）です。'; }
+    }
+    H.push(['シリーズ別の週間動向', pSer]);
+    // ⑧ 機種の週間動向（#03ダイジェスト行・#06数値併記＋アウト急増急減＋死に台ゲート）
+    var _kl=[];
+    function _mrow(m){ return '<b>'+m.name+'</b>（出玉率'+m.pRate.toFixed(1)+'%→'+m.rate.toFixed(1)+'%・'+Math.round(m.taiAvg)+'台・アウト'+Math.round(m.outPT).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(m.profPT))+'/日）'; }
+    function _srow(m){ return '<b>'+m.name+'</b>（'+Math.round(m.pOut).toLocaleString()+'→'+Math.round(m.cOut).toLocaleString()+'枚・'+_bjwkPct(m.dPct)+'・'+Math.round(m.taiAvg)+'台・台粗利'+_bjwkYen(Math.round(m.profPT))+'/日）'; }
+    if(C.tight.length)_kl.push('締め方向 → '+C.tight.map(_mrow).join('、'));
+    if(C.loose.length)_kl.push('開け方向 → '+C.loose.map(_mrow).join('、'));
+    if(C.surge.length)_kl.push('アウト急増 → '+C.surge.map(_srow).join('、'));
+    if(C.drop.length)_kl.push('アウト急減 → '+C.drop.map(_srow).join('、'));
+    var p5=_kl.length?_kl.join('<br>'):'主要機種（3台以上・一定のアウトが入っている機種）に大きな設定変化・稼働変化は見られませんでした。';
+    p5+='<br><span class="bjwk-note">※3台以上かつ一定のアウトが入っている機種のみを対象にしています。機種ごとの詳細はレポートタブをご覧ください。</span>';
+    H.push(['機種の週間動向（先週対比）', p5]);
+    // ⑨ 機種マップ（#10: 4象限の別途テキスト。A/B/C/D・影響の大きい機種優先）
+    var pQ='';
+    if(C.quad&&C.quad.length){
+      function _qrow(q){ return '<b>'+q.name+'</b>（出玉率'+q.pRate.toFixed(1)+'%→'+q.cRate.toFixed(1)+'%・アウト'+Math.round(q.pOut).toLocaleString()+'→'+Math.round(q.cOut).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(q.pProf))+'→'+_bjwkYen(Math.round(q.cProf))+'/日）'; }
+      function _qpick(f){ return C.quad.filter(f).sort(function(a,b){return b.impact-a.impact;}).slice(0,2); }
+      var _qa=_qpick(function(q){return q.dr>=1&&q.dPct>=8;});
+      var _qb=_qpick(function(q){return q.dr>=1&&q.dPct<=-8;});
+      var _qc=_qpick(function(q){return q.dr<=-1&&q.dPct>=8;});
+      var _qd=_qpick(function(q){return q.dr<=-1&&q.dPct<=-8;});
+      var _ql=[];
+      if(_qa.length)_ql.push('<b>A. 開けて客が増えた（狙いどおりの放出）</b> → '+_qa.map(_qrow).join('、'));
+      if(_qb.length)_ql.push('<b>B. 開けたのに客が減った（無駄放出の疑い・要チェック）</b> → '+_qb.map(_qrow).join('、'));
+      if(_qc.length)_ql.push('<b>C. 締めても客が増えた（理想の展開）</b> → '+_qc.map(_qrow).join('、'));
+      if(_qd.length)_ql.push('<b>D. 締めたら客も減った（締めすぎの可能性）</b> → '+_qd.map(_qrow).join('、'));
+      pQ=_ql.length?_ql.join('<br>'):'はっきり象限に振れた機種はありませんでした（中央付近＝平常運転）。';
+      pQ+='<br><span class="bjwk-note">各象限とも店への影響が大きい機種（日次アウト・粗利の動き）から最大2機種。判定は出玉率±1pt×アウト±8%以上。</span>';
+    } else pQ='先週と比較できる機種がありませんでした。';
+    H.push(['機種マップ（開け締め×客数の全体図）', pQ]);
+    // ⑥ 来週の見どころ
+    var p6='来週は'+_bjwkFmtW(C.NW)+'。';
+    if(C.nToku.length)p6+='特定日は'+C.nToku.map(function(t){return _bjbFmtD(t.date)+'（'+t.label+'）';}).join('、')+'。';
+    else p6+='この店の特定日パターンに該当する日はありません。';
+    var _na=C.debut.concat(C.cont);
+    if(_na.length)p6+=' '+_na[0].name+'は導入第'+(_na[0].week+1)+'週目に入ります。';
+    p6+=_pk([' 山の日の前日に仕込みが入るか、ベースが守られるかに注目です。',' 先週の型が続くのか、切り替わるのかを見る一週間です。',' 特定日の約束が守られるかが最初のチェックポイントです。']);
+    H.push(['来週の見どころ', p6]);
+    return H;
+  }
+  // ── 描画 ──
+  function buildWeeklyTab(panel){
+    if(!panel||document.getElementById('bjwkBody'))return;
+    panel.innerHTML=''
+      +'<div class="bjb-bar" style="margin-bottom:10px;">'
+      +'<span class="bj-wordmark" style="font-size:15px;white-space:nowrap;cursor:help;" title="AIの週報 β ── 表示中の店舗の「先週（月〜日）」を自動でふり返ります。週の月所属はその週の木曜日が属する月で数えます（例: 6/29週は7月第1週）。基準日を変えると過去の週報を当時の情報だけで再現します。">WEEKLY REPORT <span style="font-size:10px;color:var(--text2);">β</span></span>'
+      +'基準日：<input type="date" id="bjwkDateInp">'
+      +'<a href="javascript:void(0)" id="bjwkToday" class="bjb-todaybtn">今日に戻る</a>'
+      +'<button class="bjp-info" id="bjwkPrint" style="margin-left:8px;">印刷・PDF保存</button>'
+      +'<span id="bjwkTmNote" class="bjb-tmnote"></span></div>'
+      +'<div class="bjwk-sheet" id="bjwkSheet"><div id="bjwkBody"><div style="padding:18px;">タブを開くと生成します…</div></div></div>';
+    var di=document.getElementById('bjwkDateInp');
+    if(di){ di.value=_bjbTodayStr(); di.addEventListener('change',function(){ _bjwkDate=(di.value&&di.value!==_bjbTodayStr())?di.value:null; _bjwkRenderLoading(); }); }
+    var tb=document.getElementById('bjwkToday');
+    if(tb)tb.addEventListener('click',function(){ _bjwkDate=null; if(di)di.value=_bjbTodayStr(); _bjwkRenderLoading(); });
+    var pb=document.getElementById('bjwkPrint');
+    if(pb)pb.addEventListener('click',function(){ _bjwkFillAll(); setTimeout(function(){ window.print(); },80); });   // 印刷前にタイプ演出を全完了
+    window.addEventListener('beforeprint', _bjwkFillAll);
+  }
+  function _bjwkRenderLoading(){ _bjShowLoading(); setTimeout(function(){ try{ _bjwkRender(); }catch(e){ console.error('weekly',e); } finally { _bjHideLoading(); } },60); }
+  // 全セクション即表示（印刷前・再訪時に使用）
+  function _bjwkFillAll(){ var H=window._bjwkLastH; if(!H)return; _bjwkTypeSkip=true;
+    if(_bjwkTypeTimer){ clearInterval(_bjwkTypeTimer); _bjwkTypeTimer=null; }
+    H.forEach(function(sec,i){ var el=document.getElementById('bjwkP'+i); if(el){ el.classList.remove('typing'); el.onclick=null; el.innerHTML=sec[1]; } }); }
+  // Chart.js棒グラフ（#04: 棒の上に数値・アニメなし・固定サイズ＝印刷安定）
+  var _bjwkCharts=[];
+  function _bjwkBar(id, labels, datasets, opts){
+    var el=document.getElementById(id); if(!el||typeof Chart==='undefined')return;
+    var ch=new Chart(el.getContext('2d'), { type:'bar',
+      data:{ labels:labels, datasets:datasets },
+      options:(function(){ var sc;
+        if(opts.horiz){ sc={ x:{beginAtZero:true, ticks:{font:{size:9}, color:'#94a3b8'}, grid:{color:'#eef2f7'}},
+                 y:{ticks:{font:{size:9.5}, color:'#475569'}, grid:{display:false}} }; }
+        else { sc={ y:{beginAtZero:true, ticks:{font:{size:9}, color:'#94a3b8'}, grid:{color:'#eef2f7'}},
+                 x:{ticks:{font:{size:9.5}, color:'#475569'}, grid:{display:false}} };
+          if(opts.y2)sc.y1={ position:'right', ticks:{font:{size:9}, color:'#c2410c'}, grid:{display:false} }; }
+        return { responsive:false, animation:false, indexAxis:opts.horiz?'y':'x',
+        layout:{padding:{top:16, right:opts.horiz?40:0}},
+        plugins:{ legend:opts.legend?{display:true, position:'top', labels:{boxWidth:12, font:{size:10}, color:'#475569'}}:{display:false},
+          title:opts.title?{display:true, text:opts.title, font:{size:11, weight:'bold'}, color:'#334155'}:{display:false}, tooltip:{enabled:false} },
+        scales:sc }; })(),
+      plugins:[{ afterDatasetsDraw:function(c){ var ctx=c.ctx; ctx.save(); ctx.font='bold 10px sans-serif'; ctx.fillStyle='#334155';
+        c.data.datasets.forEach(function(ds,di){ if(ds.type==='line')return; var meta=c.getDatasetMeta(di); meta.data.forEach(function(bar,i){ var v=ds.data[i]; if(v==null)return;
+          var txt=opts.fmt?opts.fmt(v):v;
+          if(c.options.indexAxis==='y'){ ctx.textAlign=(v>=0)?'left':'right'; ctx.fillText(txt, bar.x+(v>=0?4:-4), bar.y+3.5); }
+          else { ctx.textAlign='center'; ctx.fillText(txt, bar.x, bar.y-4); } }); }); ctx.restore(); } }]
+    });
+    _bjwkCharts.push(ch);
+  }
+  function _bjwkShort(s){ return s.length>11?s.slice(0,11)+'…':s; }
+  // 4象限の機種マップ（#08 案2: x=出玉率の変化pt・y=アウトの変化%。象限で型が見える）
+  function _bjwkScatter(id, pts, opts){
+    var el=document.getElementById(id); if(!el||typeof Chart==='undefined')return;
+    var mx=Math.max(3, Math.max.apply(null, pts.map(function(p){return Math.abs(p.dr);})))*1.25;
+    var my=Math.max(25, Math.max.apply(null, pts.map(function(p){return Math.abs(p.dPct);})))*1.2;
+    function col(p){ if(p.dr>=0&&p.dPct>=0)return '#c2410c'; if(p.dr<0&&p.dPct>=0)return '#0f7a4f';
+      if(p.dr>=0)return '#b3261e'; return '#1e5fa8'; }
+    var ch=new Chart(el.getContext('2d'), { type:'scatter',
+      data:{ datasets:[{ data:pts.map(function(p){return {x:+p.dr.toFixed(2), y:+p.dPct.toFixed(1)};}),
+        pointBackgroundColor:pts.map(col), pointRadius:4.5, pointBorderWidth:0 }] },
+      options:{ responsive:false, animation:false,
+        plugins:{ legend:{display:false}, tooltip:{enabled:false},
+          title:{display:true, text:opts.title, font:{size:11, weight:'bold'}, color:'#334155'} },
+        scales:{ x:{min:-mx, max:mx, title:{display:true, text:'出玉率の変化（pt）', font:{size:9.5}, color:'#64748b'}, ticks:{font:{size:9}, color:'#94a3b8'}, grid:{color:'#f1f5f9'}},
+                 y:{min:-my, max:my, title:{display:true, text:'アウトの変化（%）', font:{size:9.5}, color:'#64748b'}, ticks:{font:{size:9}, color:'#94a3b8'}, grid:{color:'#f1f5f9'}} } },
+      plugins:[{ afterDraw:function(c){ var ctx=c.ctx, xs=c.scales.x, ys=c.scales.y;
+        ctx.save();
+        ctx.strokeStyle='#cbd5e1'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(xs.getPixelForValue(0), ys.top); ctx.lineTo(xs.getPixelForValue(0), ys.bottom); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(xs.left, ys.getPixelForValue(0)); ctx.lineTo(xs.right, ys.getPixelForValue(0)); ctx.stroke();
+        ctx.font='9px sans-serif'; ctx.fillStyle='#94a3b8';
+        ctx.textAlign='right'; ctx.fillText('開けて客増', xs.right-4, ys.top+10);
+        ctx.textAlign='left';  ctx.fillText('締めても客増（理想）', xs.left+4, ys.top+10);
+        ctx.textAlign='right'; ctx.fillText('開けたのに客減（無駄放出の疑い）', xs.right-4, ys.bottom-5);
+        ctx.textAlign='left';  ctx.fillText('締めて客減', xs.left+4, ys.bottom-5);
+        ctx.font='8.5px sans-serif'; ctx.fillStyle='#475569'; ctx.textAlign='left';
+        pts.forEach(function(p){ if(Math.abs(p.dr)>=2||Math.abs(p.dPct)>=20){
+          var px=xs.getPixelForValue(+p.dr.toFixed(2)), py=ys.getPixelForValue(+p.dPct.toFixed(1));
+          ctx.fillText(_bjwkShort(p.name), Math.min(px+5, xs.right-64), py-5); } });
+        ctx.restore(); } }]
+    });
+    _bjwkCharts.push(ch);
+  }
+  // タイプライター演出（#02: 朝礼と同じ24ms・クリックで残り即表示・店舗×基準日×対象週が同じ間は再演出しない）
+  var _bjwkTypedKey='', _bjwkTypeTimer=null, _bjwkTypeSkip=false;
+  function _bjwkPlain(html){ return html.replace(/<br\s*\/?>/gi, String.fromCharCode(10)).replace(/<\/tr>/gi, String.fromCharCode(10)).replace(/<\/t[dh]>/gi,'　').replace(/<[^>]+>/g,''); }
+  function _bjwkTypeSecs(H, i){
+    if(i>=H.length)return;
+    var el=document.getElementById('bjwkP'+i); if(!el)return;
+    if(_bjwkTypeSkip){ el.innerHTML=H[i][1]; _bjwkTypeSecs(H,i+1); return; }
+    var text=_bjwkPlain(H[i][1]), k=0, done=false;
+    if(_bjwkTypeTimer){ clearInterval(_bjwkTypeTimer); _bjwkTypeTimer=null; }
+    el.classList.add('typing');
+    function finish(){ if(_bjwkTypeTimer){clearInterval(_bjwkTypeTimer);_bjwkTypeTimer=null;} el.classList.remove('typing'); el.onclick=null; el.innerHTML=H[i][1]; if(!done){done=true; _bjwkTypeSecs(H,i+1);} }
+    el.onclick=function(){ _bjwkTypeSkip=true; finish(); };
+    _bjwkTypeTimer=setInterval(function(){ k+=1; el.textContent=text.slice(0,k); if(k>=text.length)finish(); },24);
+  }
+  function _bjwkRender(){
+    var body=document.getElementById('bjwkBody'); if(!body)return;
+    var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
+    if(!recs.length){ _bjwkRetry++;
+      if(_bjwkRetry<=15){ body.innerHTML='<div class="bjb-none">データ読み込み中…</div>';
+        setTimeout(function(){ if(window._bjRoom==='weekly'){ try{ _bjwkRender(); }catch(e){} } },400); }
+      else body.innerHTML='<div class="bjb-none">この店舗にデータがありません。</div>';
+      return; }
+    _bjwkRetry=0;
+    var st0=(typeof getActiveStore==='function')?getActiveStore():null;
+    var sName=(st0&&st0.name)?st0.name:'この店舗';
+    var _lastRec=''; for(var i=0;i<recs.length;i++){ var d0=recs[i]&&recs[i].date; if(d0&&d0>_lastRec)_lastRec=d0; }
+    var key='wk2|'+((st0&&st0.key)||'')+'|'+recs.length+'|'+_lastRec;
+    var M;
+    if(_bjwkMemoKey===key&&_bjwkMemo){ M=_bjwkMemo; }
+    else { var byD={}, byMD={};
+      for(var j=0;j<recs.length;j++){ var r=recs[j]; if(!r.date)continue;
+        var inv=(+r['IN枚数']||0), df=(+r['差枚']||0), pr=(+r['台粗利']||0), sl=(+r['台売上']||0), mn=r['機種名'];
+        if(!byD[r.date])byD[r.date]={in:0,c:0,p:0,df:0,s:0}; var bd=byD[r.date]; bd.in+=inv; bd.c++; bd.p+=pr; bd.df+=df; bd.s+=sl;
+        if(mn){ if(!byMD[mn])byMD[mn]={}; if(!byMD[mn][r.date])byMD[mn][r.date]={in:0,c:0,diff:0,p:0,t:[]};
+          var o=byMD[mn][r.date]; o.in+=inv; o.c++; o.diff+=df; o.p+=pr; o.t.push(r['台番']); } }
+      M={byD:byD, byMD:byMD, allDates:Object.keys(byD).sort()};
+      _bjwkMemo=M; _bjwkMemoKey=key; }
+    var todayS=_bjbTodayStr(), target=_bjwkDate||todayS;
+    var tm=document.getElementById('bjwkTmNote');
+    if(tm)tm.textContent=_bjwkDate?('タイムマシン再現中：'+_bjbFmtD(target)+' 時点の情報のみで生成'):'';
+    var C=_bjwkCompute(M, target);
+    if(C.err){ body.innerHTML='<div class="bjb-none">'+C.err+'</div>'; return; }
+    var H=_bjwkProse(C, sName);
+    window._bjwkLastH=H;
+    if(_bjwkTypeTimer){ clearInterval(_bjwkTypeTimer); _bjwkTypeTimer=null; }
+    _bjwkCharts.forEach(function(c){ try{ c.destroy(); }catch(e){} }); _bjwkCharts=[];
+    // ── レポートシート組み立て（#04: PDF風）──
+    var cur=C.cur, dowJ='日月火水木金土';
+    var hero='<div class="bjwk-hero"><div class="bjwk-hero-l">'
+      +'<span class="bjwk-hero-en">WEEKLY REPORT</span>'
+      +'<span class="bjwk-hero-t">'+C.yr+'年 '+_bjwkFmtW(C.W)+'</span>'
+      +'<span class="bjwk-hero-s">週次レポート　'+_bjEsc(sName)+'</span>'
+      +'</div><div class="bjwk-hero-k">'+_bjEsc(C.kata)+'の一週間</div></div>';
+    function _kpi(label, val, unit, sub, cls){ return '<div class="bjwk-kpi"><div class="k-l">'+label+'</div><div class="k-v">'+val+'<span class="k-u">'+unit+'</span></div><div class="k-s '+(cls||'')+'">'+sub+'</div></div>'; }
+    var _dO2=C.prev?_bjwkDeltaOut(cur.outPT,C.prev.outPT):null;
+    var _dP2=C.prev?_bjwkDeltaYen(cur.profPerDay,C.prev.profPerDay):null;
+    var _pkToku=C.toku.filter(function(t){return t.date===C.peak.date;})[0];
+    var kpis='<div class="bjwk-kpis">'
+      +_kpi('台あたりアウト', Math.round(cur.outPT).toLocaleString(), '枚/日', _dO2?'前週から'+_dO2:'前週データなし', (C.dOut!=null&&C.dOut<0)?'dn':'up')
+      +_kpi('店の粗利', _bjwkYen(cur.profPerDay), '/日', _dP2?'前週から'+_dP2:'前週データなし', (C.dProfY!=null&&C.dProfY<0)?'dn':'up')
+      +_kpi('出玉率', cur.rate!=null?cur.rate.toFixed(1):'-', '%', C.dRate!=null?('前週比'+(C.dRate>=0?'+':'')+C.dRate.toFixed(1)+'pt'):'—', '')
+      +_kpi('週内ピーク', Math.round(C.peak.outPT).toLocaleString(), '枚', _bjbFmtD(C.peak.date)+'（'+dowJ[C.peak.dow]+'）'+(_pkToku?'・'+_bjEsc(_pkToku.label):''), '')
+      +'</div>';
+    var band=(C.nWeeksYear>=4)?('<div class="bjwk-band">'+C.yr+'年に入ってからの'+C.nWeeksYear+'週の中で：アウト <b>'+C.rankOut+'位</b> ／ 利益 <b>'+C.rankProf+'位</b></div>'):'';
+    var CH={1:'<div class="bjwk-charts"><canvas id="bjwkCh1" width="372" height="220"></canvas><canvas id="bjwkCh2" width="372" height="220"></canvas></div>',
+            2:'<div class="bjwk-charts"><canvas id="bjwkCh3" width="758" height="220"></canvas></div>',
+            3:'<div class="bjwk-charts"><canvas id="bjwkCh4" width="758" height="230"></canvas></div>',
+            7:'<div class="bjwk-charts"><canvas id="bjwkCh5" width="372" height="220"></canvas><canvas id="bjwkCh5b" width="372" height="220"></canvas></div>',
+            8:'<div class="bjwk-charts"><canvas id="bjwkCh6" width="372" height="230"></canvas><canvas id="bjwkCh7" width="372" height="230"></canvas></div>',
+            9:'<div class="bjwk-charts"><canvas id="bjwkCh8" width="758" height="280"></canvas></div>'};
+    var secs=H.map(function(sec,i){ return '<div class="bjwk-sec"><div class="bjwk-ttl">'+sec[0]+'</div>'+(CH[i]||'')+'<div class="bjwk-p" id="bjwkP'+i+'"></div></div>'; }).join('');
+    var foot='<div class="bjwk-foot">根拠：店舗データ '+_bjbFmtD(C.dataFrom)+'〜'+_bjbFmtD(C.dataTo)+'／数値は統計推定を含みます／BEAR JOHN 週次レポート（AIの週報 β）</div>';
+    body.innerHTML=hero+kpis+band+secs+foot;
+    // グラフ（ものさし2本＋ベースと山）
+    try{
+      var la=[], da=[], dp=[];
+      if(C.lastM){ la.push(['先月同週','('+_bjbFmtD(C.MW.mon)+'-'+_bjbFmtD(C.MW.sun)+')']); da.push(Math.round(C.lastM.outPT)); dp.push(+(C.lastM.profPerDay/10000).toFixed(1)); }
+      if(C.prev){ la.push(['前週','('+_bjbFmtD(C.PW.mon)+'-'+_bjbFmtD(C.PW.sun)+')']); da.push(Math.round(C.prev.outPT)); dp.push(+(C.prev.profPerDay/10000).toFixed(1)); }
+      la.push(['今週','('+_bjbFmtD(C.W.mon)+'-'+_bjbFmtD(C.W.sun)+')']); da.push(Math.round(cur.outPT)); dp.push(+(cur.profPerDay/10000).toFixed(1));
+      var pal=la.map(function(_,i){ return i===la.length-1?'#1e5fa8':'#b9d3ee'; });
+      _bjwkBar('bjwkCh1', la, [{data:da, backgroundColor:pal, borderRadius:4}], {title:'台あたりアウト（枚/日）', fmt:function(v){return v.toLocaleString();}});
+      _bjwkBar('bjwkCh2', la, [{data:dp, backgroundColor:pal, borderRadius:4}], {title:'店の粗利（万円/日）', fmt:function(v){return v.toLocaleString();}});
+      if(C.spCur&&C.spCur.base!=null){
+        _bjwkBar('bjwkCh3', [['ベース稼働','(平日)'],['山の日','(土日祝・特定日)']], [
+          {label:'前週', data:[C.spPrev&&C.spPrev.base!=null?Math.round(C.spPrev.base):null, C.spPrev&&C.spPrev.yama!=null?Math.round(C.spPrev.yama):null], backgroundColor:'#b9d3ee', borderRadius:4},
+          {label:'今週', data:[Math.round(C.spCur.base), C.spCur.yama!=null?Math.round(C.spCur.yama):null], backgroundColor:'#1e5fa8', borderRadius:4}
+        ], {title:'ベースと山：台あたりアウト（枚/日）', legend:true, fmt:function(v){return v.toLocaleString();}});
+      }
+      // メリハリ収支の日次グラフ（#05: アウト棒＝山の日を濃く・店粗利は右軸の線）
+      if(C.cur.days&&C.cur.days.length){
+        _bjwkBar('bjwkCh4', C.cur.days.map(function(d){return [_bjbFmtD(d.date),'('+dowJ[d.dow]+')'];}), [
+          {label:'台あたりアウト（枚）', data:C.cur.days.map(function(d){return Math.round(d.outPT);}), backgroundColor:C.cur.days.map(function(d){return d.yama?'#1e5fa8':'#b9d3ee';}), borderRadius:4, order:2},
+          {type:'line', label:'店粗利（万円）', data:C.cur.days.map(function(d){return +(d.prof/10000).toFixed(1);}), borderColor:'#c2410c', backgroundColor:'#c2410c', pointRadius:2.5, borderWidth:2, tension:0.25, yAxisID:'y1', order:1}
+        ], {title:'日次のメリハリ：アウト（棒・濃い色＝山の日）と店粗利（線）', legend:true, y2:true, fmt:function(v){return v.toLocaleString();}});
+      }
+      // シリーズ別グラフ（#07アウト・#09で台粗利も追加＝2枚組）
+      if(C.series&&C.series.length){
+        var _sl=C.series.map(function(s){return s.label.replace(/（.*/,'').replace('シリーズ','');});
+        _bjwkBar('bjwkCh5', _sl, [
+          {label:'前週', data:C.series.map(function(s){return s.prev?Math.round(s.prev.outPT):null;}), backgroundColor:'#b9d3ee', borderRadius:4},
+          {label:'今週', data:C.series.map(function(s){return Math.round(s.cur.outPT);}), backgroundColor:'#1e5fa8', borderRadius:4}
+        ], {title:'シリーズ別：台あたりアウト（枚/日）', legend:true, fmt:function(v){return v.toLocaleString();}});
+        _bjwkBar('bjwkCh5b', _sl, [
+          {label:'前週', data:C.series.map(function(s){return s.prev?Math.round(s.prev.profPT):null;}), backgroundColor:'#f2d8bd', borderRadius:4},
+          {label:'今週', data:C.series.map(function(s){return Math.round(s.cur.profPT);}), backgroundColor:'#c2410c', borderRadius:4}
+        ], {title:'シリーズ別：台粗利（円/日）', legend:true, fmt:function(v){return v.toLocaleString();}});
+      }
+      // 機種の週間動向グラフ（#08 案1: ダイバージング横棒×2）
+      var _tl=C.tight.concat(C.loose);
+      if(_tl.length){
+        _bjwkBar('bjwkCh6', _tl.map(function(m){return _bjwkShort(m.name);}), [
+          {data:_tl.map(function(m){return +m.dr.toFixed(1);}), backgroundColor:_tl.map(function(m){return m.dr<0?'#1e5fa8':'#c2410c';}), borderRadius:4}
+        ], {title:'出玉率の変化（pt）　左=締め・右=開け', horiz:true, fmt:function(v){return (v>=0?'+':'')+v;}});
+      }
+      var _sd=C.drop.concat(C.surge);
+      if(_sd.length){
+        _bjwkBar('bjwkCh7', _sd.map(function(m){return _bjwkShort(m.name);}), [
+          {data:_sd.map(function(m){return +m.dPct.toFixed(0);}), backgroundColor:_sd.map(function(m){return m.dPct<0?'#1e5fa8':'#c2410c';}), borderRadius:4}
+        ], {title:'アウトの変化（%）　左=急減・右=急増', horiz:true, fmt:function(v){return (v>=0?'+':'')+v+'%';}});
+      }
+      // 機種の週間動向グラフ（#08 案2: 4象限マップ＝型の可視化）
+      if(C.quad&&C.quad.length>=3){ _bjwkScatter('bjwkCh8', C.quad, {title:'機種マップ：出玉率の変化（pt）× アウトの変化（%）'}); }
+    }catch(e){ console.error('weekly charts', e); }
+    var _tk=key+'|'+target+'|'+C.W.mon;
+    if(_bjwkTypedKey===_tk){ _bjwkFillAll(); }
+    else { _bjwkTypedKey=_tk; _bjwkTypeSkip=false; _bjwkTypeSecs(H, 0); }
+  }
+
   try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(e){}   // リロード時のスクロール位置復元を無効化（非同期描画で"変な位置スタート"になるのを防ぐ）
   function build(){
     if(document.getElementById('bjTabsNav'))return true;
@@ -15174,6 +15828,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     try{ buildPayoutTab(panels.payout); }catch(e){ console.error('buildPayoutTab', e); }
     // ⑦ AIの朝礼（偵察レポート・遅延生成）
     try{ buildBriefingTab(panels.briefing); }catch(e){ console.error('buildBriefingTab', e); }
+    try{ if(panels.weekly) buildWeeklyTab(panels.weekly); }catch(e){ console.error('buildWeeklyTab', e); }
     var _psw=document.querySelector('.pin-section-wrapper'); if(_psw&&_psw.parentNode) _psw.parentNode.removeChild(_psw);  // ピンポイント分析＋ダーク帯を削除
     // 並び替え：比較期間を店舗A/B選択の上へ、指標チップをグラフの下へ
     (function(){
@@ -15666,6 +16321,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     window._bjPayoutDirty=true; _bjpMemoKey=''; _bjpAnchor=null;          // 出玉配分：店舗変更で再計算＆スライド位置を最新に戻す
     if(window._bjRoom==='payout'){ try{ _bjpRender(); }catch(e){} }
     _bjbMemoKey=''; _bjbMemo=null; _bjbRetry=0;                          // AIの朝礼：店舗変更で再生成
+    _bjwkMemoKey=''; _bjwkMemo=null; _bjwkRetry=0;                       // AIの週報：同上
+    if(window._bjRoom==='weekly'){ _bjShowLoading(); setTimeout(function(){ try{ _bjwkRender(); }catch(e){} finally { _bjHideLoading(); } },60); }
     if(window._bjRoom==='briefing'){
       _bjShowLoading();
       setTimeout(function(){ try{ _bjbRender(); }catch(e){} finally { _bjHideLoading(); } },60);   // rAFは裏タブで止まるためsetTimeoutで確実に
