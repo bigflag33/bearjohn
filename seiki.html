@@ -14237,12 +14237,25 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjwk-tbl th{ background:rgba(0,152,212,.07); font-weight:800; }
   .bjwk-tbl th:first-child,.bjwk-tbl td:first-child{ text-align:left; }
   .bjwk-newtbl td:first-child{ white-space:normal; min-width:150px; max-width:250px; line-height:1.5; }
+  /* 朝礼v2（#22: シート内の固定配色＋今日の構えカード） */
+  #bjbSheet .bjb-body{ color:#1e293b; }
+  #bjbSheet .bjb-fact{ color:#334155; }
+  #bjbSheet .bjb-facts{ border-top:1px solid #e2e8f0; }
+  #bjbSheet .bjb-facts-h{ color:#173a7a; }
+  #bjbSheet .bjb-foot{ color:#94a3b8; border-top:1px solid #e2e8f0; }
+  #bjbSheet .bjb-none{ display:block; padding:18px; }
+  .bjb2-cards{ display:flex; gap:10px; margin:12px 18px 0; flex-wrap:wrap; }
+  .bjb2-card{ flex:1; min-width:250px; border-radius:10px; padding:10px 14px; font-size:12.5px; line-height:1.85; }
+  .bjb2-h{ font-weight:800; font-size:11px; letter-spacing:1.2px; margin-bottom:2px; }
+  .bjb2-atk{ background:#fdf3ec; border:1px solid #f0d5bd; color:#7c3210; }
+  .bjb2-def{ background:#eef4fb; border:1px solid #cfe0f2; color:#173a7a; }
   .bjwk-p.typing{ cursor:pointer; }
   .bjwk-p.typing::after{ content:'▋'; margin-left:1px; color:var(--accent); animation:bjbBlink 0.9s steps(1) infinite; }
   /* 週報レポートシート（#04 PDF風・常に白い紙＝テーマ/印刷非依存） */
   .bjwk-sheet{ background:#fff; color:#1e293b; border:1px solid var(--border); border-radius:14px; max-width:860px; padding-bottom:16px; overflow:hidden; }
   .bjwk-sheet .bjb-none{ display:block; padding:18px; }
   .bjwk-hero{ background:#173a7a; color:#fff; padding:13px 22px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .bjb2-hero{ background:#6b1d32; }   /* 朝礼はワインレッド（週報の紺と区別・#24） */
   .bjwk-hero-l{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; min-width:0; }
   .bjwk-hero-en{ font-size:9.5px; letter-spacing:2px; opacity:.7; font-family:'Hiragino Mincho ProN','Yu Mincho',Georgia,serif; white-space:nowrap; }
   .bjwk-hero-t{ font-size:17.5px; font-weight:800; white-space:nowrap; }
@@ -14264,9 +14277,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjwk-foot{ margin:18px 18px 0; font-size:10px; color:#94a3b8; border-top:1px solid #e2e8f0; padding-top:8px; }
   @media print{
     body *{ visibility:hidden; }
-    #bjwkSheet, #bjwkSheet *{ visibility:visible; }
-    #bjwkSheet{ position:absolute; left:0; top:0; width:100%; max-width:none; border:none; border-radius:0; }
-    .bjwk-sec{ break-inside:avoid; }
+    body:not([data-bjroom="briefing"]) #bjwkSheet, body:not([data-bjroom="briefing"]) #bjwkSheet *{ visibility:visible; }
+    body[data-bjroom="briefing"] #bjbSheet, body[data-bjroom="briefing"] #bjbSheet *{ visibility:visible; }
+    #bjwkSheet, #bjbSheet{ position:absolute; left:0; top:0; width:100%; max-width:none; border:none; border-radius:0; }
+    .bjwk-sec, .bjb2-cards{ break-inside:avoid; }
     @page{ size:A4; margin:10mm; }
   }
   .bjp-dates{ font-size:12.5px; color:var(--text2); background:rgba(0,152,212,.06); border:1px solid rgba(0,152,212,.18); border-radius:9px; padding:9px 13px; margin:2px 0 10px; }
@@ -14442,6 +14456,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     document.querySelectorAll('.bj-panel').forEach(function(p){p.classList.toggle('on',p.id==='bj-'+room);});
     window.scrollTo(0,0);
     window._bjRoom=room;
+    try{ document.body.setAttribute('data-bjroom', room); }catch(e){}
     try{ _bjUpdateContext(); }catch(e){}
     if(room==='basic'){ setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); },80); return; }
     // 重い描画はローディング（熊）を挟んで1フレーム後に実行＝スピナーが必ず見える
@@ -14728,16 +14743,19 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function buildBriefingTab(panel){
     if(!panel||document.getElementById('bjbBody'))return;
     panel.innerHTML=''
-      +'<div class="bjp-head"><div class="bj-wordmark" style="font-size:21px;">MORNING BRIEFING</div></div>'
-      +'<div class="bjb-sub">AIの朝礼 ── 表示中の店舗の「昨日の答合せ」と「今日の構え」を自動生成</div>'
-      +'<div class="bjb-bar">朝礼の日付：<input type="date" id="bjbDateInp">'
+      +'<div class="bjb-bar" style="margin-bottom:10px;">'
+      +'<span class="bj-wordmark" style="font-size:15px;white-space:nowrap;cursor:help;" title="AIの朝礼 ── 表示中の店舗の「昨日の答合せ」と「今日の構え」を自動生成します。日付を変えると、その日の朝を当時の情報だけで再現します。">MORNING BRIEFING <span style="font-size:10px;color:var(--text2);">β</span></span>'
+      +'朝礼の日付：<input type="date" id="bjbDateInp">'
       +'<a href="javascript:void(0)" id="bjbToday" class="bjb-todaybtn">今日に戻る</a>'
+      +'<button class="bjp-info" id="bjbPrint" style="margin-left:8px;">印刷・PDF保存</button>'
       +'<span id="bjbTmNote" class="bjb-tmnote"></span></div>'
-      +'<div class="bjb-card" id="bjbBody">タブを開くと生成します…</div>';
+      +'<div class="bjwk-sheet" id="bjbSheet"><div id="bjbBody"><div style="padding:18px;">タブを開くと生成します…</div></div></div>';
     var di=document.getElementById('bjbDateInp');
     if(di){ di.value=_bjbTodayStr(); di.addEventListener('change',function(){ _bjbDate=(di.value&&di.value!==_bjbTodayStr())?di.value:null; _bjbRenderLoading(); }); }
     var tb=document.getElementById('bjbToday');
     if(tb)tb.addEventListener('click',function(){ _bjbDate=null; if(di)di.value=_bjbTodayStr(); _bjbRenderLoading(); });
+    var pb=document.getElementById('bjbPrint');
+    if(pb)pb.addEventListener('click',function(){ var t=document.getElementById('bjbType'); if(t&&t.classList.contains('typing'))t.click(); setTimeout(function(){ window.print(); },100); });
   }
   function _bjbRenderLoading(){ _bjShowLoading(); setTimeout(function(){ try{ _bjbRender(); }catch(e){ console.error('briefing',e); } finally { _bjHideLoading(); } },60); }
   function _bjbStats(dates, vals){
@@ -15140,9 +15158,63 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var facts=items.map(function(it){return it.html;});
     var factsHtml = facts.length ? facts.slice(0,8).map(function(h){return '<div class="bjb-fact">・'+_bjEsc(_raw(h))+'</div>';}).join('') : '<div class="bjb-fact" style="color:var(--text2);">・特記事項なし</div>';
     var foot='根拠：店舗データ '+_bjbFmtD(dates[0])+'〜'+_bjbFmtD(ld)+'（'+n+'日分）／予想の的中度 '+(hit!=null?'約'+hit+'%':'—')+'（直近30日）／突出判定＝設置3台以上・平常＝その機種の直前7営業日平均／放出は推定粗利の赤字額（円）を優先／数値は統計推定を含みます。この朝礼は期間フィルターの影響を受けません（常に「履歴×基準日」で生成。店舗を切り替えるとその店の朝礼になります）。';
-    body.innerHTML='<div class="bjb-body" id="bjbType"></div>'
+    // ── 朝礼v2（台帳#22: ビジュアル層。本文ロジック・文章は一切不変＝上に視覚要素を足すだけ）──
+    _bjwkCharts.forEach(function(c){ try{ c.destroy(); }catch(e){} }); _bjwkCharts=[];
+    var dowJ2='日月火水木金土';
+    var _tp=null,_tb=1; _bjDayPats(target).forEach(function(p){ if(adopted[p]&&adopted[p]>_tb){_tb=adopted[p];_tp=p;} });
+    var hero='<div class="bjwk-hero bjb2-hero"><div class="bjwk-hero-l">'
+      +'<span class="bjwk-hero-en">MORNING BRIEFING</span>'
+      +'<span class="bjwk-hero-t">'+_bjbFmtD(target)+'（'+dowJ2[_bjwkD(target).getDay()]+'）の朝礼</span>'
+      +'<span class="bjwk-hero-s">'+_bjEsc(sName)+'</span></div>'
+      +'<div class="bjwk-hero-k">'+(_tp?('今日は'+_bjPatLabel(_tp)):'通常営業日')+'</div></div>';
+    var _y=M.byD[ld], _yOut=_y.c?_y.in/_y.c:0, _yProf=_y.p, _yRate=_y.in>0?(_y.in+_y.df)/_y.in*100:null;
+    var _eLd=exp(ld);
+    var _pAvg=0; dates.forEach(function(d){_pAvg+=M.byD[d].p;}); _pAvg/=n;
+    var _r14=dates.slice(-14).map(function(d){var o=M.byD[d];return o.in>0?(o.in+o.df)/o.in*100:null;}).filter(function(x){return x!=null;});
+    var _rAvg=_r14.length?_r14.reduce(function(a,b){return a+b;},0)/_r14.length:null;
+    function _bk(label,val,unit,sub,cls){ return '<div class="bjwk-kpi"><div class="k-l">'+label+'</div><div class="k-v">'+val+'<span class="k-u">'+unit+'</span></div><div class="k-s '+(cls||'')+'">'+sub+'</div></div>'; }
+    var _dOutY=(_eLd>0)?_bjwkDeltaOut(_yOut,_eLd):null;
+    var _dPrY=_bjwkDeltaYen(_yProf,_pAvg);
+    var kpis='<div class="bjwk-kpis">'
+      +_bk('台あたりアウト（'+_bjbFmtD(ld)+'）', Math.round(_yOut).toLocaleString(), '枚', _dOutY?('普段のこの日と比べ'+_dOutY):'—', (_eLd&&_yOut<_eLd)?'dn':'up')
+      +_bk('店の粗利（'+_bjbFmtD(ld)+'）', _bjwkYen(Math.round(_yProf)), '', _dPrY?('普段と比べ'+_dPrY):'—', (_yProf<_pAvg)?'dn':'up')
+      +_bk('出玉率（'+_bjbFmtD(ld)+'）', _yRate!=null?_yRate.toFixed(1):'-', '%', (_rAvg!=null&&_yRate!=null)?('直近2週平均比'+((_yRate-_rAvg)>=0?'+':'')+(_yRate-_rAvg).toFixed(1)+'pt'):'—', '')
+      +_bk('予測の的中度（直近30日）', hit!=null?('約'+hit):'—', hit!=null?'%':'', '昨日: 予測'+Math.round(_eLd).toLocaleString()+'枚 → 実績'+Math.round(_yOut).toLocaleString()+'枚', '')
+      +'</div>';
+    var monBand=(_bjwkD(target).getDay()===1)?'<div class="bjwk-band">週が明けました。先週全体のまとめは「AIの週報 β」タブでどうぞ。</div>':'';
+    var cards='';
+    if(reconTight||reconLoose){
+      cards='<div class="bjb2-cards">';
+      if(reconTight)cards+='<div class="bjb2-card bjb2-atk"><div class="bjb2-h">攻めの一手</div><b>'+_bjEsc(reconTight.mn)+'</b>がここ1週間締め気味（出玉率'+reconTight.from.toFixed(1)+'%→'+reconTight.to.toFixed(1)+'%）。自店の同系機種を強化する好機です。</div>';
+      if(reconLoose)cards+='<div class="bjb2-card bjb2-def"><div class="bjb2-h">守りの一手</div><b>'+_bjEsc(reconLoose.mn)+'</b>がここ1週間出し気味（出玉率'+reconLoose.from.toFixed(1)+'%→'+reconLoose.to.toFixed(1)+'%）。客を取られやすいタイミングなので警戒を。</div>';
+      cards+='</div>';
+    }
+    body.innerHTML=hero+kpis+monBand
+      +'<div class="bjwk-charts" style="margin:10px 18px 0;"><canvas id="bjbCh1" width="758" height="200"></canvas></div>'
+      +'<div style="padding:2px 18px 0;"><div class="bjb-body" id="bjbType"></div></div>'
+      +cards
+      +'<div style="padding:0 18px 4px;">'
       +'<div class="bjb-facts" id="bjbFacts" style="display:none;"><div class="bjb-facts-h">ファクト</div>'+factsHtml+'</div>'
-      +'<div class="bjb-foot">'+foot+'</div>';
+      +'<div class="bjb-foot">'+foot+'</div></div>';
+    try{
+      var _cd=dates.slice(-14);
+      var _useProf=(axis==='profit'||axis==='bleed');   // #24: 昨日の主役が利益（回収/放出）の日は粗利グラフに切替
+      var _barCol=_cd.map(function(d){ if(d===ld)return '#7c2440'; var t=null; _bjDayPats(d).forEach(function(p){ if(adopted[p])t=1; }); return t?'#f0c98f':'#b9d3ee'; });
+      var _lbl=_cd.map(function(d){return [_bjbFmtD(d), dowJ2[_bjwkD(d).getDay()]];});
+      if(_useProf){
+        _bjwkBar('bjbCh1', _lbl, [
+          {label:'店の粗利（万円）', data:_cd.map(function(d){return +(M.byD[d].p/10000).toFixed(1);}), backgroundColor:_barCol, borderRadius:3, order:2},
+          {type:'line', label:'普段（平均）', data:_cd.map(function(){return +(_pAvg/10000).toFixed(1);}), borderColor:'#94a3b8', borderDash:[5,4], pointRadius:0, borderWidth:1.5, order:1}
+        ], {title:'直近14日のポジション：店の粗利・万円（濃い棒＝'+_bjbFmtD(ld)+'・薄いオレンジ＝特定日・点線＝普段の平均）', legend:true,
+            valOnly:_cd.length-1, fmt:function(v){return v.toLocaleString();}});
+      } else {
+        _bjwkBar('bjbCh1', _lbl, [
+          {label:'台あたりアウト', data:_cd.map(function(d){var o=M.byD[d];return o.c?Math.round(o.in/o.c):0;}), backgroundColor:_barCol, borderRadius:3, order:2},
+          {type:'line', label:'普段（平均）', data:_cd.map(function(){return Math.round(stats.mean);}), borderColor:'#94a3b8', borderDash:[5,4], pointRadius:0, borderWidth:1.5, order:1}
+        ], {title:'直近14日のポジション（濃い棒＝'+_bjbFmtD(ld)+'・薄いオレンジ＝特定日・点線＝普段の平均）', legend:true,
+            valOnly:_cd.length-1, fmt:function(v){return v.toLocaleString();}});
+      }
+    }catch(e){ console.error('briefing chart', e); }
     var _typeKey=key+'|'+target;   // 店舗×基準日。同じ間は演出を出さず即表示（初回のみタイプライター）
     var _typeEl=document.getElementById('bjbType'), _showFacts=function(){ var f=document.getElementById('bjbFacts'); if(f)f.style.display='block'; };
     if(_bjbTypedKey===_typeKey){ if(_typeEl){_typeEl.textContent=plain;_typeEl.classList.remove('typing');} _showFacts(); }
@@ -15601,6 +15673,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         scales:sc }; })(),
       plugins:[{ afterDatasetsDraw:function(c){ var ctx=c.ctx; ctx.save(); ctx.font='bold 10px sans-serif'; ctx.fillStyle='#334155';
         c.data.datasets.forEach(function(ds,di){ if(ds.type==='line')return; var meta=c.getDatasetMeta(di); meta.data.forEach(function(bar,i){ var v=ds.data[i]; if(v==null)return;
+          if(opts.valOnly!=null && i!==opts.valOnly)return;
           var txt=opts.fmt?opts.fmt(v):v;
           if(c.options.indexAxis==='y'){ ctx.textAlign=(v>=0)?'left':'right'; ctx.fillText(txt, bar.x+(v>=0?4:-4), bar.y+3.5); }
           else { ctx.textAlign='center'; ctx.fillText(txt, bar.x, bar.y-4); } }); }); ctx.restore(); } }]
