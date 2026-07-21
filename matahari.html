@@ -5788,6 +5788,8 @@ function renderRivalAnalysis() {
       }
 
       html += '<div style="font-size:10.5px;color:var(--text2);margin-top:4px;line-height:1.6;">※ 「旧台番」＝消えた台番、「新台番」＝追加された台番。台数同・台番変化のみ抽出（増台・減台は別セクション）。</div>';
+      // 増減台・移動の週次レポート差し込み先（本体は_bjweRender・セクション内側必須＝サブタブ切替に追従）
+      html += '<div id="bjweHost"></div>';
       html += '</div>';
     }
   }
@@ -14377,9 +14379,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjwr-tbl th{ background:rgba(245,158,11,.10); font-weight:800; }
   .bjwr-tbl td:first-child,.bjwr-tbl th:first-child{ text-align:left; }
   .bjwr-cur td{ background:rgba(245,158,11,.08); font-weight:700; }
+  .bjwr-mn{ text-align:left !important; white-space:normal !important; min-width:180px; max-width:340px; line-height:1.55; }
+  .bjwr-sum td{ font-weight:800; border-top:2px solid var(--border); background:rgba(120,120,140,.08); }
   .bjwr-p{ font-size:13px; line-height:2.0; color:var(--text); margin:10px 0 2px; }
   .bjwr-note{ font-size:10.5px; color:var(--text2); line-height:1.6; margin-top:6px; }
-  #bjwrType.typing::after{ content:'▌'; color:#d97706; animation:bjwrBlink .9s step-end infinite; }
+  #bjwrType.typing::after, .bjwe-p.typing::after{ content:'▌'; color:#d97706; animation:bjwrBlink .9s step-end infinite; }
+  .bjwe-seg-t{ font-size:12.5px; font-weight:800; color:var(--text); margin:16px 0 0; padding-left:8px; border-left:3px solid #a78bfa; }
   @keyframes bjwrBlink{ 50%{opacity:0;} }
   .bjwk-hero-l{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; min-width:0; }
   .bjwk-hero-en{ font-size:9.5px; letter-spacing:2px; opacity:.7; font-family:'Hiragino Mincho ProN','Yu Mincho',Georgia,serif; white-space:nowrap; }
@@ -14587,7 +14592,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // 重い描画はローディング（熊）を挟んで1フレーム後に実行＝スピナーが必ず見える
     var needHeavy = (room==='report'&&window._bjReportDirty) || (room==='post'&&window._bjReportDirty) || (room==='payout'&&window._bjPayoutDirty) || (room==='briefing') || (room==='weekly');
     var work=function(){
-      if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); setTimeout(function(){ try{ _bjwrRender(); }catch(e){ console.error('bjwr', e); } },140); }
+      if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); setTimeout(function(){ try{ _bjwrRender(); }catch(e){ console.error('bjwr', e); } try{ _bjweRender(); }catch(e){ console.error('bjwe', e); } },140); }
       if(room==='post'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } try{ renderAlertTiles(); }catch(e){} }   // ポストイットはrival依存→先にrival描画してキャッシュ確保
       if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
       if(room==='briefing'){ _bjbRetry=0; try{ _bjbRender(); }catch(e){ console.error('briefing', e); } }   // AIの朝礼：開くたび生成（メモ化済みで軽い）
@@ -15969,6 +15974,241 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
 
 
+
+  // ===== レポート: 増減台・移動の週次レポート β（#R9。増台/減台/移動を分離・総アウト前後比較。週=月〜日・直近12週・全履歴） =====
+  var _bjweTypedKey='', _bjweChkOff=null;
+  function _bjweRender(){
+    var host=document.getElementById('bjweHost'); if(!host)return;
+    try{
+      var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
+      if(!recs.length){ host.innerHTML=''; return; }
+      // 機種×日→台番Set／IN集計
+      var mds={}, mIn={}, dateSet={};
+      for(var i=0;i<recs.length;i++){ var r=recs[i], d=r.date, mn=r['機種名'];
+        var tai=(r['台番']!=null)?String(r['台番']).trim():'';
+        if(!d||!mn||!tai)continue; dateSet[d]=1;
+        var k=mn+'\x00'+d;
+        (mds[k]=mds[k]||{})[tai]=1;
+        (mIn[k]=mIn[k]||{in:0,c:0}); mIn[k].in+=r['IN枚数']||0; mIn[k].c++;
+      }
+      var dates=Object.keys(dateSet).sort();
+      if(dates.length<14){ host.innerHTML=''; return; }
+      // 増減台・台移動イベント（レポート本体と同じ定義: 台数±1でも検出。日空き比較も含む）
+      var byModel={};
+      Object.keys(mds).forEach(function(k){ var p=k.indexOf('\x00'), mn2=k.slice(0,p);
+        (byModel[mn2]=byModel[mn2]||[]).push({d:k.slice(p+1), set:mds[k]}); });
+      var evs=[];   // {d, mn, kind, units, from, to}
+      Object.keys(byModel).forEach(function(mn2){
+        var ds=byModel[mn2]; ds.sort(function(a,b){return a.d<b.d?-1:1;});
+        for(var j=1;j<ds.length;j++){
+          var pv=ds[j-1], cu=ds[j];
+          var pn=Object.keys(pv.set).length, cn=Object.keys(cu.set).length;
+          if(cn!==pn){ evs.push({d:cu.d, mn:mn2, kind:cn>pn?'増台':'減台', units:Math.abs(cn-pn), from:pn, to:cn}); }
+          else{ var moved=0; Object.keys(pv.set).forEach(function(t){ if(!cu.set[t])moved++; });
+            if(moved>0)evs.push({d:cu.d, mn:mn2, kind:'移動', units:moved, from:pn, to:cn}); }
+        }
+      });
+      // 台あたり平均（アウトアップ判定＝上のタイルと同じ）と 機種総アウト/日（前7日 vs 後7日・当日含む）
+      function _wavg(mn2, f, t){ var s=0,c=0;
+        for(var dd=f; dd<=t; dd=_bjwkAddD(dd,1)){ var o=mIn[mn2+'\x00'+dd]; if(o){s+=o.in;c+=o.c;} }
+        return c>0?s/c:null; }
+      function _tavg(mn2, f, t){ var s=0,n=0;
+        for(var dd=f; dd<=t; dd=_bjwkAddD(dd,1)){ var o=mIn[mn2+'\x00'+dd]; if(o&&o.c){s+=o.in;n++;} }
+        return n>0?s/n:null; }
+      evs.forEach(function(e){
+        var pre=_wavg(e.mn,_bjwkAddD(e.d,-7),_bjwkAddD(e.d,-1));
+        var post=_wavg(e.mn,e.d,_bjwkAddD(e.d,6));
+        e.up=(pre!=null&&post!=null)?(post>pre):null;
+        e.preTot=_tavg(e.mn,_bjwkAddD(e.d,-7),_bjwkAddD(e.d,-1));
+        e.postTot=_tavg(e.mn,e.d,_bjwkAddD(e.d,6));
+        e.totPct=(e.preTot!=null&&e.postTot!=null&&e.preTot>0)?((e.postTot-e.preTot)/e.preTot*100):null;
+      });
+      // 週の枠（万枚週次と同じ: 日曜まで閉じた週×最大12）
+      var lastD=dates[dates.length-1], lastMon=_bjwkMonday(lastD);
+      var endMon=(lastD>=_bjwkAddD(lastMon,6))?lastMon:_bjwkAddD(lastMon,-7);
+      var weeks=[];
+      for(var w=0;w<12;w++){ var mon=_bjwkAddD(endMon,-7*w); if(_bjwkAddD(mon,6)<dates[0])break;
+        weeks.push({mon:mon, sun:_bjwkAddD(mon,6), W:_bjwkWeekOf(mon)}); }
+      weeks.reverse();
+      if(weeks.length<2){ host.innerHTML=''; return; }
+      var KINDS=['増台','減台','移動'];
+      weeks.forEach(function(wk){
+        wk.cat={};
+        KINDS.forEach(function(kd){ wk.cat[kd]={m:{},units:0,up:{},pre:0,post:0,preN:0,evs:[]}; });
+        evs.forEach(function(e){ if(e.d<wk.mon||e.d>wk.sun)return;
+          var c=wk.cat[e.kind]; c.m[e.mn]=1; c.units+=e.units; if(e.up)c.up[e.mn]=1; c.evs.push(e);
+          if(e.preTot!=null&&e.postTot!=null){ c.pre+=e.preTot; c.post+=e.postTot; c.preN++; } });
+      });
+      var cur=weeks[weeks.length-1];
+      function _wLab(wk){ return parseInt(wk.W.month.slice(5),10)+'月第'+wk.W.idx+'週'; }
+      function _fk(v){ return Math.round(v).toLocaleString(); }
+      function _pcS(pre,post){ if(!(pre>0))return null; var p=(post-pre)/pre*100; return (p>=0?'+':'')+p.toFixed(0)+'%'; }
+      var COL={'増台':'#34d399','減台':'#f87171','移動':'#a78bfa'};
+      // カテゴリ別テーブル（機種数・台数・アウトアップ機種数・総アウト/日 前→後）
+      function _catTable(kd){
+        var col=COL[kd];
+        var any=weeks.some(function(wk){ return Object.keys(wk.cat[kd].m).length>0; });
+        if(!any)return '<div class="bjwr-note" style="margin:12px 0 4px;"><b style="color:'+col+';">'+kd+'</b>：この12週間はありませんでした。</div>';
+        // #R10: 主だった機種（週内ユニーク機種を最大2つ・台数変化つき）
+        function _names(evs2, cap){
+          var seen={}, out=[];
+          evs2.forEach(function(e){ if(seen[e.mn])return; seen[e.mn]=1;
+            if(out.length<cap)out.push('<b>'+_bjEsc(e.mn)+'</b>（'+(e.kind==='移動'?(e.units+'台'):(e.from+'台→'+e.to+'台'))+'）'); });
+          var total=Object.keys(seen).length;
+          return out.join('、')+(total>cap?('　ほか'+(total-cap)+'機種'):'');
+        }
+        var h='<div style="font-size:12.5px;font-weight:800;color:'+col+';margin:16px 0 2px;">'+kd+'</div>'
+          +'<div style="overflow-x:auto;"><table class="bjwr-tbl"><thead><tr><th>週</th><th>主だった機種</th><th>機種数</th><th>台数</th><th>アウトアップ機種数</th><th>総アウト/日（前 → 後）</th></tr></thead><tbody>';
+        h+=weeks.map(function(wk,i){ var c=wk.cat[kd], mN=Object.keys(c.m).length;
+          var io2='-';
+          if(c.preN&&c.pre>0){ io2=_fk(c.pre)+'枚 → '+_fk(c.post)+'枚（'+_pcS(c.pre,c.post)+'）'; }
+          return '<tr'+(i===weeks.length-1?' class="bjwr-cur"':'')+'><td>'+_wLab(wk)+'（'+_bjbFmtD(wk.mon)+'〜）</td>'
+            +'<td class="bjwr-mn">'+(mN?_names(c.evs,2):'-')+'</td>'
+            +'<td>'+(mN||'-')+'</td><td>'+(c.units||'-')+'</td><td>'+(Object.keys(c.up).length||'-')+'</td><td>'+io2+'</td></tr>'; }).join('');
+        // #R10: 12週合計行（機種数=ユニーク・台数=Σ・主だった機種=動かした台数上位2）
+        var tm={}, tup={}, tu=0, tp=0, tq=0, unitByM={};
+        weeks.forEach(function(wk){ var c=wk.cat[kd];
+          Object.keys(c.m).forEach(function(m){tm[m]=1;});
+          Object.keys(c.up).forEach(function(m){tup[m]=1;});
+          tu+=c.units; tp+=c.pre; tq+=c.post;
+          c.evs.forEach(function(e){ unitByM[e.mn]=(unitByM[e.mn]||0)+e.units; }); });
+        var topM=Object.keys(unitByM).sort(function(a,b){return unitByM[b]-unitByM[a];}).slice(0,2);
+        var sumNames=topM.map(function(m){return '<b>'+_bjEsc(m)+'</b>（'+unitByM[m]+'台）';}).join('、');
+        var extra=Object.keys(tm).length-topM.length; if(extra>0)sumNames+='　ほか'+extra+'機種';
+        var sumIo='-'; if(tp>0)sumIo=_fk(tp)+'枚 → '+_fk(tq)+'枚（'+_pcS(tp,tq)+'）';
+        h+='<tr class="bjwr-sum"><td>12週合計</td><td class="bjwr-mn">'+sumNames+'</td>'
+          +'<td>'+Object.keys(tm).length+'</td><td>'+tu+'</td><td>'+(Object.keys(tup).length||'-')+'</td><td>'+sumIo+'</td></tr>';
+        return h+'</tbody></table></div>';
+      }
+      // ===== コメント（#R11: 3セグメント化＋見どころ） =====
+      var allEvs=[]; weeks.forEach(function(wk){ KINDS.forEach(function(kd){ wk.cat[kd].evs.forEach(function(e){ allEvs.push({e:e, wk:wk}); }); }); });
+      function _evName(e){ return '<b>'+_bjEsc(e.mn)+'</b>（'+(e.kind==='移動'?(e.units+'台移動'):(e.kind+' '+e.from+'台→'+e.to+'台'))+'）'; }
+      var S=[];
+      if(!allEvs.length){
+        S.push(['今週の動き','この12週、増台・減台・移動はいずれもありませんでした。設置構成を固定して運用している期間です。']);
+      } else {
+        // ① 今週の動き
+        var s1=[];
+        var curAny=KINDS.some(function(kd){ return Object.keys(cur.cat[kd].m).length>0; });
+        if(curAny){
+          KINDS.forEach(function(kd){
+            var c=cur.cat[kd], mN=Object.keys(c.m).length; if(!mN)return;
+            var seen={}, nm=[];
+            c.evs.forEach(function(e){ if(seen[e.mn])return; seen[e.mn]=1;
+              if(nm.length<2)nm.push('<b>'+_bjEsc(e.mn)+'</b>（'+(e.kind==='移動'?(e.units+'台'):(e.from+'台→'+e.to+'台'))+'）'); });
+            var ex=Object.keys(seen).length-nm.length;
+            var t='<b style="color:'+COL[kd]+';">'+kd+'</b>：'+mN+'機種・'+c.units+'台 → '+nm.join('、')+(ex>0?'　ほか'+ex+'機種':'')+'。';
+            if(c.preN&&c.pre>0)t+='総アウトは日あたり'+_fk(c.pre)+'枚 → <b>'+_fk(c.post)+'枚（'+_pcS(c.pre,c.post)+'）</b>。';
+            t+='台あたりで上がったのは'+Object.keys(c.up).length+'機種。';
+            s1.push(t);
+          });
+        } else {
+          var t1='直近週（'+_wLab(cur)+'）は増台・減台・移動いずれもありませんでした。';
+          var lastWk=null, lastEv=null;
+          for(var wi=weeks.length-2; wi>=0; wi--){ var found=null;
+            KINDS.forEach(function(kd){ weeks[wi].cat[kd].evs.forEach(function(e){ found=e; }); });
+            if(found){ lastWk=weeks[wi]; lastEv=found; break; } }
+          if(lastWk)t1+='最後の動きは'+_wLab(lastWk)+'（'+_evName(lastEv)+'）です。';
+          s1.push(t1);
+        }
+        S.push(['今週の動き', s1.join('<br>')]);
+        // ② 見どころ
+        var s2=[];
+        var best=null; allEvs.forEach(function(x){ if(x.e.totPct!=null&&(!best||x.e.totPct>best.e.totPct))best=x; });
+        if(best&&best.e.totPct>0)s2.push('いちばん効いた打ち手 → '+_evName(best.e)+'＠'+_wLab(best.wk)+'：総アウト<b>+'+best.e.totPct.toFixed(0)+'%</b>。');
+        var miss=null; allEvs.forEach(function(x){ if(x.e.kind==='減台')return;
+          if(x.e.totPct!=null&&x.e.totPct<0&&(!miss||x.e.totPct<miss.e.totPct))miss=x; });
+        if(miss)s2.push('効かなかった打ち手 → '+_evName(miss.e)+'＠'+_wLab(miss.wk)+'：総アウト'+miss.e.totPct.toFixed(0)+'%。増台・移動なのにアウトが下がった形です。');
+        var gen=null; allEvs.forEach(function(x){ if(x.e.kind!=='減台'||x.e.totPct==null||!(x.e.from>0))return;
+          if(!gen||x.e.units>gen.e.units)gen=x; });
+        if(gen){ var ge=gen.e, uPct=(ge.to-ge.from)/ge.from*100, gdiff=ge.totPct-uPct;
+          var verdict=gdiff>=15?'台数の減り以上にアウトが残りました＝間引き成功':
+                      gdiff<=-15?'台数の減り以上にアウトを失いました＝削りすぎの可能性':
+                      '台数減とほぼ比例＝想定どおりの圧縮';
+          s2.push('減台の答え合わせ → '+_evName(ge)+'＠'+_wLab(gen.wk)+'：台数'+uPct.toFixed(0)+'%に対して総アウト'+(ge.totPct>=0?'+':'')+ge.totPct.toFixed(0)+'% → '+verdict+'。'); }
+        var mvSeen={}, upSeen={};
+        weeks.forEach(function(wk){ KINDS.forEach(function(kd){ var c=wk.cat[kd];
+          Object.keys(c.m).forEach(function(m){ mvSeen[m]=1; }); Object.keys(c.up).forEach(function(m){ upSeen[m]=1; }); }); });
+        var mvN=Object.keys(mvSeen).length, upN=Object.keys(upSeen).length;
+        if(mvN)s2.push('12週の打率 → 動かした'+mvN+'機種中<b>'+upN+'機種</b>（'+Math.round(upN/mvN*100)+'%）で台あたりアウト増。');
+        if(s2.length)S.push(['見どころ', s2.join('<br>')]);
+        // ③ 12週の傾向
+        var s3=[], scale=[], net=0, rr=[];
+        KINDS.forEach(function(kd){ var tm={}, tu=0, tp=0, tq=0;
+          weeks.forEach(function(wk){ var c=wk.cat[kd]; Object.keys(c.m).forEach(function(m){tm[m]=1;}); tu+=c.units; tp+=c.pre; tq+=c.post; });
+          if(kd==='増台')net+=tu; if(kd==='減台')net-=tu;
+          var n=Object.keys(tm).length;
+          if(n){ scale.push(kd+' '+n+'機種・'+tu+'台'); var ps=_pcS(tp,tq); if(ps)rr.push(kd+'後'+ps); } });
+        if(scale.length){
+          s3.push('規模 → '+scale.join('、')+'。設置は差し引き<b>'+(net>0?'+':'')+net+'台</b>。');
+          if(rr.length)s3.push('結果 → 総アウトは'+rr.join('・')+'。');
+          var busy=null; weeks.forEach(function(wk){ var u=0; KINDS.forEach(function(kd){ u+=wk.cat[kd].units; });
+            wk._u=u; if(u>0&&(!busy||u>busy._u))busy=wk; });
+          if(busy)s3.push('動きが集中した週 → '+_wLab(busy)+'（'+busy._u+'台）。');
+          S.push(['12週の傾向', s3.join('<br>')]);
+        }
+      }
+      // ===== 描画（#R11: セグメント見出し＋グラフ全幅2段） =====
+      var segHtml=S.map(function(s,i){
+        return '<div class="bjwe-seg-t">'+s[0]+'</div><div class="bjwr-p bjwe-p" id="bjweP'+i+'"></div>';
+      }).join('');
+      host.innerHTML='<div class="rival-section-title" style="color:#a78bfa;margin-top:26px;"><span class="rst-en">WEEKLY</span> 増減台・移動の週次レポート β</div>'
+        +'<div class="bjwr-note">直近'+weeks.length+'週（月〜日）の推移。AIの週報と同じ週の数え方。期間フィルターの影響を受けません。'
+        +'アウトアップ機種数＝変化前7日と変化後7日（当日含む）の台あたり平均アウトが上がった機種（上の増減台・台移動分析と同じ判定）。'
+        +'総アウト/日＝対象機種の1日あたり合計アウト（台数変化の影響込み＝島全体の吸引力）。直近の変化は7日分の実績が揃うまで暫定です。</div>'
+        +segHtml
+        +'<div class="bjwk-charts" style="margin:12px 0 2px;"><canvas id="bjweCh1" width="758" height="200"></canvas></div>'
+        +'<div class="bjwk-charts" style="margin:0 0 2px;"><canvas id="bjweCh2" width="758" height="200"></canvas></div>'
+        +KINDS.map(_catTable).join('');
+      var _sLbl=weeks.map(function(wk){return [_bjbFmtD(wk.mon)+'〜', _wLab(wk)];});
+      _bjwkBar('bjweCh1', _sLbl, [
+        {label:'増台（台）', data:weeks.map(function(wk){return wk.cat['増台'].units||null;}), backgroundColor:'#34d399', borderRadius:3, order:2},
+        {label:'減台（台・マイナス表示）', data:weeks.map(function(wk){return wk.cat['減台'].units?-wk.cat['減台'].units:null;}), backgroundColor:'#f87171', borderRadius:3, order:2},
+        {type:'line', label:'移動（台）', data:weeks.map(function(wk){return wk.cat['移動'].units||null;}), borderColor:'#a78bfa', backgroundColor:'#a78bfa', pointRadius:3, borderWidth:1.5, tension:0, order:1}
+      ], {title:'設置の出入り（12週）', legend:true, intY:true, fmt:function(){return '';}});
+      _bjwkBar('bjweCh2', _sLbl, [
+        {label:'増台後', data:weeks.map(function(wk){var c=wk.cat['増台']; return (c.preN&&c.pre>0)?+(((c.post-c.pre)/c.pre*100).toFixed(0)):null;}), backgroundColor:'#34d399', borderRadius:3},
+        {label:'減台後', data:weeks.map(function(wk){var c=wk.cat['減台']; return (c.preN&&c.pre>0)?+(((c.post-c.pre)/c.pre*100).toFixed(0)):null;}), backgroundColor:'#f87171', borderRadius:3},
+        {label:'移動後', data:weeks.map(function(wk){var c=wk.cat['移動']; return (c.preN&&c.pre>0)?+(((c.post-c.pre)/c.pre*100).toFixed(0)):null;}), backgroundColor:'#a78bfa', borderRadius:3}
+      ], {title:'動かした機種の総アウト変化率（前7日→後7日・%）', legend:true, intY:true, fmt:function(){return '';}});
+      // ===== 順次タイプライター（#R11: セグメントごとに打つ。店×週で1回・クリックで全文） =====
+      var _st=(typeof getActiveStore==='function')?getActiveStore():null;
+      var _tk=((_st&&_st.key)||'')+'|'+cur.mon;
+      var _fillAll=function(){ S.forEach(function(s,i){ var el=document.getElementById('bjweP'+i); if(el){ el.innerHTML=s[1]; el.style.minHeight=''; } }); };
+      if(_bjweTypedKey===_tk){ _fillAll(); }
+      else{
+        S.forEach(function(s,i){ var el=document.getElementById('bjweP'+i); if(el)el.style.minHeight='3em'; });
+        var _started=false, _skip=false;
+        var _typeSeq=function(i){ if(i>=S.length)return;
+          var el=document.getElementById('bjweP'+i); if(!el)return;
+          if(_skip){ el.innerHTML=S[i][1]; el.style.minHeight=''; _typeSeq(i+1); return; }
+          el.innerHTML=S[i][1]; el.style.minHeight=el.offsetHeight+'px'; el.innerHTML='';
+          var text=_bjwkPlain(S[i][1]), kk=0, tm=null, done=false;
+          el.classList.add('typing');
+          var fin=function(){ if(tm){clearInterval(tm);tm=null;} el.classList.remove('typing'); el.onclick=null; el.innerHTML=S[i][1]; if(!done){done=true; _typeSeq(i+1);} };
+          el.onclick=function(){ _skip=true; fin(); };
+          tm=setInterval(function(){ kk+=1; el.textContent=text.slice(0,kk); if(kk>=text.length)fin(); },24);
+        };
+        var _startType=function(){ if(_started)return; _started=true; _bjweTypedKey=_tk; _typeSeq(0); };
+        var tEl0=document.getElementById('bjweP0');
+        var _chk=function(){ if(_started){ _bjweChkOff&&_bjweChkOff(); return; }
+          if(!tEl0.isConnected){ _bjweChkOff&&_bjweChkOff(); return; }
+          var rc=tEl0.getBoundingClientRect(), vh=window.innerHeight||document.documentElement.clientHeight||720;
+          if(tEl0.offsetParent && rc.top<vh*0.85 && rc.bottom>40){ _bjweChkOff&&_bjweChkOff(); _startType(); } };
+        var _chkSoon=function(){ setTimeout(_chk,250); };
+        if(_bjweChkOff)_bjweChkOff();
+        window.addEventListener('scroll',_chk,{passive:true});
+        document.addEventListener('click',_chkSoon);
+        _bjweChkOff=function(){ window.removeEventListener('scroll',_chk); document.removeEventListener('click',_chkSoon); _bjweChkOff=null; };
+        if('IntersectionObserver' in window){
+          var _io=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){ _io.disconnect(); _startType(); } }); },{threshold:0.35});
+          _io.observe(tEl0);
+        }
+        setTimeout(_chk,400);
+      }
+    }catch(e){ console.error('bjwe', e); host.innerHTML=''; }
+  }
+
   // ===== レポート: 全台系・万枚の週次イベントレポート β（#R1 叩き。週=月〜日・直近12週・全履歴＝期間フィルター非依存） =====
   var _bjwrTypedKey='', _bjwrChkOff=null;
   function _bjwrRender(){
@@ -16140,8 +16380,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         // 検知はIntersectionObserver＋scroll/クリック時の位置判定の二段構え（描画停止環境でIOが沈黙しても動く）
         var _chk=function(){ if(_started){ _bjwrChkOff&&_bjwrChkOff(); return; }
           if(!tEl.isConnected){ _bjwrChkOff&&_bjwrChkOff(); return; }
-          var r=tEl.getBoundingClientRect();
-          if(tEl.offsetParent && r.top<window.innerHeight*0.85 && r.bottom>40){ _bjwrChkOff&&_bjwrChkOff(); _startType(); } };
+          var r=tEl.getBoundingClientRect(), vh=window.innerHeight||document.documentElement.clientHeight||720;
+          if(tEl.offsetParent && r.top<vh*0.85 && r.bottom>40){ _bjwrChkOff&&_bjwrChkOff(); _startType(); } };
         var _chkSoon=function(){ setTimeout(_chk,250); };
         if(_bjwrChkOff)_bjwrChkOff();
         window.addEventListener('scroll',_chk,{passive:true});
