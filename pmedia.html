@@ -5286,6 +5286,101 @@ function renderRivalAnalysis() {
     }
   }
 
+  // ②-b WIN機種（高勝率）検出 — 3台以上設置・最低アウト＝店舗平均IN枚数以上の台のみで勝率判定
+  {
+    const hasTaibanForWin = all.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
+    const winMinIn = all.length ? all.reduce((s, r) => s + (+r['IN枚数'] || 0), 0) / all.length : 0;
+    const winByDM = {}; // 'date\x00model' → {台番: {in,df}}
+    if (hasTaibanForWin) {
+      all.forEach(r => {
+        const model = r['機種名'];
+        const tai   = r['台番'] != null ? String(r['台番']).trim() : '';
+        const date  = r.date;
+        if (!model || !tai || !date) return;
+        const k = date + '\x00' + model;
+        if (!winByDM[k]) winByDM[k] = {};
+        if (!winByDM[k][tai]) winByDM[k][tai] = { in: 0, df: 0 };
+        winByDM[k][tai].in += +r['IN枚数'] || 0;
+        winByDM[k][tai].df += +r['差枚']   || 0;
+      });
+    }
+    const winEv100 = [], winEv75 = [], winEv65 = [];
+    let winEligible = 0;
+    Object.keys(winByDM).forEach(k => {
+      const p = k.indexOf('\x00');
+      const date = k.slice(0, p), model = k.slice(p + 1);
+      const units = Object.keys(winByDM[k]).map(t => winByDM[k][t]);
+      const elig = units.filter(t => t.in >= winMinIn);
+      if (elig.length < 3) return;
+      winEligible++;
+      const W = elig.filter(t => t.df >= 0).length;
+      const rate = W / elig.length * 100;
+      if (rate < 65) return;
+      const e = { date, model, setup: units.length, N: elig.length, W, rate };
+      if (rate >= 100) winEv100.push(e);
+      if (rate >= 75)  winEv75.push(e);
+      winEv65.push(e);
+    });
+    [winEv100, winEv75, winEv65].forEach(a => a.sort((x, y) => y.date.localeCompare(x.date)));
+    const winPct = n => winEligible > 0 ? (n / winEligible * 100).toFixed(1) + '%' : '-';
+
+    function _winTile(id, cnt, label, sublabel, color, pctStr) {
+      const col    = cnt > 0 ? color : '#6b7280';
+      const bg     = cnt > 0 ? color + '12' : 'rgba(107,114,128,0.05)';
+      const badge  = cnt > 0 ? 'badge-warn' : 'badge-ok';
+      const badgeTxt = cnt > 0 ? cnt + '件' : 'なし';
+      return '<div id="winTile_' + id + '" data-open="false" onclick="toggleWinDetail(\'' + id + '\')"'
+        + ' style="border:1px solid ' + col + ';border-radius:14px;padding:18px 14px 14px;cursor:pointer;background:' + bg + ';user-select:none;">'
+        + '<div style="font-size:56px;font-weight:900;line-height:1;color:' + col + ';letter-spacing:-3px;font-variant-numeric:tabular-nums;">' + cnt + '</div>'
+        + '<div style="font-size:22px;font-weight:900;color:' + col + ';margin-top:4px;letter-spacing:.3px;font-variant-numeric:tabular-nums;">' + pctStr + '</div>'
+        + '<div style="font-size:9.5px;font-weight:800;letter-spacing:.6px;color:' + col + ';margin-top:8px;">' + label + '</div>'
+        + '<div style="font-size:11.5px;font-weight:700;color:var(--text);margin-top:3px;line-height:1.35;">' + sublabel + '</div>'
+        + '<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between;">'
+        + '<span class="action-badge ' + badge + '">' + badgeTxt + '</span>'
+        + '<span style="font-size:10px;color:var(--text2);">▾</span>'
+        + '</div></div>';
+    }
+    function _winRows(events, accentColor) {
+      const cap = 40;
+      const rows = events.slice(0, cap).map(e =>
+        '<div style="display:flex;gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;flex-wrap:wrap;">'
+        + '<span style="color:var(--text2);font-variant-numeric:tabular-nums;">' + e.date.slice(5).replace('-', '/') + '</span>'
+        + '<span style="font-weight:700;color:var(--text);flex:1;min-width:140px;">' + e.model + '</span>'
+        + '<span style="color:' + accentColor + ';font-weight:800;">対象' + e.N + '台中' + e.W + '台プラス（勝率' + Math.round(e.rate) + '%）</span>'
+        + '<span style="color:var(--text2);font-size:10.5px;">設置' + e.setup + '台</span>'
+        + '</div>').join('');
+      const more = events.length > cap ? '<div style="font-size:10.5px;color:var(--text2);margin-top:8px;">…ほか' + (events.length - cap) + '件（期間を絞ると全件見えます）</div>' : '';
+      return (rows || '<div style="font-size:11px;color:var(--text2);">該当なし</div>') + more;
+    }
+    function _winDetail(id, events, label, desc, accentColor) {
+      return '<div id="winDetail_' + id + '" style="display:none;margin-bottom:12px;padding:16px 18px;border-radius:12px;border:1px solid ' + accentColor + '4d;background:rgba(0,0,0,0.18);">'
+        + '<div style="font-size:12px;font-weight:700;color:' + accentColor + ';margin-bottom:12px;">' + label + ' 一覧（' + desc + ' 全' + events.length + '件）</div>'
+        + _winRows(events, accentColor) + '</div>';
+    }
+
+    html += '<div class="rival-section" id="rivalWinSection">';
+    html += '<div class="rival-section-title" style="color:#34d399;"><span class="rst-en">WIN</span> WIN機種（高勝率）検出</div>';
+    html += '<div style="font-size:11px;color:var(--text2);margin-bottom:18px;line-height:1.65;">'
+      + '機種×日ごとに、差枚プラス（0含む）の台の割合＝勝率を判定します。'
+      + '条件：<b>3台以上</b>＋<b>最低アウト＝店舗平均IN枚数（' + Math.round(winMinIn).toLocaleString() + '枚）以上</b>の台のみ対象。タイルクリックで一覧展開。</div>';
+    if (!hasTaibanForWin) {
+      html += '<div style="font-size:11px;color:var(--text2);">台番データがないためWIN機種検出を実行できません。</div>';
+    } else {
+      html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:660px;margin-bottom:16px;">';
+      html += _winTile('win100', winEv100.length, '勝率100%',   '対象台の100%がプラス', '#059669', winPct(winEv100.length));
+      html += _winTile('win75',  winEv75.length,  '勝率75%以上', '対象台の75%以上がプラス', '#10b981', winPct(winEv75.length));
+      html += _winTile('win65',  winEv65.length,  '勝率65%以上', '対象台の65%以上がプラス', '#34d399', winPct(winEv65.length));
+      html += '</div>';
+      html += _winDetail('win100', winEv100, '勝率100%',   '対象台の100%がプラス', '#059669');
+      html += _winDetail('win75',  winEv75,  '勝率75%以上', '対象台の75%以上がプラス', '#10b981');
+      html += _winDetail('win65',  winEv65,  '勝率65%以上', '対象台の65%以上がプラス', '#34d399');
+      html += '<div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6;">'
+        + '※ タイル2段目の％＝件数÷判定対象（3台以上が最低アウトを満たした機種×日の組合せ ' + winEligible + '件）。'
+        + '75%以上は100%を、65%以上は75%以上を含みます。台番データ必須。</div>';
+    }
+    html += '</div>';
+  }
+
   // ②-c 増台減台分析
   {
     const hasTaibanForChange = all.some(r => r['台番'] != null && String(r['台番']).trim() !== '');
@@ -6254,6 +6349,9 @@ function renderRivalAnalysis() {
 
     html += '<div style="font-size:10.5px;color:var(--text2);margin-top:8px;line-height:1.6;">'
       + '※ 出現率＝件数÷（ユニーク台番数' + manUniqueTai + '台×営業日数' + manTotalDays + '日）。1台が連日万枚なら複数カウント。台番データ必須。</div>';
+    // 週次イベントレポート差し込み先（本体は_bjwrRender・AIの週報と同じ週定義）。
+    // セクションdivの内側に置くこと＝サブタブの表示切替に追従させる（外に出すと全タブで常時表示になる）
+    html += '<div id="bjwrHost"></div>';
     html += '</div>';
   }
 
@@ -10681,6 +10779,23 @@ function toggleManDetail(key) {
   }
 }
 
+function toggleWinDetail(key) {
+  const el = document.getElementById('winDetail_' + key);
+  if (!el) return;
+  const isOpen = el.style.display !== 'none';
+  ['win100','win75','win65'].forEach(k => {
+    const p = document.getElementById('winDetail_' + k);
+    if (p) p.style.display = 'none';
+    const t = document.getElementById('winTile_' + k);
+    if (t) t.setAttribute('data-open','false');
+  });
+  if (!isOpen) {
+    el.style.display = 'block';
+    const tile = document.getElementById('winTile_' + key);
+    if (tile) tile.setAttribute('data-open','true');
+  }
+}
+
 function toggleMainOpDetail(key) {
   const el = document.getElementById('mainOpDetail_' + key);
   if (!el) return;
@@ -14256,6 +14371,16 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjwk-sheet .bjb-none{ display:block; padding:18px; }
   .bjwk-hero{ background:#173a7a; color:#fff; padding:13px 22px; display:flex; justify-content:space-between; align-items:center; gap:12px; }
   .bjb2-hero{ background:#6b1d32; }   /* 朝礼はワインレッド（週報の紺と区別・#24） */
+  /* レポート: 週次イベントレポート（#R1） */
+  .bjwr-tbl{ border-collapse:collapse; font-size:11.5px; margin:10px 0 6px; }
+  .bjwr-tbl th,.bjwr-tbl td{ border:1px solid var(--border); padding:4px 10px; text-align:right; white-space:nowrap; color:var(--text); }
+  .bjwr-tbl th{ background:rgba(245,158,11,.10); font-weight:800; }
+  .bjwr-tbl td:first-child,.bjwr-tbl th:first-child{ text-align:left; }
+  .bjwr-cur td{ background:rgba(245,158,11,.08); font-weight:700; }
+  .bjwr-p{ font-size:13px; line-height:2.0; color:var(--text); margin:10px 0 2px; }
+  .bjwr-note{ font-size:10.5px; color:var(--text2); line-height:1.6; margin-top:6px; }
+  #bjwrType.typing::after{ content:'▌'; color:#d97706; animation:bjwrBlink .9s step-end infinite; }
+  @keyframes bjwrBlink{ 50%{opacity:0;} }
   .bjwk-hero-l{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; min-width:0; }
   .bjwk-hero-en{ font-size:9.5px; letter-spacing:2px; opacity:.7; font-family:'Hiragino Mincho ProN','Yu Mincho',Georgia,serif; white-space:nowrap; }
   .bjwk-hero-t{ font-size:17.5px; font-weight:800; white-space:nowrap; }
@@ -14462,7 +14587,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // 重い描画はローディング（熊）を挟んで1フレーム後に実行＝スピナーが必ず見える
     var needHeavy = (room==='report'&&window._bjReportDirty) || (room==='post'&&window._bjReportDirty) || (room==='payout'&&window._bjPayoutDirty) || (room==='briefing') || (room==='weekly');
     var work=function(){
-      if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); }
+      if(room==='report'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } setTimeout(function(){ try{ syncReportSubtabs(); _bjFixReportGray(); }catch(e){} },60); setTimeout(function(){ try{ _bjwrRender(); }catch(e){ console.error('bjwr', e); } },140); }
       if(room==='post'){ if(window._bjReportDirty){ try{ renderRivalAnalysis(); }catch(e){} } try{ renderAlertTiles(); }catch(e){} }   // ポストイットはrival依存→先にrival描画してキャッシュ確保
       if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
       if(room==='briefing'){ _bjbRetry=0; try{ _bjbRender(); }catch(e){ console.error('briefing', e); } }   // AIの朝礼：開くたび生成（メモ化済みで軽い）
@@ -15665,7 +15790,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
                  y:{ticks:{font:{size:9.5}, color:'#475569'}, grid:{display:false}} }; }
         else { sc={ y:{beginAtZero:true, ticks:{font:{size:9}, color:'#94a3b8'}, grid:{color:'#eef2f7'}},
                  x:{ticks:{font:{size:9.5}, color:'#475569'}, grid:{display:false}} };
-          if(opts.y2)sc.y1={ position:'right', ticks:{font:{size:9}, color:'#c2410c'}, grid:{display:false} }; }
+          if(opts.y2)sc.y1={ position:'right', ticks:{font:{size:9}, color:'#c2410c'}, grid:{display:false} };
+          if(opts.intY)sc.y.ticks.precision=0; }
         return { responsive:false, animation:false, indexAxis:opts.horiz?'y':'x',
         layout:{padding:{top:16, right:opts.horiz?40:0}},
         plugins:{ legend:opts.legend?{display:true, position:'top', labels:{boxWidth:12, font:{size:10}, color:'#475569'}}:{display:false},
@@ -15840,6 +15966,210 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var _tk=key+'|'+target+'|'+C.W.mon;
     if(_bjwkTypedKey===_tk){ _bjwkFillAll(); }
     else { _bjwkTypedKey=_tk; _bjwkTypeSkip=false; _bjwkTypeSecs(H, 0); }
+  }
+
+
+  // ===== レポート: 全台系・万枚の週次イベントレポート β（#R1 叩き。週=月〜日・直近12週・全履歴＝期間フィルター非依存） =====
+  var _bjwrTypedKey='', _bjwrChkOff=null;
+  function _bjwrRender(){
+    var host=document.getElementById('bjwrHost'); if(!host)return;
+    try{
+      var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
+      if(!recs.length){ host.innerHTML=''; return; }
+      var isP=(typeof _isPachinkoStore==='function')?!!_isPachinkoStore():false;
+      var mc=(typeof _manConfig==='function')?_manConfig():{t1:10000,t2:9000,t3:8000,l1:'万枚突破',l2:'9,000枚突破',l3:'8,000枚突破'};
+      // 台番×日（万枚判定）
+      var taiDay={}, dateSet={};
+      for(var i=0;i<recs.length;i++){ var r=recs[i], d=r.date; if(!d)continue; dateSet[d]=1;
+        var tai=(r['台番']!=null)?String(r['台番']).trim():''; if(!tai)continue;
+        var k1=d+'\x00'+tai;
+        if(!taiDay[k1])taiDay[k1]={d:d,tai:tai,mn:r['機種名']||'不明',diff:0};
+        taiDay[k1].diff+=r['差枚']||0; }
+      var evAll=Object.keys(taiDay).map(function(k){return taiDay[k];});
+      var dates=Object.keys(dateSet).sort();
+      if(dates.length<14||!evAll.length){ host.innerHTML=''; return; }
+      // 機種×日×台の集計（全台系とWINで共用）
+      var zk={};
+      for(var i2=0;i2<recs.length;i2++){ var r2=recs[i2], d2=r2.date, mn2=r2['機種名'];
+        var t2=(r2['台番']!=null)?String(r2['台番']).trim():'';
+        if(!d2||!mn2||!t2)continue; var kk=d2+'\x00'+mn2+'\x00'+t2;
+        if(!zk[kk])zk[kk]={d:d2,mn:mn2,in:0,df:0};
+        zk[kk].in+=r2['IN枚数']||0; zk[kk].df+=r2['差枚']||0; }
+      var zdm={};
+      Object.keys(zk).forEach(function(kk){ var v=zk[kk], k2=v.d+'\x00'+v.mn;
+        (zdm[k2]=zdm[k2]||{d:v.d,mn:v.mn,tais:[]}).tais.push(v); });
+      // 全台系イベント（スロ店のみ・日×機種・3台以上・全台IN2万超・全台100%/105%）
+      var zenEv=[];
+      if(!isP){
+        Object.keys(zdm).forEach(function(k2){ var g=zdm[k2]; if(g.tais.length<3)return;
+          var ok100=g.tais.every(function(t){ return t.in>=20000 && (t.in+t.df)/t.in>=1.00; });
+          if(!ok100)return;
+          var ok105=g.tais.every(function(t){ return (t.in+t.df)/t.in>=1.05; });
+          zenEv.push({d:g.d, mn:g.mn, k:ok105?105:100}); });
+      }
+      // WIN機種イベント（#R5: レポート本体と同条件＝店舗平均IN以上の台のみ・3台以上・勝率65/75/100。全履歴平均）
+      var _totIn=0;
+      for(var i3=0;i3<recs.length;i3++){ _totIn+=recs[i3]['IN枚数']||0; }
+      var _avgIn=recs.length?_totIn/recs.length:0;
+      var winEv=[];
+      Object.keys(zdm).forEach(function(k2){ var g=zdm[k2];
+        var elig=g.tais.filter(function(t){ return t.in>=_avgIn; });
+        if(elig.length<3)return;
+        var W=0; elig.forEach(function(t){ if(t.df>=0)W++; });
+        var rate=W/elig.length*100;
+        if(rate>=65)winEv.push({d:g.d, mn:g.mn, rate:rate});
+      });
+      // 直近の「日曜まで閉じた」週から最大12週（週報と同じ木曜ルールの週番号）
+      var lastD=dates[dates.length-1], lastMon=_bjwkMonday(lastD);
+      var endMon=(lastD>=_bjwkAddD(lastMon,6))?lastMon:_bjwkAddD(lastMon,-7);
+      var weeks=[];
+      for(var w=0;w<12;w++){ var mon=_bjwkAddD(endMon,-7*w); if(_bjwkAddD(mon,6)<dates[0])break;
+        weeks.push({mon:mon, sun:_bjwkAddD(mon,6), W:_bjwkWeekOf(mon)}); }
+      weeks.reverse();
+      if(weeks.length<2){ host.innerHTML=''; return; }
+      weeks.forEach(function(wk){
+        var m1=0,m2=0,m3=0, taiSet={}, daySet={}, mans={};
+        evAll.forEach(function(e){ if(e.d<wk.mon||e.d>wk.sun)return;
+          taiSet[e.tai]=1; daySet[e.d]=1;
+          if(e.diff>=mc.t3)m3++;
+          if(e.diff>=mc.t2)m2++;
+          if(e.diff>=mc.t1){ m1++; mans[e.mn]=(mans[e.mn]||0)+1; } });
+        var den=Object.keys(taiSet).length*Object.keys(daySet).length;
+        wk.man1=m1; wk.man2=m2; wk.man3=m3; wk.mans=mans; wk.days=Object.keys(daySet).length;
+        wk.p1=den?m1/den*100:0; wk.p2=den?m2/den*100:0; wk.p3=den?m3/den*100:0;
+        wk.z105=[]; wk.z100=[];
+        zenEv.forEach(function(z){ if(z.d<wk.mon||z.d>wk.sun)return; wk.z100.push(z); if(z.k===105)wk.z105.push(z); });
+        wk.w100=0; wk.w75=0; wk.w65=0; wk.winM={}; wk.winAll={};
+        winEv.forEach(function(w){ if(w.d<wk.mon||w.d>wk.sun)return;
+          wk.w65++; wk.winAll[w.mn]=(wk.winAll[w.mn]||0)+1;
+          if(w.rate>=75)wk.w75++; if(w.rate>=100){ wk.w100++; wk.winM[w.mn]=(wk.winM[w.mn]||0)+1; } });
+      });
+      var cur=weeks[weeks.length-1], prevW=weeks.slice(0,-1);
+      function _wLab(wk){ return parseInt(wk.W.month.slice(5),10)+'月第'+wk.W.idx+'週'; }
+      // テーブル（5項目＋出現率）
+      var thead='<tr><th>週</th>'+(isP?'':'<th>全台系105%</th><th>全台系100%</th>')
+        +'<th>WIN100%</th><th>WIN75%以上</th><th>WIN65%以上</th>'
+        +'<th>'+mc.l1+'</th><th>出現率</th><th>'+mc.l2+'</th><th>'+mc.l3+'</th></tr>';
+      var trows=weeks.map(function(wk,i){
+        return '<tr'+(i===weeks.length-1?' class="bjwr-cur"':'')+'><td>'+_wLab(wk)+'（'+_bjbFmtD(wk.mon)+'〜）</td>'
+          +(isP?'':'<td>'+(wk.z105.length||'-')+'</td><td>'+(wk.z100.length||'-')+'</td>')
+          +'<td>'+(wk.w100||'-')+'</td><td>'+(wk.w75||'-')+'</td><td>'+(wk.w65||'-')+'</td>'
+          +'<td>'+(wk.man1||'-')+'</td><td>'+(wk.man1?wk.p1.toFixed(2)+'%':'-')+'</td>'
+          +'<td>'+(wk.man2||'-')+'</td><td>'+(wk.man3||'-')+'</td></tr>'; }).join('');
+      // コメント（#R6: 万枚・全台系・WINの3項目に分ける）
+      var lines=[];
+      // 【万枚突破】
+      var avg1=prevW.reduce(function(s,x){return s+x.man1;},0)/prevW.length;
+      var trend=(cur.man1>=avg1*1.3&&cur.man1>avg1)?'出玉の見せ場が増えています':
+                (cur.man1<=avg1*0.7)?'見せ場は控えめでした':'ほぼ普段どおりのペースです';
+      lines.push('<b>【'+mc.l1+'】</b>直近週（'+_wLab(cur)+'）は<b>'+cur.man1+'件・出現率'+cur.p1.toFixed(2)+'%</b>（過去'+prevW.length+'週平均'+avg1.toFixed(1)+'件）→ '+trend+'。');
+      var tot={}; weeks.forEach(function(wk){ Object.keys(wk.mans).forEach(function(m){ tot[m]=(tot[m]||0)+wk.mans[m]; }); });
+      var top=Object.keys(tot).sort(function(a,b){return tot[b]-tot[a];}).slice(0,3);
+      if(top.length)lines.push('この12週で多いのは '+top.map(function(m){return '<b>'+_bjEsc(m)+'</b>（'+tot[m]+'件）';}).join('、')+'。');
+      var newFace=Object.keys(cur.mans).filter(function(m){ return !prevW.some(function(wk){return wk.mans[m];}); });
+      if(newFace.length)lines.push('直近週の新顔 → '+newFace.map(function(m){return '<b>'+_bjEsc(m)+'</b>';}).join('、')+'（この12週で初の'+mc.l1+'）。');
+      // 【全台系】
+      if(!isP){
+        var zT105=0, zT100=0; weeks.forEach(function(wk){ zT105+=wk.z105.length; zT100+=wk.z100.length; });
+        if(!zT100){ lines.push('<b>【全台系】</b>この12週間で全台系イベントは検出されていません。'); }
+        else{
+          lines.push('<b>【全台系】</b>この12週で105%以上が<b>'+zT105+'件</b>・100%以上が<b>'+zT100+'件</b>。');
+          if(cur.z100.length){
+            var zm={}; cur.z100.forEach(function(z){ zm[z.mn]=1; });
+            lines.push('直近週は '+Object.keys(zm).slice(0,3).map(function(m){return '<b>'+_bjEsc(m)+'</b>';}).join('、')+'で発生。');
+          } else {
+            var lastZ=null;
+            for(var wi=weeks.length-2; wi>=0; wi--){ if(weeks[wi].z100.length){ lastZ=weeks[wi]; break; } }
+            if(lastZ)lines.push('直近の発生は'+_wLab(lastZ)+'（'+_bjEsc(lastZ.z100[lastZ.z100.length-1].mn)+'）。直近週はありませんでした。');
+          }
+        }
+      }
+      // 【WIN機種】
+      var avgW=prevW.reduce(function(s,x){return s+x.w65;},0)/prevW.length;
+      var wLine='<b>【WIN機種】</b>直近週の勝率65%以上は<b>'+cur.w65+'件</b>（過去'+prevW.length+'週平均'+avgW.toFixed(1)+'件）';
+      if(cur.w100){ var wmTop=Object.keys(cur.winM).sort(function(a,b){return cur.winM[b]-cur.winM[a];}).slice(0,2);
+        wLine+='。うち勝率100%は'+cur.w100+'件 → '+wmTop.map(function(m){return '<b>'+_bjEsc(m)+'</b>';}).join('、'); }
+      lines.push(wLine+'。');
+      var wTot={}; weeks.forEach(function(wk){ Object.keys(wk.winM).forEach(function(m){ wTot[m]=(wTot[m]||0)+wk.winM[m]; }); });
+      var wTop=Object.keys(wTot).sort(function(a,b){return wTot[b]-wTot[a];}).slice(0,2);
+      if(wTop.length)lines.push('12週の勝率100%常連 → '+wTop.map(function(m){return '<b>'+_bjEsc(m)+'</b>（'+wTot[m]+'件）';}).join('、')+'。');
+      // #R7: WINに最近出てきた／いなくなった機種（直近3週 vs それ以前・65%以上ベース）
+      if(weeks.length>=6){
+        var rcW=weeks.slice(-3), oldW=weeks.slice(0,-3);
+        var rcM={}, oldM={};
+        rcW.forEach(function(wk){ Object.keys(wk.winAll).forEach(function(m){ rcM[m]=(rcM[m]||0)+wk.winAll[m]; }); });
+        oldW.forEach(function(wk){ Object.keys(wk.winAll).forEach(function(m){ oldM[m]=(oldM[m]||0)+wk.winAll[m]; }); });
+        var came=Object.keys(rcM).filter(function(m){ return !oldM[m]; })
+          .sort(function(a,b){ return rcM[b]-rcM[a]; }).slice(0,3);
+        if(came.length)lines.push('WINに最近出てきた → '+came.map(function(m){return '<b>'+_bjEsc(m)+'</b>（直近3週で'+rcM[m]+'件・それ以前は0件）';}).join('、')+'。');
+        var gone=Object.keys(oldM).filter(function(m){ return oldM[m]>=2 && !rcM[m]; })
+          .sort(function(a,b){ return oldM[b]-oldM[a]; }).slice(0,3);
+        if(gone.length){
+          lines.push('WINからいなくなった → '+gone.map(function(m){
+            var lastW=null; for(var gi=oldW.length-1; gi>=0; gi--){ if(oldW[gi].winAll[m]){ lastW=oldW[gi]; break; } }
+            return '<b>'+_bjEsc(m)+'</b>（'+(lastW?_wLab(lastW)+'を最後に':'')+'直近3週は0件）';
+          }).join('、')+'。');
+        }
+        if(came.length&&gone.length)lines.push('→ 勝たせどころ（勝率で見せる機種）の入れ替わりが起きています。');
+      }
+      host.innerHTML='<div class="rival-section-title" style="color:#f59e0b;margin-top:26px;"><span class="rst-en">WEEKLY</span> 全台系・万枚の週次レポート β</div>'
+        +'<div class="bjwr-note">直近'+weeks.length+'週（月〜日）の推移。AIの週報と同じ週の数え方（週の月所属はその週の木曜日が属する月）。期間フィルターの影響を受けません。WIN機種の条件は上のセグメントと同じ（3台以上・店舗平均IN枚数以上の台のみ・差枚プラス台の割合）。</div>'
+        +'<div class="bjwr-p" id="bjwrType"></div>'
+        +'<div class="bjwk-charts" style="margin:10px 0 2px;"><canvas id="bjwrCh" width="758" height="190"></canvas></div>'
+        +'<div class="bjwk-charts" style="margin:0 0 2px;">'
+          +(isP?'':'<canvas id="bjwrCh2" width="372" height="185"></canvas>')
+          +'<canvas id="bjwrCh3" width="'+(isP?758:372)+'" height="185"></canvas></div>'
+        +'<div style="overflow-x:auto;"><table class="bjwr-tbl"><thead>'+thead+'</thead><tbody>'+trows+'</tbody></table></div>';
+      // #R3: コメントはグラフ上部・スクロールで見えたらタイプライター開始（朝礼と同じ24ms・クリックで全文・店×週につき1回）
+      var _cHtml=lines.join('<br>');
+      var _st=(typeof getActiveStore==='function')?getActiveStore():null;
+      var _tk=((_st&&_st.key)||'')+'|'+cur.mon;
+      var tEl=document.getElementById('bjwrType');
+      if(_bjwrTypedKey===_tk){ tEl.innerHTML=_cHtml; }
+      else{
+        tEl.style.minHeight='7em';   // 仮の高さ＝スクロール検知の面積確保（正確な高さは開始時に測る）
+        var _started=false;
+        var _startType=function(){ if(_started)return; _started=true; _bjwrTypedKey=_tk;
+          tEl.innerHTML=_cHtml; tEl.style.minHeight=tEl.offsetHeight+'px'; tEl.innerHTML='';   // 可視状態で高さ確保＝タイプ中にグラフが動かない
+          var text=_bjwkPlain(_cHtml), k=0, tm=null;
+          tEl.classList.add('typing');
+          var fin=function(){ if(tm){clearInterval(tm);tm=null;} tEl.classList.remove('typing'); tEl.onclick=null; tEl.innerHTML=_cHtml; };
+          tEl.onclick=fin;
+          tm=setInterval(function(){ k+=1; tEl.textContent=text.slice(0,k); if(k>=text.length)fin(); },24);
+        };
+        // 検知はIntersectionObserver＋scroll/クリック時の位置判定の二段構え（描画停止環境でIOが沈黙しても動く）
+        var _chk=function(){ if(_started){ _bjwrChkOff&&_bjwrChkOff(); return; }
+          if(!tEl.isConnected){ _bjwrChkOff&&_bjwrChkOff(); return; }
+          var r=tEl.getBoundingClientRect();
+          if(tEl.offsetParent && r.top<window.innerHeight*0.85 && r.bottom>40){ _bjwrChkOff&&_bjwrChkOff(); _startType(); } };
+        var _chkSoon=function(){ setTimeout(_chk,250); };
+        if(_bjwrChkOff)_bjwrChkOff();
+        window.addEventListener('scroll',_chk,{passive:true});
+        document.addEventListener('click',_chkSoon);
+        _bjwrChkOff=function(){ window.removeEventListener('scroll',_chk); document.removeEventListener('click',_chkSoon); _bjwrChkOff=null; };
+        if('IntersectionObserver' in window){
+          var _io=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){ _io.disconnect(); _startType(); } }); },{threshold:0.35});
+          _io.observe(tEl);
+        }
+        setTimeout(_chk,400);
+      }
+      _bjwkBar('bjwrCh', weeks.map(function(wk){return [_bjbFmtD(wk.mon)+'〜',_wLab(wk)];}), [
+        {label:mc.l1+'（件）', data:weeks.map(function(wk){return wk.man1;}), backgroundColor:weeks.map(function(wk,i){return i===weeks.length-1?'#d97706':'#f5d7a1';}), borderRadius:3, order:2},
+        {type:'line', label:'出現率（%）', data:weeks.map(function(wk){return +wk.p1.toFixed(2);}), borderColor:'#c2410c', backgroundColor:'#c2410c', pointRadius:2.5, borderWidth:1.5, tension:0.25, yAxisID:'y1', order:1}
+      ], {title:mc.l1+'の12週推移（棒=件数・線=出現率）', legend:true, y2:true, intY:true, fmt:function(v){return v||'';}});
+      var _sLbl=weeks.map(function(wk){return _bjbFmtD(wk.mon);});
+      if(!isP){
+        _bjwkBar('bjwrCh2', _sLbl, [
+          {label:'105%以上（件）', data:weeks.map(function(wk){return wk.z105.length;}), backgroundColor:'#f59e0b', borderRadius:3},
+          {label:'100%以上（件・105%含む）', data:weeks.map(function(wk){return wk.z100.length;}), backgroundColor:'#fcd34d', borderRadius:3}
+        ], {title:'全台系の12週推移', legend:true, intY:true, fmt:function(){return '';}});
+      }
+      _bjwkBar('bjwrCh3', _sLbl, [
+        {label:'勝率100%', data:weeks.map(function(wk){return wk.w100;}), backgroundColor:'#059669', borderRadius:3},
+        {label:'75%以上（100%含む）', data:weeks.map(function(wk){return wk.w75;}), backgroundColor:'#10b981', borderRadius:3},
+        {label:'65%以上（75%含む）', data:weeks.map(function(wk){return wk.w65;}), backgroundColor:'#6ee7b7', borderRadius:3}
+      ], {title:'WIN機種の12週推移', legend:true, intY:true, fmt:function(){return '';}});
+    }catch(e){ console.error('bjwr', e); host.innerHTML=''; }
   }
 
   try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(e){}   // リロード時のスクロール位置復元を無効化（非同期描画で"変な位置スタート"になるのを防ぐ）
@@ -16038,7 +16368,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(!secs.length)return;
     // グループ：全台系＋万枚、増減台＋台移動 を1タブにまとめる
     var groups=[
-      {match:/全台系|万枚/, label:'全台系・万枚', secs:[]},
+      {match:/全台系|万枚|WIN機種/, label:'全台系・万枚', secs:[]},
       {match:/増台|減台|台移動|移動/, label:'増減台・移動', secs:[]}
     ];
     var tabs=[];
