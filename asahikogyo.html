@@ -1081,6 +1081,7 @@
           <button type="button" class="bjp-info trend-mode on" data-mode="chart" onclick="bjTrendMode('chart')">グラフ</button>
           <button type="button" class="bjp-info trend-mode" data-mode="table" onclick="bjTrendMode('table')">テーブル</button>
           <button type="button" class="bjp-info" id="trendCsvBtn" style="display:none;" onclick="bjTrendCsv()">CSVダウンロード</button>
+          <button type="button" class="bjp-info" id="bjBackRangeBtn" style="display:none;font-weight:700;color:#0098d4;border-color:#0098d4;" onclick="bjRangeBack()">← 期間に戻る</button>
         </div>
       </div>
       <div id="trendChartWrap" class="chart-wrapper"><canvas id="trendChart"></canvas></div>
@@ -3043,6 +3044,28 @@ function reloadAll() {
 
 let filtered = loadAllData();
 let trendChart;
+// 日次グラフの単日絞り込みから戻るための直前期間（日クリック時に保存・戻る/範囲指定で破棄）
+let _bjPrevRange = null;
+function bjRangeBack(){
+  if (!_bjPrevRange) return;
+  const f = document.getElementById('dateFrom'), t = document.getElementById('dateTo');
+  if (f) f.value = _bjPrevRange.from;
+  if (t) t.value = _bjPrevRange.to;
+  _bjPrevRange = null;
+  applyFilter();
+}
+function _bjSyncBackBtn(){
+  const b = document.getElementById('bjBackRangeBtn'); if (!b) return;
+  const f = document.getElementById('dateFrom'), t = document.getElementById('dateTo');
+  const single = f && t && f.value && f.value === t.value;
+  if (single && _bjPrevRange && (_bjPrevRange.from !== f.value || _bjPrevRange.to !== t.value)) {
+    b.style.display = '';
+    b.textContent = '← ' + _bjPrevRange.from.slice(5).replace('-','/') + '〜' + _bjPrevRange.to.slice(5).replace('-','/') + ' に戻る';
+  } else {
+    b.style.display = 'none';
+    if (!single) _bjPrevRange = null;   // 範囲に戻った/変えた時点で記憶を破棄
+  }
+}
 
 const fmt = n => (n >= 0 ? '+' : '') + Math.round(n).toLocaleString();
 const fmtYen = n => Math.round(n).toLocaleString() + '円';
@@ -9028,6 +9051,7 @@ function renderCharts() {
           const ds = filteredDates[pts[0].index];
           if (!ds) return;
           const f = document.getElementById('dateFrom'), t = document.getElementById('dateTo');
+          if (f && t && f.value && f.value !== t.value) _bjPrevRange = { from: f.value, to: t.value };
           if (f) f.value = ds;
           if (t) t.value = ds;
           applyFilter();
@@ -9052,7 +9076,8 @@ function renderCharts() {
   });
   const _tc = document.getElementById('trendChart');
   _tc.style.cursor = 'pointer';
-  _tc.title = '日付をクリックすると、その日1日だけの分析に絞り込みます（期間の再指定で戻せます）';
+  _tc.title = '日付をクリックすると、その日1日だけの分析に絞り込みます（グラフ右上の「← 戻る」で元の期間に戻せます）';
+  _bjSyncBackBtn();
   _tc.classList.remove('chart-animate');
   void _tc.offsetWidth; // reflow で animation をリセット
   _tc.classList.add('chart-animate');
@@ -15467,6 +15492,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         aOut=so/past.length; aProf=sp/past.length; }
       return {date:d.date, dow:d.dow, label:bp?_bjPatLabel(bp):'特定日', outPT:d.outPT, exp:e, ratio:e>0?d.outPT/e:null, prof:d.prof,
         past:past.length, avgOut:aOut, avgProf:aProf}; });
+    // #13 予想の答え合わせ用: 各日の素の期待値（エッジ1.0＝朝礼と同じ物差し）。#15: エッジ計算用に店平均も添付
+    cur.days.forEach(function(d){ d.exp=_bjbExpOf(stats,adopted,d.date); });
+    cur.expMean=stats.mean;
     // 機種：締め/出し（週比・稼働2台以上＆死に台除外）＋新台通信簿
     var mc=_bjwkMachAgg(M,W.mon,W.sun), mp=_bjwkMachAgg(M,PW.mon,PW.sun);
     // 機種ピックアップの共通ゲート（#06: ある程度アウトが入っている機種だけ＝朝礼#03死に台ゲートの週版）
@@ -15535,6 +15563,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(varNames.length>=3){ var cV=_serAgg(varNames,mc);
       if(cV)series.push({label:'バラエティ', note:varNames.length+'機種', models:varNames.length, names:varNames, cur:cV, prev:_serAgg(varNames,mp)}); }
     // 設備の動き（#02: 前営業日比の段差＝朝礼#11と同じ考え方。増減台=|Δ|>=2かつmax>=3、台移動=台数同じで台番が2台以上入替）
+    // #12: 前後比較用の窓集計（台あたりアウト・台粗利/台日。後窓は対象週の日曜まで＝タイムマシン安全）
+    function _eqWin(mn2, f, t){ var md2=M.byMD[mn2]; if(!md2)return null; var inS=0,c=0,p=0,nd=0;
+      for(var d2=f; d2<=t; d2=_bjwkAddD(d2,1)){ var o=md2[d2]; if(!o||!o.c)continue; inS+=o.in; c+=o.c; p+=o.p; nd++; }
+      return c>0?{outPT:inS/c, profPT:p/c, nd:nd}:null; }
     var equip=[], moved=[];
     Object.keys(M.byMD).forEach(function(mn){ if(debutSet[mn])return;
       var md=M.byMD[mn], mdays=Object.keys(md).sort();
@@ -15542,11 +15574,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         var dp=mdays[di-1]; if(_bjwkD(dc)-_bjwkD(dp)>7*864e5)continue;
         var cc=md[dc].c, cp=md[dp].c;
         if(Math.abs(cc-cp)>=2 && Math.max(cc,cp)>=3){ equip.push({mn:mn, date:dc, from:cp, to:cc, kind:cc>cp?'増台':'減台',
-          outPT:mc[mn]?mc[mn].outPT:null, profPT:mc[mn]?mc[mn].profPT:null}); break; }
+          pre:_eqWin(mn,_bjwkAddD(dc,-7),_bjwkAddD(dc,-1)),
+          post:_eqWin(mn,dc,(_bjwkAddD(dc,6)<W.sun?_bjwkAddD(dc,6):W.sun))}); break; }
         if(cc===cp && md[dc].t && md[dp].t){ var sp={}; md[dp].t.forEach(function(x){sp[x]=1;});
           var diffN=md[dc].t.filter(function(x){return !sp[x];}).length;
           if(diffN>=2 && cc>=3){ moved.push({mn:mn, date:dc, n:diffN, c:cc,
-            outPT:mc[mn]?mc[mn].outPT:null, profPT:mc[mn]?mc[mn].profPT:null}); break; } }
+            pre:_eqWin(mn,_bjwkAddD(dc,-7),_bjwkAddD(dc,-1)),
+            post:_eqWin(mn,dc,(_bjwkAddD(dc,6)<W.sun?_bjwkAddD(dc,6):W.sun))}); break; } }
       } });
     // 来週の見どころ
     var NW=_bjwkWeekOf(_bjwkAddD(W.mon,7));
@@ -15625,7 +15659,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(C.spCur&&C.spCur.base!=null){
       var p3='平日のベース稼働（土日祝・特定日を除く）は台あたり<b>'+Math.round(C.spCur.base).toLocaleString()+'枚</b>';
       if(C.spPrev&&C.spPrev.base)p3+='（前週から'+_bjwkDeltaOut(C.spCur.base,C.spPrev.base)+'）';
-      if(C.spCur.yama!=null){ p3+='、山の日（土日祝・特定日）は<b>'+Math.round(C.spCur.yama).toLocaleString()+'枚</b>';
+      if(C.spCur.yama!=null){ p3+='、山場（土日祝・特定日）は<b>'+Math.round(C.spCur.yama).toLocaleString()+'枚</b>';
         if(C.spPrev&&C.spPrev.yama)p3+='（同'+_bjwkDeltaOut(C.spCur.yama,C.spPrev.yama)+'）'; }
       p3+='。'+_pk(['ベースは店の体力、山は集客力です。','ベースが痩せずに山が伸びるのが理想の形です。','山だけ崩れる週は競合のイベントに客を取られたサインです。']);
       if(C.peak)p3+=' 週内のピークは'+_bjbFmtD(C.peak.date)+'（'+'日月火水木金土'[C.peak.dow]+'）の'+Math.round(C.peak.outPT).toLocaleString()+'枚でした。';
@@ -15661,6 +15695,37 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     } else if(C.hasToku){ p4b='この週に、この店の特定日パターン（長期履歴から検出）に該当する日はありませんでした。'; }
     else { p4b='この店にはまだ明確な特定日パターンが検出されていません。履歴がたまると自動で検出されます。'; }
     H.push(['特定日の通信簿', p4b]);
+    // ⑤b 予想について（#13: 素の期待値=エッジ1.0。的中度=100%−平均誤差＝曜日＆特定日タブと同じ式）
+    var fcErr=0, fcN=0, fcMiss=[];
+    C.cur.days.forEach(function(d){ if(!(d.exp>0))return;
+      var err=(d.outPT-d.exp)/d.exp; fcErr+=Math.abs(err); fcN++;
+      if(Math.abs(err)>=0.15)fcMiss.push({date:d.date, dow:d.dow, exp:d.exp, act:d.outPT, err:err}); });
+    var pFc='';
+    if(fcN>=4){
+      // #15: エッジ別の的中度（本家未来予測と同じ式: mean×max(0.2, 1+(乗数-1)×E)）
+      var _fcMean=C.cur.expMean||0;
+      var _accE=function(E){ var s=0,n=0;
+        C.cur.days.forEach(function(d){ if(!(d.exp>0))return;
+          var ex=(_fcMean>0)?_fcMean*Math.max(0.2,1+(d.exp/_fcMean-1)*E):d.exp;
+          if(!(ex>0))return; s+=Math.abs(d.outPT-ex)/ex; n++; });
+        return n?Math.max(0,100-s/n*100):null; };
+      var acc=(_fcMean>0&&_accE(1)!=null)?_accE(1):Math.max(0,100-fcErr/fcN*100);
+      var accBest=acc, bestE=1;
+      if(_fcMean>0){ for(var E=1.1; E<=2.4001; E+=0.1){ var a2=_accE(E); if(a2!=null&&a2>accBest+1e-6){ accBest=a2; bestE=Math.round(E*10)/10; } } }
+      var accTxt=(accBest>acc+0.5)
+        ?('<b>'+acc.toFixed(0)+'%〜'+accBest.toFixed(0)+'%</b>（素の予想＝エッジ1.0で'+acc.toFixed(0)+'%、エッジを'+bestE.toFixed(1)+'まで立てると'+accBest.toFixed(0)+'%）')
+        :('<b>'+acc.toFixed(0)+'%</b>（エッジ1.0。今週はエッジを立てても改善しませんでした）');
+      pFc='今週の予想的中度は'+accTxt+'。的中度＝100%−平均誤差です。';
+      if(fcMiss.length){
+        fcMiss.sort(function(a,b){return Math.abs(b.err)-Math.abs(a.err);});
+        pFc+='<br>振り返りたい営業日<br>'+fcMiss.slice(0,3).map(function(x){
+          return '・<b>'+_bjbFmtD(x.date)+'（'+'日月火水木金土'[x.dow]+'）</b> 予想'+Math.round(x.exp).toLocaleString()+'枚 → 実績'+Math.round(x.act).toLocaleString()+'枚（'+(x.err>=0?'+':'')+(x.err*100).toFixed(0)+'%'+(x.err>=0?'の上振れ':'の下振れ')+'）';
+        }).join('<br>');
+        pFc+='<br>'+_pk(['上振れの日は「何が効いたか」、下振れの日は「どこに客を取られたか」を振り返ると次に活きます。','大きく外れた日には、競合のイベントか自店の仕掛けの答えが隠れています。','外れる向きが同じ週は、店のベース自体が動き始めたサインです。']);
+      } else pFc+='<br>大きく外した営業日はありませんでした。予想どおりに動いた一週間です。';
+      pFc+='<br><span class="bjwk-note">エッジ＝曜日・特定日の振れ幅を何倍で見るかの係数。詳細は「ポストイット＆未来予測」タブの未来予測をご覧ください。</span>';
+    } else pFc='答え合わせできる日数が足りませんでした（'+fcN+'日分）。履歴がたまると精度が上がります。';
+    H.push(['予想について', pFc]);
     // ⑤ 新台（#02独立・#10テーブル化・#11週推移＝初週→2週目→3週目を行で積む。最下行=今回の週）
     function _newTrs(n){
       var wks=(n.weeks&&n.weeks.length)?n.weeks:[{k:n.week, outPT:n.outPT, rate:n.rate, profPT:n.profPT, taiAvg:n.taiAvg}];
@@ -15677,14 +15742,43 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var _ntr=C.debut.map(_newTrs).concat(C.cont.map(_newTrs));
     var p5n=_ntr.length
       ?'<div style="overflow-x:auto;"><table class="bjwk-tbl bjwk-newtbl"><thead><tr><th>機種名</th><th>登場</th><th>台数</th><th>週</th><th>台あたりアウト</th><th>出玉率</th><th>台粗利</th></tr></thead><tbody>'+_ntr.join('')+'</tbody></table></div>'
+        +'<span class="bjwk-note">詳細はレポートタブの「新台登場 検出」をご覧ください。</span>'
       :'この週に新しい機種の登場はありませんでした。';
     H.push(['新台', p5n]);
     // ⑥ 増台・減台・レイアウト変更（#02新設・#03「設備」表現廃止＋ダイジェスト行・日付順）
-    function _eqNum(e){ return (e.outPT!=null)?('・週のアウト'+Math.round(e.outPT).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(e.profPT))+'/日'):''; }
-    var _er=C.equip.map(function(e){return {d:e.date, t:_bjbFmtD(e.date)+' <b>'+e.mn+'</b> → '+e.from+'台→'+e.to+'台（'+e.kind+'）'+_eqNum(e)};})
-      .concat(C.moved.slice(0,5).map(function(e){return {d:e.date, t:_bjbFmtD(e.date)+' <b>'+e.mn+'</b> → '+e.n+'台入替（レイアウト変更）'+_eqNum(e)};}));
-    _er.sort(function(a,b){return a.d<b.d?-1:1;});
-    var p6e=_er.length?_er.map(function(x){return x.t;}).join('<br>')+(C.moved.length>5?'<br>ほかレイアウト変更'+(C.moved.length-5)+'機種':''):'この週に増台・減台・レイアウト変更はありませんでした。';
+    function _eqNum(e){
+      if(!e.post)return '';
+      var s='・アウト ';
+      if(e.pre){
+        var pc=e.pre.outPT>0?((e.post.outPT-e.pre.outPT)/e.pre.outPT*100):null;
+        s+='前'+Math.round(e.pre.outPT).toLocaleString()+'枚 → 後'+Math.round(e.post.outPT).toLocaleString()+'枚'+(pc!=null?('（'+(pc>=0?'+':'')+pc.toFixed(0)+'%）'):'');
+        s+='・台粗利 前'+_bjwkYen(Math.round(e.pre.profPT))+' → 後'+_bjwkYen(Math.round(e.post.profPT))+'/日';
+      } else {
+        s+='後'+Math.round(e.post.outPT).toLocaleString()+'枚・台粗利 後'+_bjwkYen(Math.round(e.post.profPT))+'/日（変化前のデータなし）';
+      }
+      if(e.post.nd<3)s+='（変化後'+e.post.nd+'日分の暫定）';
+      return s; }
+    // #13: テーブル化（日付｜機種名｜内容｜アウト前→後｜台粗利前→後）
+    var _ev=C.equip.map(function(e){return {d:e.date, mn:e.mn, naiyo:e.from+'台→'+e.to+'台（'+e.kind+'）', e:e};})
+      .concat(C.moved.slice(0,8).map(function(e){return {d:e.date, mn:e.mn, naiyo:e.n+'台入替（レイアウト変更）', e:e};}));
+    _ev.sort(function(a,b){return a.d<b.d?-1:1;});
+    function _eqCell(e){ if(!e.post)return ['-','-'];
+      var oa, pa;
+      if(e.pre){ var pc2=e.pre.outPT>0?((e.post.outPT-e.pre.outPT)/e.pre.outPT*100):null;
+        oa=Math.round(e.pre.outPT).toLocaleString()+' → '+Math.round(e.post.outPT).toLocaleString()+'枚'+(pc2!=null?('（'+(pc2>=0?'+':'')+pc2.toFixed(0)+'%）'):'');
+        pa=_bjwkYen(Math.round(e.pre.profPT))+' → '+_bjwkYen(Math.round(e.post.profPT))+'/日';
+      } else { oa='－ → '+Math.round(e.post.outPT).toLocaleString()+'枚'; pa='－ → '+_bjwkYen(Math.round(e.post.profPT))+'/日'; }
+      if(e.post.nd<3)oa+='<span class="bjwk-note">（後'+e.post.nd+'日分）</span>';
+      return [oa,pa]; }
+    var p6e;
+    if(_ev.length){
+      p6e='<div style="overflow-x:auto;"><table class="bjwk-tbl"><thead><tr><th>日付</th><th>機種名</th><th>内容</th><th>アウト（前 → 後）</th><th>台粗利（前 → 後）</th></tr></thead><tbody>'
+        +_ev.map(function(x){ var c2=_eqCell(x.e);
+          return '<tr><td>'+_bjbFmtD(x.d)+'</td><td style="text-align:left;white-space:normal;min-width:150px;max-width:260px;line-height:1.5;">'+x.mn+'</td><td>'+x.naiyo+'</td><td>'+c2[0]+'</td><td>'+c2[1]+'</td></tr>'; }).join('')
+        +'</tbody></table></div>'
+        +'<span class="bjwk-note">前＝変化前7日・後＝変化日から対象週の日曜まで（最大7日）の台あたり平均。詳細はレポートタブの「増減台・移動」をご覧ください。</span>'
+        +(C.moved.length>8?'<div class="bjwk-note">ほかレイアウト変更'+(C.moved.length-8)+'機種</div>':'');
+    } else p6e='この週に増台・減台・レイアウト変更はありませんでした。';
     H.push(['増台・減台・レイアウト変更', p6e]);
     // ⑦ シリーズ別の週間動向（#07: 面の話。ミニ型判定つき）
     var pSer='';
@@ -15725,11 +15819,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var _kl=[];
     function _mrow(m){ return '<b>'+m.name+'</b>（出玉率'+m.pRate.toFixed(1)+'%→'+m.rate.toFixed(1)+'%・'+Math.round(m.taiAvg)+'台・アウト'+Math.round(m.outPT).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(m.profPT))+'/日）'; }
     function _srow(m){ return '<b>'+m.name+'</b>（'+Math.round(m.pOut).toLocaleString()+'→'+Math.round(m.cOut).toLocaleString()+'枚・'+_bjwkPct(m.dPct)+'・'+Math.round(m.taiAvg)+'台・台粗利'+_bjwkYen(Math.round(m.profPT))+'/日）'; }
-    if(C.tight.length)_kl.push('締め方向 → '+C.tight.map(_mrow).join('、'));
-    if(C.loose.length)_kl.push('開け方向 → '+C.loose.map(_mrow).join('、'));
-    if(C.surge.length)_kl.push('アウト急増 → '+C.surge.map(_srow).join('、'));
-    if(C.drop.length)_kl.push('アウト急減 → '+C.drop.map(_srow).join('、'));
-    var p5=_kl.length?_kl.join('<br>'):'主要機種（3台以上・一定のアウトが入っている機種）に大きな設定変化・稼働変化は見られませんでした。';
+    if(C.tight.length)_kl.push('<b>締め方向</b><br>'+C.tight.map(function(m){return '・'+_mrow(m);}).join('<br>'));
+    if(C.loose.length)_kl.push('<b>開け方向</b><br>'+C.loose.map(function(m){return '・'+_mrow(m);}).join('<br>'));
+    if(C.surge.length)_kl.push('<b>アウト急増</b><br>'+C.surge.map(function(m){return '・'+_srow(m);}).join('<br>'));
+    if(C.drop.length)_kl.push('<b>アウト急減</b><br>'+C.drop.map(function(m){return '・'+_srow(m);}).join('<br>'));
+    var p5=_kl.length?_kl.join('<br><br>'):'主要機種（3台以上・一定のアウトが入っている機種）に大きな設定変化・稼働変化は見られませんでした。';
     p5+='<br><span class="bjwk-note">※3台以上かつ一定のアウトが入っている機種のみを対象にしています。機種ごとの詳細はレポートタブをご覧ください。</span>';
     H.push(['機種の週間動向（先週対比）', p5]);
     // ⑨ 機種マップ（#10: 4象限の別途テキスト。A/B/C/D・影響の大きい機種優先）
@@ -15747,7 +15841,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(_qc.length)_ql.push('<b>C. 締めても客が増えた（理想の展開）</b> → '+_qc.map(_qrow).join('、'));
       if(_qd.length)_ql.push('<b>D. 締めたら客も減った（締めすぎの可能性）</b> → '+_qd.map(_qrow).join('、'));
       pQ=_ql.length?_ql.join('<br>'):'はっきり象限に振れた機種はありませんでした（中央付近＝平常運転）。';
-      pQ+='<br><span class="bjwk-note">各象限とも店への影響が大きい機種（日次アウト・粗利の動き）から最大2機種。判定は出玉率±1pt×アウト±8%以上。</span>';
+      pQ+='<br><span class="bjwk-note">各象限とも店への影響が大きい機種（日次アウト・粗利の動き）から最大2機種。判定は出玉率±1pt×アウト±8%以上。グラフのラベルも影響の大きい主だった機種だけに絞っています。</span>';
     } else pQ='先週と比較できる機種がありませんでした。';
     H.push(['機種マップ（開け締め×客数の全体図）', pQ]);
     // ⑥ 来週の見どころ
@@ -15756,7 +15850,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     else p6+='この店の特定日パターンに該当する日はありません。';
     var _na=C.debut.concat(C.cont);
     if(_na.length)p6+=' '+_na[0].name+'は導入第'+(_na[0].week+1)+'週目に入ります。';
-    p6+=_pk([' 山の日の前日に仕込みが入るか、ベースが守られるかに注目です。',' 先週の型が続くのか、切り替わるのかを見る一週間です。',' 特定日の約束が守られるかが最初のチェックポイントです。']);
+    p6+=_pk([' 山場の前日に仕込みが入るか、ベースが守られるかに注目です。',' 先週の型が続くのか、切り替わるのかを見る一週間です。',' 特定日の約束が守られるかが最初のチェックポイントです。']);
     H.push(['来週の見どころ', p6]);
     return H;
   }
@@ -15802,11 +15896,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         plugins:{ legend:opts.legend?{display:true, position:'top', labels:{boxWidth:12, font:{size:10}, color:'#475569'}}:{display:false},
           title:opts.title?{display:true, text:opts.title, font:{size:11, weight:'bold'}, color:'#334155'}:{display:false}, tooltip:{enabled:false} },
         scales:sc }; })(),
-      plugins:[{ afterDatasetsDraw:function(c){ var ctx=c.ctx; ctx.save(); ctx.font='bold 10px sans-serif'; ctx.fillStyle='#334155';
-        c.data.datasets.forEach(function(ds,di){ if(ds.type==='line')return; var meta=c.getDatasetMeta(di); meta.data.forEach(function(bar,i){ var v=ds.data[i]; if(v==null)return;
-          if(opts.valOnly!=null && i!==opts.valOnly)return;
-          var txt=opts.fmt?opts.fmt(v):v;
-          if(c.options.indexAxis==='y'){ ctx.textAlign=(v>=0)?'left':'right'; ctx.fillText(txt, bar.x+(v>=0?4:-4), bar.y+3.5); }
+      plugins:[{ afterDatasetsDraw:function(c){ var ctx=c.ctx; ctx.save(); ctx.font='bold 10px sans-serif';
+        c.data.datasets.forEach(function(ds,di){ var isLine=(ds.type==='line');
+          if(isLine&&!opts.lineVals)return;
+          var meta=c.getDatasetMeta(di); meta.data.forEach(function(bar,i){ var v=ds.data[i]; if(v==null)return;
+          if(!isLine && opts.valOnly!=null && i!==opts.valOnly)return;
+          var txt=isLine?(opts.lineFmt?opts.lineFmt(v):(opts.fmt?opts.fmt(v):v)):(opts.fmt?opts.fmt(v):v);
+          ctx.fillStyle=isLine?(ds.borderColor||'#c2410c'):'#334155';
+          if(isLine){ ctx.textAlign='center';
+            var bys=[]; c.data.datasets.forEach(function(d2,dj){ if(d2.type==='line')return; var m2=c.getDatasetMeta(dj); if(m2.data[i])bys.push(m2.data[i].y-4); });
+            var yA=bar.y-9, yB=bar.y+15, dA=1e9, dB=1e9;
+            bys.forEach(function(by){ dA=Math.min(dA,Math.abs(yA-by)); dB=Math.min(dB,Math.abs(yB-by)); });
+            var ly=(dA>=dB)?yA:yB;
+            ly=Math.max(c.chartArea.top+9, Math.min(ly, c.chartArea.bottom-3));
+            ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.strokeText(txt, bar.x, ly);
+            ctx.fillText(txt, bar.x, ly); }
+          else if(c.options.indexAxis==='y'){ ctx.textAlign=(v>=0)?'left':'right'; ctx.fillText(txt, bar.x+(v>=0?4:-4), bar.y+3.5); }
           else { ctx.textAlign='center'; ctx.fillText(txt, bar.x, bar.y-4); } }); }); ctx.restore(); } }]
     });
     _bjwkCharts.push(ch);
@@ -15837,10 +15942,27 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         ctx.textAlign='left';  ctx.fillText('締めても客増（理想）', xs.left+4, ys.top+10);
         ctx.textAlign='right'; ctx.fillText('開けたのに客減（無駄放出の疑い）', xs.right-4, ys.bottom-5);
         ctx.textAlign='left';  ctx.fillText('締めて客減', xs.left+4, ys.bottom-5);
-        ctx.font='8.5px sans-serif'; ctx.fillStyle='#475569'; ctx.textAlign='left';
-        pts.forEach(function(p){ if(Math.abs(p.dr)>=2||Math.abs(p.dPct)>=20){
+        ctx.font='8.5px sans-serif'; ctx.textAlign='left';
+        // #14: ラベルは主だった機種のみ（影響度上位8＋極端な点・最大10）。衝突したら位置替え→それでも駄目なら省略。白フチ付き。
+        var cand=pts.slice().sort(function(a,b){return (b.impact||0)-(a.impact||0);}).slice(0,8);
+        pts.forEach(function(p){ if((Math.abs(p.dr)>=8||Math.abs(p.dPct)>=60)&&cand.indexOf(p)<0)cand.push(p); });
+        cand=cand.slice(0,10);
+        var placed=[];
+        cand.forEach(function(p){
           var px=xs.getPixelForValue(+p.dr.toFixed(2)), py=ys.getPixelForValue(+p.dPct.toFixed(1));
-          ctx.fillText(_bjwkShort(p.name), Math.min(px+5, xs.right-64), py-5); } });
+          var name=_bjwkShort(p.name), w=ctx.measureText(name).width;
+          var lx=Math.min(px+5, xs.right-w-4);
+          var ys3=[py-5, py+13, py-17], ly=null;
+          for(var yi=0; yi<ys3.length; yi++){ var y2=ys3[yi], ok=true;
+            if(y2<ys.top+8||y2>ys.bottom-2)continue;
+            for(var pi2=0; pi2<placed.length; pi2++){ var q=placed[pi2];
+              if(Math.abs(y2-q.y)<10 && lx<q.x+q.w+6 && q.x<lx+w+6){ ok=false; break; } }
+            if(ok){ ly=y2; break; } }
+          if(ly==null)return;
+          ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,0.9)'; ctx.strokeText(name, lx, ly);
+          ctx.fillStyle='#475569'; ctx.fillText(name, lx, ly);
+          placed.push({x:lx, y:ly, w:w});
+        });
         ctx.restore(); } }]
     });
     _bjwkCharts.push(ch);
@@ -15912,9 +16034,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var CH={1:'<div class="bjwk-charts"><canvas id="bjwkCh1" width="372" height="220"></canvas><canvas id="bjwkCh2" width="372" height="220"></canvas></div>',
             2:'<div class="bjwk-charts"><canvas id="bjwkCh3" width="758" height="220"></canvas></div>',
             3:'<div class="bjwk-charts"><canvas id="bjwkCh4" width="758" height="230"></canvas></div>',
-            7:'<div class="bjwk-charts"><canvas id="bjwkCh5" width="372" height="220"></canvas><canvas id="bjwkCh5b" width="372" height="220"></canvas></div>',
-            8:'<div class="bjwk-charts"><canvas id="bjwkCh6" width="372" height="230"></canvas><canvas id="bjwkCh7" width="372" height="230"></canvas></div>',
-            9:'<div class="bjwk-charts"><canvas id="bjwkCh8" width="758" height="280"></canvas></div>'};
+            8:'<div class="bjwk-charts"><canvas id="bjwkCh5" width="372" height="220"></canvas><canvas id="bjwkCh5b" width="372" height="220"></canvas></div>',
+            9:'<div class="bjwk-charts"><canvas id="bjwkCh6" width="372" height="230"></canvas><canvas id="bjwkCh7" width="372" height="230"></canvas></div>',
+            10:'<div class="bjwk-charts"><canvas id="bjwkCh8" width="758" height="280"></canvas></div>'};
     var secs=H.map(function(sec,i){ return '<div class="bjwk-sec"><div class="bjwk-ttl">'+sec[0]+'</div>'+(CH[i]||'')+'<div class="bjwk-p" id="bjwkP'+i+'"></div></div>'; }).join('');
     var foot='<div class="bjwk-foot">根拠：店舗データ '+_bjbFmtD(C.dataFrom)+'〜'+_bjbFmtD(C.dataTo)+'／数値は統計推定を含みます／BEAR JOHN 週次レポート（AIの週報 β）</div>';
     body.innerHTML=hero+kpis+band+secs+foot;
@@ -15928,7 +16050,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       _bjwkBar('bjwkCh1', la, [{data:da, backgroundColor:pal, borderRadius:4}], {title:'台あたりアウト（枚/日）', fmt:function(v){return v.toLocaleString();}});
       _bjwkBar('bjwkCh2', la, [{data:dp, backgroundColor:pal, borderRadius:4}], {title:'店の粗利（万円/日）', fmt:function(v){return v.toLocaleString();}});
       if(C.spCur&&C.spCur.base!=null){
-        _bjwkBar('bjwkCh3', [['ベース稼働','(平日)'],['山の日','(土日祝・特定日)']], [
+        _bjwkBar('bjwkCh3', [['ベース稼働','(平日)'],['山場','(土日祝・特定日)']], [
           {label:'前週', data:[C.spPrev&&C.spPrev.base!=null?Math.round(C.spPrev.base):null, C.spPrev&&C.spPrev.yama!=null?Math.round(C.spPrev.yama):null], backgroundColor:'#b9d3ee', borderRadius:4},
           {label:'今週', data:[Math.round(C.spCur.base), C.spCur.yama!=null?Math.round(C.spCur.yama):null], backgroundColor:'#1e5fa8', borderRadius:4}
         ], {title:'ベースと山：台あたりアウト（枚/日）', legend:true, fmt:function(v){return v.toLocaleString();}});
@@ -15938,7 +16060,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         _bjwkBar('bjwkCh4', C.cur.days.map(function(d){return [_bjbFmtD(d.date),'('+dowJ[d.dow]+')'];}), [
           {label:'台あたりアウト（枚）', data:C.cur.days.map(function(d){return Math.round(d.outPT);}), backgroundColor:C.cur.days.map(function(d){return d.yama?'#1e5fa8':'#b9d3ee';}), borderRadius:4, order:2},
           {type:'line', label:'店粗利（万円）', data:C.cur.days.map(function(d){return +(d.prof/10000).toFixed(1);}), borderColor:'#c2410c', backgroundColor:'#c2410c', pointRadius:2.5, borderWidth:2, tension:0.25, yAxisID:'y1', order:1}
-        ], {title:'日次のメリハリ：アウト（棒・濃い色＝山の日）と店粗利（線）', legend:true, y2:true, fmt:function(v){return v.toLocaleString();}});
+        ], {title:'日次のメリハリ：アウト（棒・濃い色＝山場）と店粗利（線）', legend:true, y2:true, lineVals:true, lineFmt:function(v){return Math.round(v)+'万';}, fmt:function(v){return v.toLocaleString();}});
       }
       // シリーズ別グラフ（#07アウト・#09で台粗利も追加＝2枚組）
       if(C.series&&C.series.length){
