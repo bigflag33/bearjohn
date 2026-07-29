@@ -4220,7 +4220,10 @@ function _makeRenderKey() {
   const excl  = document.getElementById('excludeSettingDay')?.checked ? '1' : '0';
   const store = _activeStore().key;
   const dataLen = loadAllData().length;
-  return `${store}|${from}|${to}|${model}|${excl}|${dataLen}`;
+  // 機種別チューニングの世代も入れる。件数は変わらないので、これが無いと
+  // 補正を変えても「同じ条件だ」と判断されて重い関数の再計算がとばされる
+  const tune = (typeof _bjTuneVer !== 'undefined') ? _bjTuneVer : 0;
+  return `${store}|${from}|${to}|${model}|${excl}|${dataLen}|${tune}`;
 }
 
 function render() {
@@ -14965,7 +14968,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // スライドボタンの活性状態を更新
     var btnBack=document.getElementById('bjpBack'), btnFwd=document.getElementById('bjpFwd'), btnNow=document.getElementById('bjpNow');
     if(btnNow) btnNow.disabled=!_bjpAnchor;
-    var key=((st&&st.key)||'')+'|'+recs.length+'|'+minTai+'|'+minDays+'|'+(_bjpAnchor||'');
+    var key=((st&&st.key)||'')+'|'+recs.length+'|'+minTai+'|'+minDays+'|'+(_bjpAnchor||'')+'|'+_bjTuneVer;
     var M;
     if(_bjpMemoKey===key&&_bjpMemo){M=_bjpMemo;}else{M=_bjpBuild(recs,minTai,minDays);_bjpMemo=M;_bjpMemoKey=key;}
     var stt=M._stats||{total:0,fewDays:0,fewTai:0,fewPath:0};
@@ -15128,7 +15131,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var sName=(st0&&st0.name)?st0.name:'この店舗';
     // ── 全構造をメモ化（店舗×件数×最終日）：店全体日次＋機種×日次 ──
     var _lastRec=''; for(var _li=0;_li<recs.length;_li++){ var _ld0=recs[_li]&&recs[_li].date; if(_ld0&&_ld0>_lastRec)_lastRec=_ld0; }
-    var key='v3|'+((st0&&st0.key)||'')+'|'+recs.length+'|'+_lastRec;
+    var key='v3|'+((st0&&st0.key)||'')+'|'+recs.length+'|'+_lastRec+'|'+_bjTuneVer;
     var M;
     if(_bjbMemoKey===key&&_bjbMemo){ M=_bjbMemo; }
     else {
@@ -16169,7 +16172,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var st0=(typeof getActiveStore==='function')?getActiveStore():null;
     var sName=(st0&&st0.name)?st0.name:'この店舗';
     var _lastRec=''; for(var i=0;i<recs.length;i++){ var d0=recs[i]&&recs[i].date; if(d0&&d0>_lastRec)_lastRec=d0; }
-    var key='wk2|'+((st0&&st0.key)||'')+'|'+recs.length+'|'+_lastRec;
+    var key='wk2|'+((st0&&st0.key)||'')+'|'+recs.length+'|'+_lastRec+'|'+_bjTuneVer;
     var M;
     if(_bjwkMemoKey===key&&_bjwkMemo){ M=_bjwkMemo; }
     else { var byD={}, byMD={};
@@ -16973,10 +16976,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(_bjtStat && _bjtStatKey===key) return _bjtStat;
     var from30 = last ? _bjbAddDays(last,-29) : '';
     var gone   = last ? _bjbAddDays(last,-3)  : '';
-    var m=_bjtAgg(raw, _bjtFrom, _bjtTo, from30, true), rows=[], gcnt=0, nodata=0;
+    var m=_bjtAgg(raw, _bjtFrom, _bjtTo, from30, true), rows=[], gcnt=0, nodata=0, gsales=0, gprofit=0;
     for(var k in m){
       var a=m[k];
-      if(gone && a.last<gone){ gcnt++; continue; }
+      if(gone && a.last<gone){ gcnt++; gsales+=a.sales; gprofit+=a.profit; continue; }
       a.units=Object.keys(a.u).length; delete a.u;
       a.days=a.d?Object.keys(a.d).length:0; delete a.d;
       a.price   = a.out>0 ? a.sales/a.out : 0;       // 指定期間の推定コイン単価
@@ -16986,7 +16989,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       rows.push(a);
     }
     rows.sort(function(x,y){ return y.sales-x.sales || y.fullSales-x.fullSales; });
-    _bjtStat={rows:rows, first:first, last:last, from30:from30, gone:gcnt, nodata:nodata, total:raw.length};
+    _bjtStat={rows:rows, first:first, last:last, from30:from30, gone:gcnt, nodata:nodata,
+              goneSales:gsales, goneProfit:gprofit, total:raw.length};
     _bjtStatKey=key;
     return _bjtStat;
   }
@@ -17087,12 +17091,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // 補正は全期間に効くので、指定期間だけでなく全期間の着地も出す
     var note=document.getElementById('bjtSumNote');
     if(note){
-      if(!s.count){ note.textContent='上の数字はすべて指定期間（'+per+'）のものです。'; }
+      var st2=_bjtStats(), gtxt='';
+      if(st2.gone){
+        gtxt='<br>この画面の合計は<b>撤去済みとみた '+st2.gone+' 機種を除いています</b>'
+            +'（売上 '+_bjtN(st2.goneSales)+' 円／粗利 '+_bjtSign(st2.goneProfit)+' 円）。'
+            +'ベーシックの数字はこれを含むので、そのぶん差が出ます。';
+      }
+      if(!s.count){ note.innerHTML='上の数字はすべて指定期間（'+per+'）のものです。'+gtxt; }
       else{
         note.innerHTML='上の数字は指定期間（'+per+'）のものです。'
           +'補正は全期間に効くので、<b>全期間で見た着地</b>はこうなります：'
           +'基準店 売上 '+_bjtN(s.fs0)+' → '+_bjtN(s.fs1)+'（'+_bjtSign(s.fs1-s.fs0)+'）／'
-          +'粗利 '+_bjtN(s.fp0)+' → '+_bjtN(s.fp1)+'（'+_bjtSign(s.fp1-s.fp0)+'）';
+          +'粗利 '+_bjtN(s.fp0)+' → '+_bjtN(s.fp1)+'（'+_bjtSign(s.fp1-s.fp0)+'）'+gtxt;
       }
     }
   }
@@ -17797,7 +17807,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var f=(document.getElementById('dateFrom')||{}).value||'';
     var t=(document.getElementById('dateTo')||{}).value||'';
     var raw=(typeof loadAllData==='function'?loadAllData():[]);
-    var key='full|'+raw.length+'|'+f+'|'+t;
+    var key='full|'+raw.length+'|'+f+'|'+t+'|'+_bjTuneVer;
     if(window._bjFullKey===key && window._bjFullCache) return window._bjFullCache;
     var m={}, dates={};
     for(var i=0;i<raw.length;i++){ var d=raw[i];
@@ -17991,7 +18001,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var f=(document.getElementById('dateFrom')||{}).value||'';
     var t=(document.getElementById('dateTo')||{}).value||'';
     var raw=(typeof loadAllData==='function'?loadAllData():[]);
-    var key='w|'+raw.length+'|'+f+'|'+t;
+    var key='w|'+raw.length+'|'+f+'|'+t+'|'+_bjTuneVer;
     if(window._bjwKey===key && window._bjwCache) return window._bjwCache;
     function dowOf(ds){ var p=ds.split('-'); return new Date(+p[0],(+p[1])-1,+p[2]).getDay(); }
     function holi(ds){ try{ return (typeof isHoliday==='function') && isHoliday(ds); }catch(e){ return false; } }
@@ -18102,7 +18112,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var f=(document.getElementById('dateFrom')||{}).value||'';
     var t=(document.getElementById('dateTo')||{}).value||'';
     var raw=(typeof loadAllData==='function'?loadAllData():[]);
-    var key=raw.length+'|'+f+'|'+t;
+    var key=raw.length+'|'+f+'|'+t+'|'+_bjTuneVer;
     if(window._bjCompKey===key && window._bjCompCache) return window._bjCompCache;
     var agg={}, taiSet={};
     for(var i=0;i<raw.length;i++){ var d=raw[i];
