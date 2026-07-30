@@ -3385,7 +3385,9 @@ function _bjRawLoadDates() {
   const key = document.getElementById('bjRawStore').value;
   const st = getStores().find(s => s.key === key);
   const base = (st && st.id === 'ueda' && typeof RAW_DATA !== 'undefined') ? RAW_DATA : [];
-  _idbGet(key).then(recs => {
+  // 法人ページは配信JSONをDB_CACHE（メモリ）にのみ展開するため、まずメモリを見てからIndexedDBへ
+  const cached = (typeof DB_CACHE !== 'undefined' && DB_CACHE[key] && DB_CACHE[key].length) ? DB_CACHE[key] : null;
+  (cached ? Promise.resolve(cached) : _idbGet(key)).then(recs => {
     _bjRawRecs = [...base, ...(recs || [])];
     const ds = [...new Set(_bjRawRecs.map(r => r.date).filter(Boolean))].sort().reverse();
     document.getElementById('bjRawDate').innerHTML = ds.length
@@ -16833,6 +16835,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function _bjtScopeKey(){ return _bjtRef()||'*'; }   // 画面で編集する設定は基準店のもの
 
   var _BJT_SKIP_STORES={'デフォルト店舗':1,'機種フォーマッタテスト店舗':1};   // システム/テスト用は配布先に出さない
+  // 部門（4円パチンコ／20円スロット）は別の店舗として登録されている。
+  // 店舗名の末尾の（4P）で見分ける。部門をまたいで係数を配ると、機種名が
+  // たまたま一致したときだけ誤って効いてしまうので、既定では配らない
+  function _bjtDept(name){ return /[（(]4P[）)]\s*$/.test(String(name||'')) ? '4P' : '20S'; }
   function _bjtAllStores(){
     var out=[];
     try{
@@ -17475,7 +17481,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<label style="padding-top:5px;">配布先：<b id="bjtTgtCount" style="color:var(--text)"></b></label>'
       +'<div class="bjt-tgtbox" id="bjtTgtBox"></div>'
       +'<div style="display:flex;flex-direction:column;gap:6px;">'
-      +'<button type="button" class="bjt-btn" id="bjtTgtAll">全部えらぶ</button>'
+      +'<button type="button" class="bjt-btn" id="bjtTgtAll">同じ部門を全部</button>'
       +'<button type="button" class="bjt-btn" id="bjtTgtNone">基準店だけ</button>'
       +'</div>'
       +'</div>'
@@ -17563,7 +17569,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     });
     var ta=document.getElementById('bjtTgtAll');
     if(ta) ta.addEventListener('click', function(){
-      _bjtSetTargets(_bjtAllStores().map(function(s){ return s.name; }));
+      var d=_bjtDept(_bjtRef());
+      _bjtSetTargets(_bjtAllStores().filter(function(s){ return _bjtDept(s.name)===d; }).map(function(s){ return s.name; }));
       _bjtRev++; _bjtPaintHead(); _bjtPaintSummary();
       _bjtPushMeta().catch(function(){ _bjtSyncState='fail'; _bjtSyncLine(); });
     });
