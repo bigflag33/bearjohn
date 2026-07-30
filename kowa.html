@@ -1040,7 +1040,8 @@
 
   <div id="dateDots" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;align-items:center;">
     <span style="font-size:11px;color:var(--text2);font-weight:600;margin-right:4px;">読込済み日付:</span>
-    <button onclick="clearAdded()" title="追加データをリセット" style="margin-left:auto;font-size:11px;background:rgba(197,48,48,0.15);color:#fc8181;border:1px solid rgba(197,48,48,0.3);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">追加分リセット</button>
+    <button onclick="bjRawDlOpen()" title="この店の元データ（1日分・全台）をCSV/Excelでダウンロード" style="margin-left:auto;font-size:11px;background:rgba(0,152,212,0.12);color:var(--accent);border:1px solid rgba(0,152,212,0.35);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">元データDL</button>
+    <button onclick="clearAdded()" title="追加データをリセット" style="margin-left:6px;font-size:11px;background:rgba(197,48,48,0.15);color:#fc8181;border:1px solid rgba(197,48,48,0.3);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">追加分リセット</button>
   </div>
   <div class="kpi-grid">
     <div class="kpi-card">
@@ -2127,6 +2128,8 @@ function clearAdded() {
     ? '追加分データをリセットしますか？\n（ベースデータ 3/13〜3/22 は残ります）'
     : store.name + ' の全データをリセットしますか？';
   if (!confirm(msg)) return;
+  // 物騒な操作なので最終確認をもう一段（2026-07-30 ユーザー指示）
+  if (!confirm('【最終確認】本当にリセットしてよろしいですか？\nこの操作は取り消せません。')) return;
   _idbDel(store.key).catch(e => console.error('clearAdded error', e));
   showMsg('データをリセットしました', 'ok');
   reloadAll();
@@ -2623,8 +2626,9 @@ function updateDateDots() {
     monthMap[ym].push(d);
   });
 
+  const dlBtn = `<button onclick="bjRawDlOpen()" title="この店の元データ（1日分・全台）をCSV/Excelでダウンロード" style="margin-left:auto;font-size:11px;background:rgba(0,152,212,0.12);color:var(--accent);border:1px solid rgba(0,152,212,0.35);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">元データDL</button>`;
   const resetBtn = (addedDates.length > 0)
-    ? `<button onclick="clearAdded()" title="データをリセット" style="margin-left:auto;font-size:11px;background:rgba(197,48,48,0.15);color:#fc8181;border:1px solid rgba(197,48,48,0.3);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">追加分リセット</button>`
+    ? `<button onclick="clearAdded()" title="データをリセット" style="margin-left:6px;font-size:11px;background:rgba(197,48,48,0.15);color:#fc8181;border:1px solid rgba(197,48,48,0.3);border-radius:6px;padding:3px 10px;cursor:pointer;font-weight:600;">追加分リセット</button>`
     : '';
 
   if (allDates.length === 0) {
@@ -2656,6 +2660,7 @@ function updateDateDots() {
   el.innerHTML =
     `<span style="font-size:11px;color:var(--text2);font-weight:600;margin-right:4px;align-self:center;">読込済み日付:</span>`
     + monthsHtml
+    + dlBtn
     + resetBtn;
 }
 
@@ -3343,6 +3348,81 @@ function setTheme(t) {
 function initTheme() {
   const saved = localStorage.getItem('bi_theme') || 'dark';
   setTheme(saved);
+}
+
+// ── 元データダウンロード（店舗×日×全台。数値は原本一致・機種名は正式名・チューニング非適用） ──
+let _bjRawRecs = null;
+function bjRawDlOpen() {
+  let m = document.getElementById('bjRawDlModal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'bjRawDlModal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    m.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px 24px;min-width:320px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,0.35);">'
+      + '<div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:14px;">元データダウンロード（1日分・全台）</div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px;font-size:12px;color:var(--text);">'
+      + '<label>店舗<br><select id="bjRawStore" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);"></select></label>'
+      + '<label>日付<br><select id="bjRawDate" style="width:100%;padding:6px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);"></select></label>'
+      + '<div>形式：<label><input type="radio" name="bjRawFmt" value="csv" checked> CSV</label>　<label><input type="radio" name="bjRawFmt" value="xlsx"> Excel</label></div>'
+      + '<div style="font-size:10.5px;color:var(--text2);line-height:1.6;">アップロードされた元データをそのまま出力します（機種名は正式名・コイン単価補正は掛かりません）。</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;">'
+      + '<button onclick="document.getElementById(\'bjRawDlModal\').style.display=\'none\'" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;">閉じる</button>'
+      + '<button onclick="bjRawDlGo()" style="padding:7px 16px;border-radius:8px;border:none;background:var(--accent);color:white;font-weight:700;cursor:pointer;">ダウンロード</button>'
+      + '</div></div>';
+    document.body.appendChild(m);
+    m.addEventListener('click', e => { if (e.target === m) m.style.display = 'none'; });
+    document.getElementById('bjRawStore').addEventListener('change', _bjRawLoadDates);
+  }
+  m.style.display = 'flex';
+  const sel = document.getElementById('bjRawStore');
+  const stores = getStores().filter(s => s.id !== '__benchmark__');
+  const act = getActiveStoreId();
+  sel.innerHTML = stores.map(s => '<option value="' + s.key + '"' + (s.id === act ? ' selected' : '') + '>' + s.name + '</option>').join('');
+  _bjRawLoadDates();
+}
+function _bjRawLoadDates() {
+  const key = document.getElementById('bjRawStore').value;
+  const st = getStores().find(s => s.key === key);
+  const base = (st && st.id === 'ueda' && typeof RAW_DATA !== 'undefined') ? RAW_DATA : [];
+  _idbGet(key).then(recs => {
+    _bjRawRecs = [...base, ...(recs || [])];
+    const ds = [...new Set(_bjRawRecs.map(r => r.date).filter(Boolean))].sort().reverse();
+    document.getElementById('bjRawDate').innerHTML = ds.length
+      ? ds.map(d => '<option value="' + d + '">' + d + '</option>').join('')
+      : '<option value="">データなし</option>';
+  });
+}
+function bjRawDlGo() {
+  const key = document.getElementById('bjRawStore').value;
+  const ds = document.getElementById('bjRawDate').value;
+  if (!ds) { showMsg('この店舗にデータがありません', 'error'); return; }
+  const st = getStores().find(s => s.key === key);
+  const rows = (_bjRawRecs || []).filter(r => r.date === ds)
+    .sort((a, b) => (parseInt(a['台番'], 10) || 0) - (parseInt(b['台番'], 10) || 0));
+  if (!rows.length) { showMsg('この日のデータがありません', 'error'); return; }
+  const head = ['台番','機種名（データサイト表記）','機種名（正式名）','差枚','BB','RB','ART','G数','IN枚数','台売上','台粗利'];
+  const aoa = [head].concat(rows.map(r => [
+    r['台番'], r['機種名'], r['機種名正式'] || r['機種名'], r['差枚'],
+    r['BB'], r['RB'], r['ART'], r['G数'], r['IN枚数'], r['台売上'], r['台粗利']
+  ].map(v => v == null ? '' : v)));
+  const fname = ds.replace(/-/g, '') + '_' + (st ? st.name : 'store');
+  const fmt = (document.querySelector('input[name="bjRawFmt"]:checked') || {}).value || 'csv';
+  if (fmt === 'xlsx' && typeof XLSX !== 'undefined') {
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'data');
+    XLSX.writeFile(wb, fname + '.xlsx');
+  } else {
+    // UTF-8 BOM付き＝Excelダブルクリックで文字化けしない
+    const csv = '\uFEFF' + aoa.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  }
+  showMsg('元データをダウンロードしました', 'ok');
 }
 
 // ═══ 店舗管理 ═══
