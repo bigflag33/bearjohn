@@ -1888,11 +1888,63 @@ const STORE_WHITELIST = ["楽園ハッピーロード大山", "ピーアーク�
 const USER_LABEL = 'コンチェルトさん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
 const USER_ID = 'concerto';             // 例: 'hakuwa' / 'aviva'
+// このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
+// 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
+const BJ_VERSION = '20260804-072636';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
 const _NS = USER_ID + '_';  // 例: 'hakuwa_'
 const STORAGE_KEY = _NS + 'bi_added_data_legacy';
+
+// ── 更新通知（2026-08-04）──────────────────────────────────────
+// dist と一緒に置かれる version.json を時々見に行き、版が変わっていたら
+// 画面下に「更新する」ボタンを出す。勝手にはリロードしない（閲覧中の画面を飛ばさない）。
+// ・file:// のローカル版と、版番号が入っていないマスター（BJ_VERSION='dev'）では動かない
+// ・パスワードは sessionStorage に残るので、更新しても再ログインは不要
+// ・GitHub Pages のキャッシュ対策に ?t= を付けて取りに行き、更新時は ?v=版番号 で開き直す
+(function(){
+  var on = false;
+  try { on = /^https?:$/.test(location.protocol) && BJ_VERSION !== 'dev'; } catch (e) { on = false; }
+  if (!on) return;
+  var last = 0, newV = '';
+  function bar(show){
+    var el = document.getElementById('bjVerBar');
+    if (!show) { if (el) el.style.display = 'none'; return; }
+    if (!el) {
+      el = document.createElement('div'); el.id = 'bjVerBar';
+      el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99999;display:flex;align-items:center;'
+        + 'justify-content:center;gap:14px;flex-wrap:wrap;padding:10px 16px;'
+        + 'background:var(--card,#fff);color:var(--text,#1a2a33);border-top:2px solid var(--accent,#0098d4);'
+        + 'box-shadow:0 -2px 12px rgba(0,0,0,.12);font-size:13px;';
+      el.innerHTML = '<span>新しいバージョンがあります。更新すると最新の画面になります。</span>'
+        + '<button type="button" id="bjVerGo" style="padding:6px 18px;border:0;border-radius:4px;'
+        + 'background:var(--accent,#0098d4);color:#fff;font-size:13px;cursor:pointer;">更新する</button>'
+        + '<button type="button" id="bjVerLater" style="padding:6px 12px;border:1px solid var(--border,#c8d4da);'
+        + 'border-radius:4px;background:var(--card,#fff);color:var(--text2,#667);font-size:12.5px;cursor:pointer;">あとで</button>';
+      document.body.appendChild(el);
+      document.getElementById('bjVerGo').addEventListener('click', function(){
+        try { location.replace(location.pathname + '?v=' + encodeURIComponent(newV || Date.now())); }
+        catch (e) { location.reload(); }
+      });
+      document.getElementById('bjVerLater').addEventListener('click', function(){ bar(false); });   // 次の確認（約1時間後）でまた出る
+    }
+    el.style.display = 'flex';
+  }
+  function check(){
+    last = Date.now();
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+      .then(function(r){ if (!r.ok) throw 0; return r.json(); })
+      .then(function(j){ if (j && j.v && j.v !== BJ_VERSION) { newV = j.v; bar(true); } })
+      .catch(function(){});   // 取れない時は何もしない（次の機会に見る）
+  }
+  window._bjVerCheck = check;                        // 動作確認用の入り口
+  setTimeout(check, 60 * 1000);                      // 開いて1分後に1回
+  setInterval(check, 60 * 60 * 1000);                // 以後は1時間ごと
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible' && Date.now() - last > 5 * 60 * 1000) check();   // タブに戻った時（5分に1回まで）
+  });
+})();
 
 // ╔══════════════════════════════════════════════════════════════╗
 // ║  ★ ユーザー定義（管理者専用）― 担当者を増やす場合に追記      ║
@@ -2018,8 +2070,14 @@ function _invalidateLoadAllCache() {
 //   推定単価 = Σ台売上 ÷ Σアウト（法人の20円スロット全店・その機種・その週の合算から逆算）
 //   係数 a  = 正解単価 ÷ 推定単価  …… 全店に同じ係数を掛ける（比で配る）
 //   台売上' = 台売上 × a
-//   台粗利' = 黒字なら 台粗利 × a ／ 赤字なら 台粗利 ÷ a（赤字は膨らむ向き。
+//   台粗利' = その機種がその週トータルで黒字なら × a ／ 赤字なら ÷ a（赤字は膨らむ向き。
 //             掛けるだけだと赤字まで小さくなり、負けている機種を見落とす）
+// ⚠️黒字か赤字かは「この店×この機種×この週のトータル（素の台粗利の合計）」で判定する。
+//   1台1日ごとに符号を見てはいけない（2026-08-04 ユーザー差し戻し）。荒い機種は勝ち日と
+//   負け日が混ざるのが普通の姿（ただの振れ幅）で、日ごとに赤字を膨らませると二重補正になり
+//   ゴッドの台粗利が実態の半分まで落ちた。系統的なズレは清算した期間のトータルに効く。
+//   週トータルなら、後からデータが増えても過去の週の符号は変わらない＝過去の数字が動かない。
+//   同じ週の中は全レコードを同じ向きに揃える（週の合計がちょうど 合計×a／合計÷a になる）。
 // ⚠️推定単価を店ごとに出してはいけない（2026-08-03 実データで確認）。
 //   店別の逆算値には貸玉条件などによる店固有のスケール差（±5%前後・全機種で同じ向き）があり、
 //   店ごとに割るとその正しい店差まで消してしまう。全店合算から比を1つ作って全店に配る。
@@ -2126,38 +2184,57 @@ function _bjTuneFactorFor(r, models, est) {
   return (isFinite(a) && a > 0) ? a : 0;
 }
 
+// 符号表＝この店の「機種×週」ごとの素の台粗利の合計。黒字週は×a・赤字週は÷aの判定に使う
+function _bjTuneSignTable(records, models) {
+  const sign = {};
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i], m = r['機種名'];
+    if (!m || !models[m] || !r.date) continue;
+    const k = m + '|' + bjTuneMonday(r.date);
+    sign[k] = (sign[k] || 0) + (r['台粗利'] || 0);
+  }
+  return sign;
+}
+
 // 補正の本体。models を差し替えられる形＝保存前のプレビューでも同じ計算を使う
 function _bjApplyTuneWith(records, store, models) {
   // 業界ベンチマークは他社比較の物差しなので補正しない。パチンコ店も対象外
   if (!store || store.id === '__benchmark__' || bjTuneIsPachi(store.name)) return records;
   if (!models || !Object.keys(models).length) return records;   // 設定なし＝素のまま（同じ配列を返す）
   const est = bjTuneCorpEst();   // 全店合算＝店固有のスケール差を消さない
+  const sign = _bjTuneSignTable(records, models);   // 符号はこの店の週トータルで見る
   return records.map(r => {
     const a = _bjTuneFactorFor(r, models, est);
     if (!a || Math.abs(a - 1) < 1e-9) return r;                 // 対象外の機種は複製しない（巨大店舗の負荷対策）
     const c = Object.assign({}, r);
     const s0 = r['台売上'] || 0, p0 = r['台粗利'] || 0;
+    const wkNet = sign[r['機種名'] + '|' + bjTuneMonday(r.date)] || 0;
     c['台売上'] = Math.round(s0 * a);
-    c['台粗利'] = Math.round(p0 >= 0 ? p0 * a : p0 / a);        // 黒字は掛け、赤字は割る
+    c['台粗利'] = Math.round(wkNet >= 0 ? p0 * a : p0 / a);     // 週トータル黒字は掛け、赤字は割る
     return c;
   });
 }
 
 function _bjApplyTune(records, store) { return _bjApplyTuneWith(records, store, bjTuneModels()); }
 
-// 合計だけ欲しい場面（保存前の「店全体への影響」）用。配列を作らず一回でなめる
+// 合計だけ欲しい場面（保存前の「店全体への影響」）用。配列を複製せず合計だけ出す
 function bjTuneTotals(records, store, models) {
   const t = { s0: 0, p0: 0, s1: 0, p1: 0 };
   const on = store && store.id !== '__benchmark__' && !bjTuneIsPachi(store.name)
              && models && Object.keys(models).length;
   const est = on ? bjTuneCorpEst() : null;
+  const sign = on ? _bjTuneSignTable(records, models) : null;
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const s0 = r['台売上'] || 0, p0 = r['台粗利'] || 0;
     t.s0 += s0; t.p0 += p0;
     const a = on ? _bjTuneFactorFor(r, models, est) : 0;
-    if (a) { t.s1 += Math.round(s0 * a); t.p1 += Math.round(p0 >= 0 ? p0 * a : p0 / a); }
-    else   { t.s1 += s0; t.p1 += p0; }
+    if (a) {
+      const wkNet = sign[r['機種名'] + '|' + bjTuneMonday(r.date)] || 0;
+      t.s1 += Math.round(s0 * a);
+      t.p1 += Math.round(wkNet >= 0 ? p0 * a : p0 / a);
+    }
+    else { t.s1 += s0; t.p1 += p0; }
   }
   return t;
 }
@@ -17029,13 +17106,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var rr=recsOf(s);
       for(var i=0;i<rr.length;i++){
         var r=rr[i], n=r['機種名']; if(!n) continue;
-        var a=m[n]; if(!a) a=m[n]={name:n, fullS:0,fullO:0, s30:0,o30:0,pPos:0,pNeg:0,n30:0, u:{}, last:''};
+        var a=m[n]; if(!a) a=m[n]={name:n, fullS:0,fullO:0, s30:0,o30:0,n30:0, wn:{}, u:{}, last:''};
         var d=r.date||'';
         a.fullS+=r['台売上']||0; a.fullO+=r['IN枚数']||0;
         if(d>a.last) a.last=d;
         if(from30 && d>=from30){
           a.s30+=r['台売上']||0; a.o30+=r['IN枚数']||0; a.n30++;
-          var p=r['台粗利']||0; if(p>=0) a.pPos+=p; else a.pNeg+=p;
+          // 粗利は「店×週」のトータルで持つ（符号の判定単位。1台1日ごとに見ない＝2026-08-04）
+          var wk2=s.name+'|'+bjTuneMonday(d);
+          a.wn[wk2]=(a.wn[wk2]||0)+(r['台粗利']||0);
           if(r['台番']!=null) a.u[s.name+'#'+r['台番']]=1;
         }
       }
@@ -17044,6 +17123,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     for(var k2 in m){
       var a2=m[k2];
       a2.units=Object.keys(a2.u).length; delete a2.u;
+      a2.nets30=[]; a2.p30=0;
+      for(var wk3 in a2.wn){ a2.nets30.push(a2.wn[wk3]); a2.p30+=a2.wn[wk3]; }
+      delete a2.wn;
       // 推定単価（全店合算）。直近30日ぶんが基本、無ければ全期間から。
       // 店別の逆算値には貸玉条件による店固有のスケール差（±5%前後）があるが、それは正しい店差
       // なので警告しない。係数は全店合算の比で1つ＝店差は素の数字のまま保たれる（2026-08-03確認）
@@ -17168,7 +17250,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       cs.className = none ? '' : (v.a<1?'dn':(v.a>1?'up':''));
     }
     if(cp){
-      var p1=none?0:(v.a>0?(r.pPos*v.a + r.pNeg/v.a):0);
+      // 週トータルが黒の週は×a・赤の週は÷a（適用側と同じ判定）
+      var p1=0;
+      if(!none && v.a>0){ for(var w2=0;w2<r.nets30.length;w2++){ var nv=r.nets30[w2]; p1+=(nv>=0? nv*v.a : nv/v.a); } }
       var pph=(!none && r.n30>0) ? p1/r.n30 : 0;
       cp.textContent = none ? '—' : _bjtN(pph);
       cp.className = (!none && pph<0) ? 'dn' : '';
@@ -17229,7 +17313,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     for(var i=0;i<rows.length;i++){
       var r=rows[i];
       var entry=_bjtSavedEntry(r.name);
-      var pph=(r.n30>0)?(r.pPos+r.pNeg)/r.n30:0;
+      var pph=(r.n30>0)?r.p30/r.n30:0;
       var noRecent=!r.recent;
       html+='<tr id="bjtR'+i+'" data-n="'+_bjtEsc(r.name)+'">'
         +'<td class="l">'+_bjtEsc(r.name)+(noRecent?'<span class="bjt-badge">直近1ヶ月稼働なし</span>':'')+_bjtHistLine(entry)+'</td>'
@@ -17382,7 +17466,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     panel.innerHTML=''
       +'<div class="bjt-head"><div class="bj-wordmark" style="font-size:21px;">MODEL TUNING</div></div>'
       +'<div class="bjt-lead">取り込んだ数値は、データ提供元が<b>設定1のコイン単価</b>で推定したものです。実際のホールは設定1だけで営業しないので、売上も粗利も過大に出ています。<br>'
-      +'機種ごとに<b>正解のコイン単価</b>を入力すると、その比率で売上と粗利を補正します。黒字の機種は係数を掛け、<b>赤字の機種は係数で割ります</b>（赤字は膨らむ向き）。<br>'
+      +'機種ごとに<b>正解のコイン単価</b>を入力すると、その比率で売上と粗利を補正します。粗利は<b>週トータルで黒字の機種は係数を掛け、赤字の機種は係数で割ります</b>（赤字は膨らむ向き。判定は店×機種×週のトータル）。<br>'
       +'一覧は法人の<b>20円スロット全店</b>から自動で作られ、新しい機種はデータを取り込むと「未入力」として現れます。毎回ゼロから入れ直す必要はありません。<br>'
       +'単価は時期で変わるため、入力済みの機種を直すときは<b>いつから</b>（今週・先週・最初から）を選べます。最初の入力は全期間に効きます。<br>'
       +'アウトと差枚は触らないので<b>出玉率と勝率は変わりません</b>。空欄にして保存すると、その機種の補正を外します。</div>'
