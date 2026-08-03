@@ -2010,9 +2010,12 @@ function _invalidateLoadAllCache() {
 // 実際のホールは設定1だけで営業しないので、想定コイン単価は実際より高い。
 // つまり売上が過大で、その分そのまま粗利も過大になっている。
 //
-// だから直すつまみは「コイン単価」1つだけ。売上にも粗利にも同じ係数を掛ける。
+// だから直すつまみは「コイン単価」1つだけ。
 //   台売上' = 台売上 × 係数
-//   台粗利' = 台粗利 × 係数
+//   台粗利' = 黒字なら 台粗利 × 係数 ／ 赤字なら 台粗利 ÷ 係数
+// 係数は「推定がどれだけ楽観的か」を表す。黒字は楽観のぶん減らし、赤字は
+// 楽観のぶん膨らませる＝同じ率だけ実態側に寄せる。掛けるだけだと赤字まで
+// 小さくなってしまい、負けている機種を見落とす。
 // 実データ4機種で検証：通常営業の機種は、コイン単価から出した係数1つで
 // 粗利まで誤差0.3〜0.4%に収まる（正解 10,042,512 に対し 9,998,169 など）。
 //
@@ -2064,10 +2067,9 @@ function _bjApplyTune(records, store) {
     const s0 = r['台売上'] || 0, p0 = r['台粗利'] || 0;
     const s1 = Math.round(s0 * e.a);
     c['台売上'] = s1;
-    // 通常：粗利も同じ係数（機種ごとの粗利率は不変）
-    // 特殊：黒字↔赤字をまたぐ機種だけ、売上と景品金額を別々の係数で動かす。
-    //       粗利＝売上−景品金額 なので、この形なら符号をまたげる。
-    c['台粗利'] = (e.b === null) ? Math.round(p0 * e.a)
+    // 黒字は係数を掛け、赤字は係数で割る（赤字額が膨らむ向き）
+    // 特殊：売上と景品金額を別々の係数で動かす形（いまは使っていない）
+    c['台粗利'] = (e.b === null) ? Math.round(p0 >= 0 ? p0 * e.a : p0 / e.a)
                                  : Math.round(s0 * e.a - (s0 - p0) * e.b);
     return c;
   });
@@ -17033,13 +17035,16 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     for(var i=0;i<recs.length;i++){
       var r=recs[i], n=r['機種名']; if(!n) continue;
       var a=m[n];
-      if(!a) a=m[n]={name:n,sales:0,profit:0,out:0,n:0,u:{},d:(wantDays?{}:null),last:'',s30:0,o30:0,fullSales:0,fullProfit:0,fullOut:0};
+      if(!a) a=m[n]={name:n,sales:0,profit:0,out:0,n:0,u:{},d:(wantDays?{}:null),last:'',s30:0,o30:0,fullSales:0,fullProfit:0,fullOut:0,pPos:0,pNeg:0,fPos:0,fNeg:0};
       var d=r.date||'';
-      a.fullSales+=r['台売上']||0; a.fullProfit+=r['台粗利']||0; a.fullOut+=r['IN枚数']||0;
+      var _p=r['台粗利']||0;
+      a.fullSales+=r['台売上']||0; a.fullProfit+=_p; a.fullOut+=r['IN枚数']||0;
+      if(_p>=0) a.fPos+=_p; else a.fNeg+=_p;   // 黒字ぶん／赤字ぶんを分けて持つ
       if(d && d>a.last) a.last=d;                                  // 撤去判定は期間に関係なく全データで見る
       if(from30 && d>=from30){ a.s30+=r['台売上']||0; a.o30+=r['IN枚数']||0; }
       if((from && d<from) || (to && d>to)) continue;               // ここから下は指定期間のみ
-      a.sales+=r['台売上']||0; a.profit+=r['台粗利']||0; a.out+=r['IN枚数']||0;
+      a.sales+=r['台売上']||0; a.profit+=_p; a.out+=r['IN枚数']||0;
+      if(_p>=0) a.pPos+=_p; else a.pNeg+=_p;
       a.n++;                                                       // 台日数（1レコード＝1台1日）
       if(a.d && d) a.d[d]=1;                                       // 営業日数（この期間で稼働した日）
       if(r['台番']!=null) a.u[r['台番']]=1;
@@ -17081,6 +17086,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return _bjtStat;
   }
 
+  // 係数aを当てたときの粗利。黒字ぶんは掛け、赤字ぶんは割る
+  function _bjtProfitAt(pos, neg, a){ return (a>0) ? (pos*a + neg/a) : (pos+neg); }
+
+  // 目標の粗利にするための係数を解く   pos*a + neg/a = T  →  pos*a² − T*a + neg = 0
+  function _bjtSolve(pos, neg, T){
+    if(!pos && !neg) return null;
+    if(!neg) return (pos>0) ? T/pos : null;          // 黒字だけ
+    if(!pos) return (T!==0) ? neg/T : null;          // 赤字だけ
+    var disc=T*T-4*pos*neg;                          // neg<0 なので必ず正
+    if(disc<0) return null;
+    var a=(T+Math.sqrt(disc))/(2*pos);
+    return (isFinite(a)&&a>0) ? a : null;
+  }
+
   // 入力（補正後コイン単価 cv ／ 実績台粗利 pv）から補正の係数を決める
   //   係数 ＝ 実績台粗利 ÷ 推定台粗利（＝補正後コイン単価 ÷ 推定コイン単価）。売上にも粗利にも掛ける。
   //   （_bjApplyTune 側は係数2つの形にも対応済み。必要になったら b を返せば有効になる）
@@ -17093,9 +17112,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(c===null && p===null) return {a:1,b:null};
     var byCoin=function(){ return (c!==null && c>0 && r.price) ? {a:c/r.price,b:null} : null; };
     var byProf=function(){
-      if(p===null || !r.profit) return null;
-      var a2=(p*r.n)/r.profit;
-      return (isFinite(a2)&&a2>0)?{a:a2,b:null}:{a:1,b:null};
+      if(p===null || !(r.pPos||r.pNeg)) return null;
+      var a2=_bjtSolve(r.pPos, r.pNeg, p*r.n);
+      return (a2!==null && isFinite(a2) && a2>0)?{a:a2,b:null}:{a:1,b:null};
     };
     // 最後に触った欄を優先する（台粗利を入れたあと単価を動かしても効くように）
     var first=(prefer==='c')?byCoin():byProf();
@@ -17144,8 +17163,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       ps0+=r.sales;      pp0+=r.profit;
       fs0+=r.fullSales;  fp0+=r.fullProfit;
       ps1+=r.sales*a;    fs1+=r.fullSales*a;
-      pp1+=(b===null)? r.profit*a     : (r.sales*a     - (r.sales-r.profit)*b);
-      fp1+=(b===null)? r.fullProfit*a : (r.fullSales*a - (r.fullSales-r.fullProfit)*b);
+      pp1+=(b===null)? _bjtProfitAt(r.pPos, r.pNeg, a) : (r.sales*a     - (r.sales-r.profit)*b);
+      fp1+=(b===null)? _bjtProfitAt(r.fPos, r.fNeg, a) : (r.fullSales*a - (r.fullSales-r.fullProfit)*b);
       if(e) n++;
     });
     return {count:n,
@@ -17216,7 +17235,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var none=(a===1 && b===null);
     // 補正後の金額は「指定期間」ぶん＝左の売上計・粗利計と同じ土俵で見比べられるようにする
     var s1=r.sales*a;
-    var p1=(b===null)? r.profit*a : (r.sales*a - (r.sales-r.profit)*b);
+    var p1=(b===null)? _bjtProfitAt(r.pPos, r.pNeg, a) : (r.sales*a - (r.sales-r.profit)*b);
     var cf=document.getElementById('bjtF'+i),
         cs=document.getElementById('bjtS'+i), cp=document.getElementById('bjtP'+i);
     if(cf){
@@ -17381,7 +17400,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         pushKeys[sn]=1;
         if(blank){ delete slot[r.name]; changed++; return; }               // 空欄＝補正を外す
         if(Math.abs(a-1)<1e-9 && b===null){ delete slot[r.name]; changed++; return; }
-        var p1=(b===null)? r.profit*a : (r.sales*a - (r.sales-r.profit)*b);
+        var p1=(b===null)? _bjtProfitAt(r.pPos, r.pNeg, a) : (r.sales*a - (r.sales-r.profit)*b);
         slot[r.name]={target:Math.round(r.price*a*10000)/10000, base:r.price,
                       factor:a, payFactor:b, ref:ref,
                       basePph:Math.round(r.pph),
@@ -17466,7 +17485,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<div class="bjt-head"><div class="bj-wordmark" style="font-size:21px;">MODEL TUNING</div></div>'
             +'<div class="bjt-lead">取り込んだ数値は、データ提供元が<b>設定1のコイン単価</b>で推定したものです。実際のホールは設定1だけで営業しないので、売上も粗利も過大に出ています。<br>'
       +'<b>実績台粗利</b>（手元の実データの値）を入れると<b>補正後コイン単価</b>が出ます。その比を売上と粗利の両方に掛けます。コイン単価の方に直接入れても構いません。<br>'
-      +'アウトと差枚は触らないので<b>出玉率・勝率・機種ごとの粗利率は変わりません</b>。補正は全期間に効きます。空欄に戻せば元の数字に戻ります。</div>'
+      +'黒字の機種は係数を掛け、<b>赤字の機種は係数で割ります</b>（推定が楽観的なぶん、赤字は膨らむ向きに直します）。<br>'
+      +'アウトと差枚は触らないので<b>出玉率と勝率は変わりません</b>。補正は全期間に効きます。空欄に戻せば元の数字に戻ります。</div>'
       +'<div class="bjt-bar">'
       +'<label>基準店：<b id="bjtRef" style="color:var(--text)"></b></label>'
       +'<button type="button" class="bjt-btn" id="bjtRefBtn"></button>'
