@@ -1998,117 +1998,168 @@ function loadAllData() {
   return _loadAllCache;
 }
 // データ更新時にキャッシュを明示的にクリア
+// _bjDataGen はデータの世代番号。「先に消す→入れ直す」で件数が偶然同じでも、
+// 件数ベースのキャッシュ（週別推定単価・チューニングの機種一覧）が古いまま残らないようにする
+var _bjDataGen = 0;
 function _invalidateLoadAllCache() {
   _loadAllCache = null;
   _loadAllCacheKey = '';
+  _bjDataGen++;
 }
 
-// ── 機種別チューニング（コイン単価の補正）2026/07/28 ─────────────────────
+// ── 機種別チューニング（コイン単価の補正）2026/08/03 単価直接入力方式 ─────
 // 元データの推定の作られ方（データ提供元）:
 //   G数 → 推定アウト → 推定売上 = アウト × コイン単価（メーカー発表の設定1の値）
 //   セーフ = アウト + 差枚 → 景品玉 → 推定台粗利 = 推定売上 − 景品玉 × 交換単価
 // 実際のホールは設定1だけで営業しないので、想定コイン単価は実際より高い。
 // つまり売上が過大で、その分そのまま粗利も過大になっている。
 //
-// だから直すつまみは「コイン単価」1つだけ。
-//   台売上' = 台売上 × 係数
-//   台粗利' = 黒字なら 台粗利 × 係数 ／ 赤字なら 台粗利 ÷ 係数
-// 係数は「推定がどれだけ楽観的か」を表す。黒字は楽観のぶん減らし、赤字は
-// 楽観のぶん膨らませる＝同じ率だけ実態側に寄せる。掛けるだけだと赤字まで
-// 小さくなってしまい、負けている機種を見落とす。
-// 実データ4機種で検証：通常営業の機種は、コイン単価から出した係数1つで
-// 粗利まで誤差0.3〜0.4%に収まる（正解 10,042,512 に対し 9,998,169 など）。
+// 直すつまみは「コイン単価」1つだけ。ホールが機種ごとに正解のコイン単価を入力する。
+//   推定単価 = Σ台売上 ÷ Σアウト（法人の20円スロット全店・その機種・その週の合算から逆算）
+//   係数 a  = 正解単価 ÷ 推定単価  …… 全店に同じ係数を掛ける（比で配る）
+//   台売上' = 台売上 × a
+//   台粗利' = 黒字なら 台粗利 × a ／ 赤字なら 台粗利 ÷ a（赤字は膨らむ向き。
+//             掛けるだけだと赤字まで小さくなり、負けている機種を見落とす）
+// ⚠️推定単価を店ごとに出してはいけない（2026-08-03 実データで確認）。
+//   店別の逆算値には貸玉条件などによる店固有のスケール差（±5%前後・全機種で同じ向き）があり、
+//   店ごとに割るとその正しい店差まで消してしまう。全店合算から比を1つ作って全店に配る。
 //
-// ※粗利の正解から逆算して係数を作ってはいけない。目的は「その店・その期間の
-//   1機種を合わせ込むこと」ではなく「他店にも通じる系統的なズレを測ること」。
-//   基準店でたまたま黒字→赤字をまたいだ機種に合わせ込むと、他店で普通に
-//   営業している同じ機種へ間違った補正が飛ぶ。
+// 正解単価は時期で変わる（例: ゴッドの3月と8月）ので「どの週から」を版で持つ。
+//   形: window.BJ_TUNE = { v:2, models:{ 機種名:{ vers:[{from:'',price:3.2},{from:'2026-08-03',price:3.5}] } } }
+//   from は適用開始週の月曜（週の区切りは週報と同じ 月〜日）。'' は最初から。
+//   レコードの日付が属する週で版を選ぶので、過去に入れた値は過去のまま動かない。
 //
 // アウト(IN枚数)と差枚は触らないので出玉率・勝率は不変。機種ごとの粗利率も不変。
+// パチンコ（店舗名が（4P）で終わる店）はコイン単価の話ではないので対象外。
 // 設定が空のときは元の配列をそのまま返すため、従来と完全に同じ動きになる。
-// 形: { '*': { 機種名: {target,base,factor} }, '店舗名': {...} }  店舗別が全店に優先
 window.BJ_TUNE = window.BJ_TUNE || {};
 
 function bjTuneBump() { _bjTuneVer++; _invalidateLoadAllCache(); }
 
-// 有効な補正だけを { 機種名: {a, b} } に畳む。1.00 と未設定は入れない
-// （店舗別で 1.00 を入れると、全店設定を打ち消せる）
-//   a … 売上の係数（＝補正後コイン単価 ÷ 推定コイン単価）
-//   b … 景品金額の係数。通常は null（＝粗利も a を掛けるだけ）。
-//        黒字↔赤字をまたぐ機種だけ b を持つ（下の _bjApplyTune 参照）
-function bjTuneFactors(storeName) {
-  const T = window.BJ_TUNE || {};
-  const out = {};
-  const put = src => {
-    if (!src) return;
-    for (const m in src) {
-      const e = src[m] || {};
-      const a = Number(e.factor);
-      const bv = (e.payFactor == null) ? null : Number(e.payFactor);
-      const hasB = (bv !== null && isFinite(bv) && bv > 0);
-      if (isFinite(a) && a > 0 && (a !== 1 || hasB)) out[m] = { a: a, b: hasB ? bv : null };
-      else delete out[m];
-    }
-  };
-  put(T['*']);
-  if (storeName) put(T[storeName]);
+// 入力済みの機種マスタ（v2形式でなければ空＝旧・基準店方式の保存は使わない）
+function bjTuneModels() {
+  const T = window.BJ_TUNE;
+  if (!T || T.v !== 2 || !T.models || typeof T.models !== 'object') return {};
+  return T.models;
+}
+
+// その日が属する週の月曜。日付文字列ごとにメモ化（レコード数ぶん呼ばれるため）
+const _bjTuneMonCache = {};
+function bjTuneMonday(ds) {
+  const hit = _bjTuneMonCache[ds];
+  if (hit !== undefined) return hit;
+  const d = new Date(ds + 'T00:00:00');
+  let r = '';
+  if (!isNaN(d)) {
+    d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+    r = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  _bjTuneMonCache[ds] = r;
+  return r;
+}
+
+// その日に効く正解単価＝「適用開始週の月曜 ≦ その日の週の月曜」の中で一番新しい版
+function bjTunePriceAt(entry, dateStr) {
+  const vs = entry && entry.vers;
+  if (!Array.isArray(vs) || !vs.length) return null;
+  const wk = bjTuneMonday(dateStr || '');
+  let best = null, bestFrom = null;
+  for (let i = 0; i < vs.length; i++) {
+    const v = vs[i]; if (!v) continue;
+    const f = v.from || '';
+    if (f && (!wk || f > wk)) continue;          // まだ始まっていない版
+    if (bestFrom === null || f >= bestFrom) { best = v; bestFrom = f; }
+  }
+  const p = best ? Number(best.price) : NaN;
+  return (isFinite(p) && p > 0) ? p : null;
+}
+
+// パチンコ店（店舗名の末尾が（4P））は対象外
+function bjTuneIsPachi(name) { return /[（(]4P[）)]\s*$/.test(String(name || '')); }
+
+// 推定単価の合算対象＝法人の20円スロット店（ベンチマーク・システム店舗・パチンコは除く）
+function _bjTuneCorpStores() {
+  const skip = { 'デフォルト店舗': 1, '機種フォーマッタテスト店舗': 1 };
+  const out = [];
+  try {
+    (typeof getStores === 'function' ? (getStores() || []) : []).forEach(s => {
+      if (s && s.name && s.id !== '__benchmark__' && !skip[s.name] && !bjTuneIsPachi(s.name)) out.push(s);
+    });
+  } catch (e) {}
   return out;
 }
 
-function _bjApplyTune(records, store) {
-  // 業界ベンチマークは他社比較の物差しなので補正しない
-  if (!store || store.id === '__benchmark__') return records;
-  const f = bjTuneFactors(store.name);
-  if (!Object.keys(f).length) return records;   // 設定なし＝素のまま（同じ配列を返す）
+// 週ごとの推定単価表（全店合算・全機種）。key = 機種名|週の月曜
+// データが増えたら作り直す（店数＋総レコード数で判定）。設定を変えても表は変わらない
+let _bjTuneEstCache = { key: '', tbl: null };
+function bjTuneCorpEst() {
+  const stores = _bjTuneCorpStores();
+  let total = 0;
+  stores.forEach(s => { total += ((typeof DB_CACHE !== 'undefined' && DB_CACHE[s.key]) || []).length; });
+  const key = stores.length + '|' + total + '|' + _bjDataGen;
+  if (_bjTuneEstCache.tbl && _bjTuneEstCache.key === key) return _bjTuneEstCache.tbl;
+  const tbl = {};
+  stores.forEach(s => {
+    const rr = (typeof DB_CACHE !== 'undefined' && DB_CACHE[s.key]) || [];
+    for (let i = 0; i < rr.length; i++) {
+      const r = rr[i], m = r['機種名'];
+      if (!m || !r.date) continue;
+      const k = m + '|' + bjTuneMonday(r.date);
+      const e = tbl[k] || (tbl[k] = { s: 0, o: 0 });
+      e.s += r['台売上'] || 0; e.o += r['IN枚数'] || 0;
+    }
+  });
+  _bjTuneEstCache = { key: key, tbl: tbl };
+  return tbl;
+}
+
+// 1レコードに効く係数。効かないときは 0 を返す
+function _bjTuneFactorFor(r, models, est) {
+  const m = r['機種名'], entry = m && models[m];
+  if (!entry || !r.date) return 0;
+  const price = bjTunePriceAt(entry, r.date);
+  if (price === null) return 0;
+  const e = est[m + '|' + bjTuneMonday(r.date)];
+  const pe = (e && e.o > 0) ? e.s / e.o : 0;     // 推定単価（全店合算・この週）
+  if (!(pe > 0)) return 0;
+  const a = price / pe;
+  return (isFinite(a) && a > 0) ? a : 0;
+}
+
+// 補正の本体。models を差し替えられる形＝保存前のプレビューでも同じ計算を使う
+function _bjApplyTuneWith(records, store, models) {
+  // 業界ベンチマークは他社比較の物差しなので補正しない。パチンコ店も対象外
+  if (!store || store.id === '__benchmark__' || bjTuneIsPachi(store.name)) return records;
+  if (!models || !Object.keys(models).length) return records;   // 設定なし＝素のまま（同じ配列を返す）
+  const est = bjTuneCorpEst();   // 全店合算＝店固有のスケール差を消さない
   return records.map(r => {
-    const e = f[r['機種名']];
-    if (!e) return r;                            // 対象外の機種は複製しない（巨大店舗の負荷対策）
+    const a = _bjTuneFactorFor(r, models, est);
+    if (!a || Math.abs(a - 1) < 1e-9) return r;                 // 対象外の機種は複製しない（巨大店舗の負荷対策）
     const c = Object.assign({}, r);
     const s0 = r['台売上'] || 0, p0 = r['台粗利'] || 0;
-    const s1 = Math.round(s0 * e.a);
-    c['台売上'] = s1;
-    // 黒字は係数を掛け、赤字は係数で割る（赤字額が膨らむ向き）
-    // 特殊：売上と景品金額を別々の係数で動かす形（いまは使っていない）
-    c['台粗利'] = (e.b === null) ? Math.round(p0 >= 0 ? p0 * e.a : p0 / e.a)
-                                 : Math.round(s0 * e.a - (s0 - p0) * e.b);
+    c['台売上'] = Math.round(s0 * a);
+    c['台粗利'] = Math.round(p0 >= 0 ? p0 * a : p0 / a);        // 黒字は掛け、赤字は割る
     return c;
   });
 }
 
-// 補正前の素データ。推定コイン単価の算出など「元の数字」が要る場面で使う
-function loadAllRawData() {
-  const store = _activeStore();
-  const added = DB_CACHE[store.key] || [];
-  const base = store.id === 'ueda' ? RAW_DATA : [];
-  return [...base, ...added];
-}
+function _bjApplyTune(records, store) { return _bjApplyTuneWith(records, store, bjTuneModels()); }
 
-// 機種ごとの推定コイン単価 = Σ台売上 ÷ Σアウト（必ず素の値で出す）
-// 戻り: { 機種名: {sales, profit, out, rows, units, price, lastDate} }
-function bjCoinPriceByModel(records) {
-  const src = records || loadAllRawData();
-  const agg = {};
-  for (let i = 0; i < src.length; i++) {
-    const r = src[i];
-    const m = r['機種名'];
-    if (!m) continue;
-    let a = agg[m];
-    if (!a) a = agg[m] = { sales: 0, profit: 0, out: 0, rows: 0, _u: {}, lastDate: '' };
-    a.sales  += r['台売上'] || 0;
-    a.profit += r['台粗利'] || 0;
-    a.out    += r['IN枚数'] || 0;
-    a.rows++;
-    if (r['台番'] != null) a._u[r['台番']] = 1;
-    if (r.date && r.date > a.lastDate) a.lastDate = r.date;
+// 合計だけ欲しい場面（保存前の「店全体への影響」）用。配列を作らず一回でなめる
+function bjTuneTotals(records, store, models) {
+  const t = { s0: 0, p0: 0, s1: 0, p1: 0 };
+  const on = store && store.id !== '__benchmark__' && !bjTuneIsPachi(store.name)
+             && models && Object.keys(models).length;
+  const est = on ? bjTuneCorpEst() : null;
+  for (let i = 0; i < records.length; i++) {
+    const r = records[i];
+    const s0 = r['台売上'] || 0, p0 = r['台粗利'] || 0;
+    t.s0 += s0; t.p0 += p0;
+    const a = on ? _bjTuneFactorFor(r, models, est) : 0;
+    if (a) { t.s1 += Math.round(s0 * a); t.p1 += Math.round(p0 >= 0 ? p0 * a : p0 / a); }
+    else   { t.s1 += s0; t.p1 += p0; }
   }
-  for (const m in agg) {
-    const a = agg[m];
-    a.units = Object.keys(a._u).length;
-    delete a._u;
-    a.price = a.out > 0 ? a.sales / a.out : 0;          // 推定コイン単価（円）
-    a.rate  = a.sales > 0 ? a.profit / a.sales : 0;     // 利益率（補正しても変わらない）
-  }
-  return agg;
+  return t;
 }
 
 function getAddedData() {
@@ -14835,15 +14886,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjt-empty{ padding:26px; text-align:center; color:var(--text2); font-size:13px; }
   .bjt-note{ font-size:11.5px; color:var(--text2); margin-top:10px; line-height:1.8; }
   .bjt-note.ng{ color:var(--red); }
-  .bjt-tgtbox{ flex:1 1 420px; max-height:112px; overflow-y:auto; border:1px solid var(--border);
-               border-radius:4px; background:var(--card); padding:6px 10px;
-               display:flex; flex-wrap:wrap; gap:2px 16px; }
-  .bjt-tgt{ display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--text);
-            white-space:nowrap; padding:2px 0; cursor:pointer; }
-  .bjt-refmark{ margin-left:5px; font-size:10.5px; color:var(--accent); border:1px solid var(--accent);
-                border-radius:3px; padding:0 4px; }
-  .bjt-bar input[type=date]{ padding:4px 6px; border:1px solid var(--border); border-radius:4px;
-               background:var(--card); color:var(--text); font-size:12.5px; }
+  .bjt-badge{ display:inline-block; font-size:10.5px; color:var(--accent); border:1px solid var(--accent);
+              border-radius:3px; padding:0 4px; margin-left:6px; vertical-align:1px; white-space:nowrap; }
+  .bjt-badge.ng{ color:var(--red); border-color:var(--red); }
+  .bjt-hist{ font-size:10.5px; color:var(--text2); margin-top:2px; white-space:normal; max-width:360px; }
+  table.bjt-t select.bjt-when{ padding:3px 4px; border:1px solid var(--border); border-radius:4px;
+              background:var(--card); color:var(--text); font-size:11.5px; }
+  table.bjt-t select.bjt-when:disabled{ opacity:.45; }
 </style>
 <script>
 (function(){
@@ -16797,50 +16846,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }catch(e){ console.error('bjwr', e); host.innerHTML=''; }
   }
 
-  // ═══ 機種別チューニング（コイン単価の補正）2026/07/28 ═══
-  // 設計：Excel由来の数値が実態とズレる機種を、ホール自身がコイン単価で補正する。
-  //  ・入力は「円」／保存は「係数」（目標単価だけ持って毎回逆算すると、データが増えるたび係数が動いて
-  //    過去の数字が毎日変わってしまうため。係数は入力した時点で確定させる）
-  //  ・売上と粗利に同じ係数 → 利益率は不変。アウト・差枚は触らない → 出玉率・勝率も不変
-  //  ・実際に掛ける処理は loadAllData()（本体上部）にある。ここは実績を見せて係数を決める画面
-  var _bjtRetry=0, _bjtDraft={}, _bjtDraftP={}, _bjtLast={}, _bjtStat=null, _bjtStatKey='', _bjtFind='', _bjtTgt=null,
-      _bjtFrom='', _bjtTo='';
+  // ═══ 機種別チューニング（コイン単価の補正）2026/08/03 単価直接入力方式 ═══
+  // 設計：法人の20円スロット全店から機種一覧を自動で作り、機種ごとに「正解のコイン単価」を入力する。
+  //  ・係数 = 正解単価 ÷ 推定単価（データから逆算）。売上×係数、粗利は黒字×係数・赤字÷係数
+  //  ・単価は時期で変わるので「どの週から」を版で持つ（週の区切りは週報と同じ 月〜日）
+  //  ・新台はデータを取り込んだ時点で「未入力」として自動で現れる。毎回ゼロから入れ直す必要はない
+  //  ・実際に掛ける処理は loadAllData()（本体上部）。ここは一覧を見せて単価を入力する画面
+  var _bjtRetry=0, _bjtDraft={}, _bjtWhen={}, _bjtFind='', _bjtOnlyEmpty=false, _bjtShowAll=false,
+      _bjtStat=null, _bjtStatKey='', _bjtSumT=null, _bjtRows=[];   // _bjtRows＝描画した行の並び（入力欄のdata-iはこれを指す）
 
-  // 基準店＝いま表示している店。「売上と粗利の答えが分かっている店」でコイン単価を決める。
-  // そこで出した係数を、チェックした配布先の店にそのまま配る（推定値のクセを揃えて直す考え方）。
   function _bjtStoreName(){ try{ var s=_activeStore(); return (s&&s.name)||''; }catch(e){ return ''; } }
 
-  // ── 基準店 ────────────────────────────────────────────────
-  // 一度決めたら固定。画面上部で表示する店を切り替えても、この画面は常に基準店を見る。
-  // 変更するとそれまでの係数の意味が変わってしまうので、変更時は設定を全部消す。
-  var _bjtRefCache=null;
-  function _bjtRefKey(){ return _bjtLsKey()+'_ref'; }
-  function _bjtRef(){
-    if(_bjtRefCache!==null) return _bjtRefCache;
-    try{ _bjtRefCache=localStorage.getItem(_bjtRefKey())||''; }catch(e){ _bjtRefCache=''; }
-    return _bjtRefCache;
-  }
-  function _bjtSetRef(name){
-    _bjtRefCache=name||'';
-    try{ if(_bjtRefCache) localStorage.setItem(_bjtRefKey(), _bjtRefCache); else localStorage.removeItem(_bjtRefKey()); }catch(e){}
-    _bjtStat=null; _bjtStatKey='';
-  }
-  // 基準店の生データ（表示中の店ではなく、必ず基準店を見る）
-  function _bjtRefRecords(){
-    var name=_bjtRef(); if(!name) return [];
-    var list=_bjtAllStores();
-    for(var i=0;i<list.length;i++){
-      if(list[i].name===name) return (typeof DB_CACHE!=='undefined' && DB_CACHE[list[i].key]) ? DB_CACHE[list[i].key] : [];
-    }
-    return [];
-  }
-  function _bjtScopeKey(){ return _bjtRef()||'*'; }   // 画面で編集する設定は基準店のもの
-
-  var _BJT_SKIP_STORES={'デフォルト店舗':1,'機種フォーマッタテスト店舗':1};   // システム/テスト用は配布先に出さない
-  // 部門（4円パチンコ／20円スロット）は別の店舗として登録されている。
-  // 店舗名の末尾の（4P）で見分ける。部門をまたいで係数を配ると、機種名が
-  // たまたま一致したときだけ誤って効いてしまうので、既定では配らない
-  function _bjtDept(name){ return /[（(]4P[）)]\s*$/.test(String(name||'')) ? '4P' : '20S'; }
+  var _BJT_SKIP_STORES={'デフォルト店舗':1,'機種フォーマッタテスト店舗':1};   // システム/テスト用は集計に入れない
   function _bjtAllStores(){
     var out=[];
     try{
@@ -16850,33 +16867,24 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }catch(e){}
     return out;
   }
-  function _bjtTgtKey(){ return _bjtLsKey()+'_targets'; }
-  function _bjtTargets(){
-    if(_bjtTgt) return _bjtTgt;
-    var saved=null;
-    try{ saved=JSON.parse(localStorage.getItem(_bjtTgtKey())||'null'); }catch(e){}
-    var all=_bjtAllStores().map(function(s){ return s.name; });
-    if(Array.isArray(saved)) _bjtTgt=saved.filter(function(n){ return all.indexOf(n)>=0; });
-    else _bjtTgt=[_bjtRef()].filter(Boolean);   // 初回は基準店だけ＝うっかり全店に配らない
-    if(!_bjtTgt.length && _bjtRef()) _bjtTgt=[_bjtRef()];
-    return _bjtTgt;
-  }
-  function _bjtSetTargets(list){
-    _bjtTgt=list.slice();
-    try{ localStorage.setItem(_bjtTgtKey(), JSON.stringify(_bjtTgt)); }catch(e){}
-  }
+  // 20円スロットの店だけが対象（パチンコ＝（4P）はコイン単価の話ではない）
+  function _bjtSlotStores(){ return _bjtAllStores().filter(function(s){ return !bjTuneIsPachi(s.name); }); }
 
   function _bjtLsKey(){ return (typeof USER_ID!=='undefined'?USER_ID:'admin')+'_bj_tune'; }
   function _bjtEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function _bjtN(v){ return Math.round(v||0).toLocaleString(); }
   function _bjtSign(v){ var n=Math.round(v||0); return (n>0?'+':'')+n.toLocaleString(); }
-  function _bjtPct(a,b){ return b ? ((a-b)/Math.abs(b)*100) : 0; }
   function _bjtNow(){ var d=new Date(); return d.toISOString().slice(0,19)+'Z'; }
+  function _bjtToday(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function _bjtWkLabel(mon){ if(!mon) return '最初から'; var d=new Date(mon+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate()+'の週から'; }
 
   function _bjtLoadSaved(){
     var o={};
     try{ var raw=localStorage.getItem(_bjtLsKey()); if(raw) o=JSON.parse(raw)||{}; }catch(e){ o={}; }
-    window.BJ_TUNE = (o && typeof o==='object') ? o : {};
+    // 旧・基準店方式（v2でない形）の保存は引き継がない＝単価直接入力で入れ直す
+    if(!(o && o.v===2 && o.models && typeof o.models==='object')) o={};
+    window.BJ_TUNE = o;
+    try{ localStorage.removeItem(_bjtLsKey()+'_ref'); localStorage.removeItem(_bjtLsKey()+'_targets'); }catch(e){}   // 旧方式の残骸を掃除
     try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
   }
   function _bjtPersist(){
@@ -16889,7 +16897,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var BJ_TUNE_API='https://izj22krk0k.execute-api.ap-northeast-1.amazonaws.com/';
   // 接続先の差し替え口（動作確認用。移設したときもここだけ変えれば済む）
   function _bjtApiBase(){ return (window.BJ_TUNE_API_URL || BJ_TUNE_API); }
-  var _bjtTk=null, _bjtTkExp=0, _bjtSyncState='', _bjtMeta={}, _bjtPullTried=false;
+  var _bjtTk=null, _bjtTkExp=0, _bjtSyncState='', _bjtMeta=null, _bjtPullTried=false;
   var _bjtRev=0;   // このPCで保存するたびに増やす。読み込みの返事が遅れて届いても、保存済みの内容を消さないための番号
 
   function _bjtCorp(){ return window.BJ_TUNE_CORP || (typeof USER_ID!=='undefined'?USER_ID:'admin'); }
@@ -16954,25 +16962,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         // 読み込んでいる間にこのPCで保存されたら、こちらの方が新しい＝返事は捨てる（保存を消さないため）
         if(rev!==_bjtRev){ _bjtSyncState='ok'; _bjtNotice();
           if(window._bjRoom==='tune'){ try{ _bjtSyncLine(); }catch(e){} } return; }
-        var next={}, meta={}, mv=null;
+        var models=null, meta=null;
         (j.items||[]).forEach(function(it){
-          if(it.kind==='coinmeta'){ try{ mv=JSON.parse(it.value); }catch(e){} return; }
-          if(it.kind!=='coin') return;
-          try{ var v=JSON.parse(it.value); if(v && typeof v==='object'){ next[it.scope]=v; meta[it.scope]={at:it.updatedAt, by:it.updatedBy}; } }catch(e){}
+          // 旧方式（kind='coin'/'coinmeta'＝基準店の係数）は読まない。新方式で入れ直す
+          if(it.kind!=='coinv2') return;
+          try{ var v=JSON.parse(it.value); if(v && typeof v==='object'){ models=v; meta={at:it.updatedAt, by:it.updatedBy}; } }catch(e){}
         });
-        // 基準店と配布先も3台で揃える
-        var metaBefore=_bjtRef()+'|'+JSON.stringify(_bjtTargets());
-        if(mv && typeof mv==='object'){
-          if(typeof mv.ref==='string') _bjtSetRef(mv.ref);
-          if(Array.isArray(mv.targets)) _bjtSetTargets(mv.targets);
-        }
-        var metaChanged=(metaBefore!==(_bjtRef()+'|'+JSON.stringify(_bjtTargets())));
+        var next=(models && Object.keys(models).length) ? {v:2, models:models} : {};
         var before=JSON.stringify(window.BJ_TUNE||{});
         window.BJ_TUNE=next; _bjtMeta=meta; _bjtPersist();
         _bjtSyncState='ok';
-        if(JSON.stringify(next)!==before || metaChanged){
+        if(JSON.stringify(next)!==before){
           try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
-          _bjtStat=null; _bjtStatKey='';
           _bjtAfterChange();
           if(window._bjRoom==='tune'){ try{ _bjtRender(); }catch(e){} }
         }
@@ -16987,32 +16988,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       });
   }
 
-  function _bjtPush(keys){
+  function _bjtPush(){
     if(!_bjtApiEnabled()) return Promise.reject(new Error('local'));
-    var T=window.BJ_TUNE||{};
-    return keys.reduce(function(p,k){
-      return p.then(function(){
-        return _bjtCall('settings',{method:'PUT',headers:{'content-type':'application/json'},
-          body:JSON.stringify({kind:'coin', scope:k, value:JSON.stringify(T[k]||{}), updatedBy:_bjtWho()})})
-          .then(function(r){ if(!r.ok) throw new Error('put '+r.status+' ('+k+')'); });
-      });
-    }, Promise.resolve());
-  }
-  // 基準店と配布先をサーバへ（3台で同じものを見るため）
-  function _bjtPushMeta(){
-    if(!_bjtApiEnabled()) return Promise.resolve();
     return _bjtCall('settings',{method:'PUT',headers:{'content-type':'application/json'},
-      body:JSON.stringify({kind:'coinmeta', scope:'*',
-        value:JSON.stringify({ref:_bjtRef(), targets:_bjtTargets()}), updatedBy:_bjtWho()})})
-      .then(function(r){ if(!r.ok) throw new Error('putmeta '+r.status); });
+      body:JSON.stringify({kind:'coinv2', scope:'*', value:JSON.stringify(bjTuneModels()), updatedBy:_bjtWho()})})
+      .then(function(r){ if(!r.ok) throw new Error('put '+r.status); });
   }
 
   window._bjtSyncNow=function(){ try{ return _bjtPull(); }catch(e){ return Promise.resolve(); } };
 
   function _bjtSyncLine(){
     var el=document.getElementById('bjtSync'); if(!el) return;
-    var k=_bjtScopeKey(), m=_bjtMeta[k];
-    var s='';
+    var m=_bjtMeta, s='';
     if(_bjtSyncState==='local'){
       var why='';
       try{ if(!/^https?:$/.test(location.protocol)) why='ファイルを直接開いているためです。'; }catch(e){}
@@ -17026,319 +17013,242 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     el.className='bjt-note'+(_bjtSyncState==='fail'?' ng':'');
   }
 
-  // 素の値で機種ごとに集計する（補正前でないと実績単価が出せない）
-  //   from/to = 係数を決めるための期間（答え合わせできる実データが手元にある期間）
-  //   sales/profit/out … その期間ぶん（推定コイン単価はここから出す）
-  //   full*          … 全期間ぶん（補正は全期間に効くので、変化額はこちらで出す）
-  function _bjtAgg(recs, from, to, from30, wantDays){
-    var m={};
-    for(var i=0;i<recs.length;i++){
-      var r=recs[i], n=r['機種名']; if(!n) continue;
-      var a=m[n];
-      if(!a) a=m[n]={name:n,sales:0,profit:0,out:0,n:0,u:{},d:(wantDays?{}:null),last:'',s30:0,o30:0,fullSales:0,fullProfit:0,fullOut:0,pPos:0,pNeg:0,fPos:0,fNeg:0};
-      var d=r.date||'';
-      var _p=r['台粗利']||0;
-      a.fullSales+=r['台売上']||0; a.fullProfit+=_p; a.fullOut+=r['IN枚数']||0;
-      if(_p>=0) a.fPos+=_p; else a.fNeg+=_p;   // 黒字ぶん／赤字ぶんを分けて持つ
-      if(d && d>a.last) a.last=d;                                  // 撤去判定は期間に関係なく全データで見る
-      if(from30 && d>=from30){ a.s30+=r['台売上']||0; a.o30+=r['IN枚数']||0; }
-      if((from && d<from) || (to && d>to)) continue;               // ここから下は指定期間のみ
-      a.sales+=r['台売上']||0; a.profit+=_p; a.out+=r['IN枚数']||0;
-      if(_p>=0) a.pPos+=_p; else a.pNeg+=_p;
-      a.n++;                                                       // 台日数（1レコード＝1台1日）
-      if(a.d && d) a.d[d]=1;                                       // 営業日数（この期間で稼働した日）
-      if(r['台番']!=null) a.u[r['台番']]=1;
-    }
-    return m;
-  }
-
-  // 今の店の一覧（撤去済みは出さない＝出玉配分βと同じ「最新日から3日以上途絶えたら撤去」判定）
+  // ── 集計（法人の20円スロット全店・機種ごと・素の値）──────────────────
+  // 一覧も推定単価もここから作る。キーは店数＋総レコード数＝取り込みがあれば自動で作り直す
   function _bjtStats(){
-    var raw=_bjtRefRecords();
-    var first='', last='';
-    for(var i=0;i<raw.length;i++){
-      var d=raw[i].date; if(!d) continue;
-      if(d>last) last=d;
-      if(!first || d<first) first=d;
-    }
-    if(!_bjtFrom) _bjtFrom=first;   // 既定は全期間。答え合わせの期間が決まっていれば絞る
-    if(!_bjtTo)   _bjtTo=last;
-    var key=_bjtRef()+'|'+raw.length+'|'+_bjtFrom+'|'+_bjtTo;
+    var stores=_bjtSlotStores(), total=0;
+    var recsOf=function(s){ return (typeof DB_CACHE!=='undefined' && DB_CACHE[s.key])||[]; };
+    stores.forEach(function(s){ total+=recsOf(s).length; });
+    var key=stores.length+'|'+total+'|'+(typeof _bjDataGen!=='undefined'?_bjDataGen:0);
     if(_bjtStat && _bjtStatKey===key) return _bjtStat;
+    var last='';
+    stores.forEach(function(s){ var rr=recsOf(s); for(var i=0;i<rr.length;i++){ var d=rr[i].date; if(d&&d>last) last=d; } });
     var from30 = last ? _bjbAddDays(last,-29) : '';
-    var gone   = last ? _bjbAddDays(last,-3)  : '';
-    var m=_bjtAgg(raw, _bjtFrom, _bjtTo, from30, true), rows=[], gcnt=0, nodata=0, gsales=0, gprofit=0;
-    for(var k in m){
-      var a=m[k];
-      if(gone && a.last<gone){ gcnt++; gsales+=a.sales; gprofit+=a.profit; continue; }
-      a.units=Object.keys(a.u).length; delete a.u;
-      a.days=a.d?Object.keys(a.d).length:0; delete a.d;
-      a.price   = a.out>0 ? a.sales/a.out : 0;       // 指定期間の推定コイン単価
-      a.pph     = a.n>0   ? a.profit/a.n  : 0;       // 指定期間の台粗利（1台1日あたり）
-      a.price30 = a.o30>0 ? a.s30/a.o30 : 0;
-      if(!a.out) nodata++;                            // 指定期間にデータが無い機種
-      rows.push(a);
+    var m={};
+    stores.forEach(function(s){
+      var rr=recsOf(s);
+      for(var i=0;i<rr.length;i++){
+        var r=rr[i], n=r['機種名']; if(!n) continue;
+        var a=m[n]; if(!a) a=m[n]={name:n, fullS:0,fullO:0, s30:0,o30:0,pPos:0,pNeg:0,n30:0, u:{}, last:''};
+        var d=r.date||'';
+        a.fullS+=r['台売上']||0; a.fullO+=r['IN枚数']||0;
+        if(d>a.last) a.last=d;
+        if(from30 && d>=from30){
+          a.s30+=r['台売上']||0; a.o30+=r['IN枚数']||0; a.n30++;
+          var p=r['台粗利']||0; if(p>=0) a.pPos+=p; else a.pNeg+=p;
+          if(r['台番']!=null) a.u[s.name+'#'+r['台番']]=1;
+        }
+      }
+    });
+    var rows=[];
+    for(var k2 in m){
+      var a2=m[k2];
+      a2.units=Object.keys(a2.u).length; delete a2.u;
+      // 推定単価（全店合算）。直近30日ぶんが基本、無ければ全期間から。
+      // 店別の逆算値には貸玉条件による店固有のスケール差（±5%前後）があるが、それは正しい店差
+      // なので警告しない。係数は全店合算の比で1つ＝店差は素の数字のまま保たれる（2026-08-03確認）
+      a2.price = a2.o30>0 ? a2.s30/a2.o30 : (a2.fullO>0 ? a2.fullS/a2.fullO : 0);
+      a2.recent = !!(from30 && a2.last>=from30);   // 直近1ヶ月に稼働があるか（既定の表示対象）
+      rows.push(a2);
     }
-    rows.sort(function(x,y){ return y.sales-x.sales || y.fullSales-x.fullSales; });
-    _bjtStat={rows:rows, first:first, last:last, from30:from30, gone:gcnt, nodata:nodata,
-              goneSales:gsales, goneProfit:gprofit, total:raw.length};
+    rows.sort(function(x,y){ return y.o30-x.o30 || y.fullO-x.fullO || (x.name<y.name?-1:(x.name>y.name?1:0)); });
+    _bjtStat={rows:rows, last:last, from30:from30, stores:stores.length};
     _bjtStatKey=key;
     return _bjtStat;
   }
 
-  // 係数aを当てたときの粗利。黒字ぶんは掛け、赤字ぶんは割る
-  function _bjtProfitAt(pos, neg, a){ return (a>0) ? (pos*a + neg/a) : (pos+neg); }
-
-  // 目標の粗利にするための係数を解く   pos*a + neg/a = T  →  pos*a² − T*a + neg = 0
-  function _bjtSolve(pos, neg, T){
-    if(!pos && !neg) return null;
-    if(!neg) return (pos>0) ? T/pos : null;          // 黒字だけ
-    if(!pos) return (T!==0) ? neg/T : null;          // 赤字だけ
-    var disc=T*T-4*pos*neg;                          // neg<0 なので必ず正
-    if(disc<0) return null;
-    var a=(T+Math.sqrt(disc))/(2*pos);
-    return (isFinite(a)&&a>0) ? a : null;
+  function _bjtSavedEntry(name){ var M=bjTuneModels(); return M[name]||null; }
+  // いま効いている正解単価（最新データ日の週のもの）
+  function _bjtCurPrice(entry){
+    var st=_bjtStat;   // render中は必ず計算済み
+    return entry ? bjTunePriceAt(entry, (st&&st.last)||'9999-12-31') : null;
   }
 
-  // 入力（補正後コイン単価 cv ／ 実績台粗利 pv）から補正の係数を決める
-  //   係数 ＝ 実績台粗利 ÷ 推定台粗利（＝補正後コイン単価 ÷ 推定コイン単価）。売上にも粗利にも掛ける。
-  //   （_bjApplyTune 側は係数2つの形にも対応済み。必要になったら b を返せば有効になる）
-  //   戻り: {a:売上の係数, b:景品金額の係数(常にnull)}
-  function _bjtCalc(r, cv, pv, prefer){
-    var c=(cv===''||cv==null)?null:Number(cv);
-    var p=(pv===''||pv==null)?null:Number(pv);
-    if(c!==null && !isFinite(c)) c=null;
-    if(p!==null && !isFinite(p)) p=null;
-    if(c===null && p===null) return {a:1,b:null};
-    var byCoin=function(){ return (c!==null && c>0 && r.price) ? {a:c/r.price,b:null} : null; };
-    var byProf=function(){
-      if(p===null || !(r.pPos||r.pNeg)) return null;
-      var a2=_bjtSolve(r.pPos, r.pNeg, p*r.n);
-      return (a2!==null && isFinite(a2) && a2>0)?{a:a2,b:null}:{a:1,b:null};
-    };
-    // 最後に触った欄を優先する（台粗利を入れたあと単価を動かしても効くように）
-    var first=(prefer==='c')?byCoin():byProf();
-    if(first) return first;
-    var second=(prefer==='c')?byProf():byCoin();
-    return second || {a:1,b:null};
+  // その機種の適用開始（下書き用）。保存済みが無ければ「最初から」＝全期間に効く
+  function _bjtFromOf(name){
+    var has=!!_bjtSavedEntry(name);
+    var w=_bjtWhen[name] || (has?'week':'all');
+    if(w==='all') return '';
+    var mon=bjTuneMonday(_bjtToday());
+    return (w==='prevweek') ? _bjbAddDays(mon,-7) : mon;
   }
 
-  // その行の入力値（下書き優先、無ければ保存済み）
-  function _bjtVals(r){
-    var e=_bjtSavedEntry(r.name);
-    var cv=(_bjtDraft[r.name]!==undefined) ? _bjtDraft[r.name]
-           : (e ? String(+(Number(e.target)||0).toFixed(4)) : '');
-    var pv=(_bjtDraftP[r.name]!==undefined) ? _bjtDraftP[r.name]
-           : (e && e.targetPph!=null ? String(e.targetPph) : '');
-    return {cv:cv, pv:pv, prefer:(_bjtLast[r.name]||'p')};
-  }
-
-  // 下書き（画面の入力）を係数に畳む。保存前のプレビュー計算に使う
-  function _bjtPreviewFactors(){
-    var st=_bjtStats(), by={}, out={};
-    st.rows.forEach(function(r){ by[r.name]=r; });
-    // まず保存済みの効き目（この店に効いている分）
-    var saved=(typeof bjTuneFactors==='function')?bjTuneFactors(_bjtRef()):{};
-    for(var n in saved) out[n]=saved[n];
-    // 下書きで上書き
-    var touched={};
-    for(var k1 in _bjtDraft) touched[k1]=1;
-    for(var k2 in _bjtDraftP) touched[k2]=1;
-    for(var m in touched){
-      var r=by[m]; if(!r) continue;
-      var vv=_bjtVals(r), res=_bjtCalc(r, vv.cv, vv.pv, vv.prefer);
-      if(res.a===1 && res.b===null) delete out[m];
-      else out[m]={a:res.a, b:res.b};
+  // 下書きを反映した機種マスタ（保存前のプレビューと保存の両方で使う）
+  function _bjtNextModels(){
+    var M=bjTuneModels(), out={}, n, bad=[];
+    for(n in M) out[n]={vers:(M[n].vers||[]).slice()};
+    for(n in _bjtDraft){
+      var raw=String(_bjtDraft[n]==null?'':_bjtDraft[n]).trim();
+      if(raw===''){ delete out[n]; continue; }        // 空欄＝この機種の補正を全部外す
+      var p=Number(raw);
+      if(!isFinite(p)||p<=0){ bad.push(n); continue; }
+      p=Math.round(p*10000)/10000;
+      var from=_bjtFromOf(n);
+      var vs=(out[n]&&out[n].vers)?out[n].vers.slice():[];
+      vs=vs.filter(function(v){ return (v.from||'')!==from; });   // 同じ週の入れ直しは置き換え
+      if(from==='') vs=[{from:'',price:p}];                       // 最初から＝履歴ごと置き換え
+      else vs.push({from:from, price:p});
+      vs.sort(function(x,y){ return (x.from||'')<(y.from||'')?-1:1; });
+      out[n]={vers:vs, at:_bjtNow()};
     }
-    return out;
+    return {models:out, bad:bad};
   }
 
-  // ps* = 指定期間（答え合わせに使う範囲）／ fs* = 全期間（実際に画面全体に効く範囲）
-  // いずれも基準店ぶん。配布先ぜんぶの合計は桁が大きすぎて判断に使えないので出さない
+  // ── 上部カード（入力状況・カバー率・表示中の店への影響）──────────────
   function _bjtSummary(){
-    var st=_bjtStats(), f=_bjtPreviewFactors();
-    var ps0=0,pp0=0,ps1=0,pp1=0, fs0=0,fp0=0,fs1=0,fp1=0, n=0;
-    st.rows.forEach(function(r){
-      var e=f[r.name], a=e?e.a:1, b=e?e.b:null;
-      ps0+=r.sales;      pp0+=r.profit;
-      fs0+=r.fullSales;  fp0+=r.fullProfit;
-      ps1+=r.sales*a;    fs1+=r.fullSales*a;
-      pp1+=(b===null)? _bjtProfitAt(r.pPos, r.pNeg, a) : (r.sales*a     - (r.sales-r.profit)*b);
-      fp1+=(b===null)? _bjtProfitAt(r.fPos, r.fNeg, a) : (r.fullSales*a - (r.fullSales-r.fullProfit)*b);
-      if(e) n++;
-    });
-    return {count:n,
-            ps0:ps0, ps1:ps1, pp0:pp0, pp1:pp1,
-            fs0:fs0, fs1:fs1, fp0:fp0, fp1:fp1,
-            r0: ps0>0?pp0/ps0*100:0, r1: ps1>0?pp1/ps1*100:0,
-            tgN: _bjtTargets().length};
+    var st=_bjtStats(), M=_bjtNextModels().models;
+    var recent=st.rows.filter(function(r){ return r.recent; });
+    var nAll=recent.length, nIn=0, outAll=0, outIn=0;
+    recent.forEach(function(r){ outAll+=r.o30; if(M[r.name]){ nIn++; outIn+=r.o30; } });
+    var s=null, eff=null, pachi=false;
+    try{ s=_activeStore(); }catch(e){}
+    if(s && bjTuneIsPachi(s.name)) pachi=true;
+    if(s && s.id!=='__benchmark__' && !pachi){
+      var recs=(typeof DB_CACHE!=='undefined' && DB_CACHE[s.key])||[];
+      eff=bjTuneTotals(recs, s, M);
+    }
+    return {nAll:nAll, nIn:nIn, outAll:outAll, outIn:outIn, eff:eff, store:(s&&s.name)||'', pachi:pachi};
   }
 
   function _bjtPaintSummary(){
     var el=document.getElementById('bjtSum'); if(!el) return;
     var s=_bjtSummary();
-    var pd=function(a,b){ return b?((a-b)/Math.abs(b)*100):0; };
-    var ds=s.ps1-s.ps0, dp=s.pp1-s.pp0;
-    var cs=ds<0?'dn':(ds>0?'up':''), cp=dp<0?'dn':(dp>0?'up':'');
-    var per=(_bjtFrom||'—')+' 〜 '+(_bjtTo||'—');
-    el.innerHTML=''
-      +'<div class="c"><div class="k">補正中の機種</div><div class="v">'+s.count+' 機種</div>'
-      +'<div class="d">基準店に効いている数（下書きを含む）</div></div>'
-      +'<div class="c"><div class="k">基準店の売上（指定期間）</div><div class="v">'+_bjtN(s.ps1)+' 円</div>'
-      +'<div class="d '+cs+'">'+(s.count? (_bjtN(s.ps0)+' → '+_bjtN(s.ps1)+'　'+_bjtSign(ds)+'（'+pd(s.ps1,s.ps0).toFixed(2)+'%）') : '補正なし')+'</div></div>'
-      +'<div class="c"><div class="k">基準店の粗利（指定期間）</div><div class="v">'+_bjtN(s.pp1)+' 円</div>'
-      +'<div class="d '+cp+'">'+(s.count? (_bjtN(s.pp0)+' → '+_bjtN(s.pp1)+'　'+_bjtSign(dp)+'（'+pd(s.pp1,s.pp0).toFixed(2)+'%）') : '補正なし')+'</div></div>'
-      +'<div class="c"><div class="k">基準店の粗利率（指定期間）</div><div class="v">'+s.r1.toFixed(2)+' %</div>'
-      +'<div class="d">補正前 '+s.r0.toFixed(2)+' %　'
-      +(Math.abs(s.r1-s.r0)<0.005?'（変わりません）'
-        :('（'+(s.r1-s.r0>0?'+':'')+(s.r1-s.r0).toFixed(2)+'pt）機種ごとの率は不変。構成比が変わるぶんだけ全体の平均が動きます'))
-      +'</div></div>';
-    // 補正は全期間に効くので、指定期間だけでなく全期間の着地も出す
+    var cov=s.outAll>0 ? (s.outIn/s.outAll*100) : 0;
+    var h=''
+      +'<div class="c"><div class="k">単価の入力状況</div><div class="v">'+s.nIn+' / '+s.nAll+' 機種</div>'
+      +'<div class="d">直近1ヶ月に稼働のある機種（20円スロット全店）</div></div>'
+      +'<div class="c"><div class="k">アウトのカバー率</div><div class="v">'+cov.toFixed(1)+' %</div>'
+      +'<div class="d">入力済みの機種が直近30日のアウトに占める割合。上位の機種から入れると早く上がります</div></div>';
+    if(s.pachi){
+      h+='<div class="c"><div class="k">表示中の店（'+_bjtEsc(s.store)+'）</div><div class="v">対象外</div>'
+        +'<div class="d">パチンコの店はコイン単価の補正対象外です。数字は変わりません</div></div>';
+    } else if(s.eff && !s.eff.s0 && !s.eff.p0){
+      h+='<div class="c"><div class="k">表示中の店（'+_bjtEsc(s.store)+'）</div><div class="v">データなし</div>'
+        +'<div class="d">画面上部で店を切り替えると、その店への影響がここに出ます</div></div>';
+    } else if(s.eff){
+      var ds=s.eff.s1-s.eff.s0, dp=s.eff.p1-s.eff.p0;
+      var cs=ds<0?'dn':(ds>0?'up':''), cp=dp<0?'dn':(dp>0?'up':'');
+      h+='<div class="c"><div class="k">表示中の店の売上（全期間）</div><div class="v">'+_bjtN(s.eff.s1)+' 円</div>'
+        +'<div class="d '+cs+'">'+(ds?(_bjtN(s.eff.s0)+' → '+_bjtN(s.eff.s1)+'　'+_bjtSign(ds)):'補正による変化なし')+'</div></div>'
+        +'<div class="c"><div class="k">表示中の店の粗利（全期間）</div><div class="v">'+_bjtN(s.eff.p1)+' 円</div>'
+        +'<div class="d '+cp+'">'+(dp?(_bjtN(s.eff.p0)+' → '+_bjtN(s.eff.p1)+'　'+_bjtSign(dp)):'補正による変化なし')+'</div></div>';
+    }
+    el.innerHTML=h;
     var note=document.getElementById('bjtSumNote');
     if(note){
-      var st2=_bjtStats(), gtxt='';
-      if(st2.gone){
-        gtxt='<br>この画面の合計は<b>撤去済みとみた '+st2.gone+' 機種を除いています</b>'
-            +'（売上 '+_bjtN(st2.goneSales)+' 円／粗利 '+_bjtSign(st2.goneProfit)+' 円）。'
-            +'ベーシックの数字はこれを含むので、そのぶん差が出ます。';
-      }
-      if(!s.count){ note.innerHTML='上の数字はすべて指定期間（'+per+'）のものです。'+gtxt; }
-      else{
-        note.innerHTML='上の数字は指定期間（'+per+'）のものです。'
-          +'補正は全期間に効くので、<b>全期間で見た着地</b>はこうなります：'
-          +'基準店 売上 '+_bjtN(s.fs0)+' → '+_bjtN(s.fs1)+'（'+_bjtSign(s.fs1-s.fs0)+'）／'
-          +'粗利 '+_bjtN(s.fp0)+' → '+_bjtN(s.fp1)+'（'+_bjtSign(s.fp1-s.fp0)+'）'+gtxt;
-      }
+      note.innerHTML='「表示中の店」は画面上部で選んでいる店（'+_bjtEsc(s.store||'—')+'）です。'
+        +'入力した単価は法人の20円スロット全店に同じように効きます。下書き（未保存の入力）も含めた見込みです。';
     }
   }
+  function _bjtQueueSummary(){
+    if(_bjtSumT) clearTimeout(_bjtSumT);
+    _bjtSumT=setTimeout(function(){ _bjtSumT=null; try{ _bjtPaintSummary(); }catch(e){} }, 250);
+  }
 
-  // 1行ぶんの「係数」と「補正後」を書き換える（入力するたび呼ぶ）
-  // 通常は実績台粗利と補正後コイン単価が同じ係数の裏表なので、片方を打つともう片方も動く。
-  // 符号をまたぐ行だけは片方から決まらないので、両方の入力が必要になる。
+  // ── 一覧の行 ─────────────────────────────────────────────
+  function _bjtRowState(r){
+    var entry=_bjtSavedEntry(r.name);
+    var edited=(_bjtDraft[r.name]!==undefined);
+    var cur=_bjtCurPrice(entry);
+    var val = edited ? String(_bjtDraft[r.name]) : (cur!=null ? String(Math.round(cur*10000)/10000) : '');
+    var p=Number(val);
+    var a=(val!=='' && isFinite(p) && p>0 && r.price>0) ? p/r.price : null;
+    return {entry:entry, edited:edited, val:val, a:a};
+  }
+
   function _bjtPaintRow(i, r){
     var tr=document.getElementById('bjtR'+i); if(!tr) return;
-    var vv=_bjtVals(r), a, b;
-    var edited=(_bjtDraft[r.name]!==undefined)||(_bjtDraftP[r.name]!==undefined);
-    if(!edited){
-      // 触っていない行は、保存されている係数をそのまま出す。
-      // 別の店を基準に決めた設定を、いまの店の実績で割り直してはいけない
-      //（A店で 4.10→3.485 と決めた設定を、実績5.00のB店で割ると 0.697 という嘘の係数になる）
-      var se=_bjtSavedEntry(r.name), sa=se?Number(se.factor):NaN;
-      if(se && isFinite(sa) && sa>0){
-        a=sa; b=(se.payFactor==null)?null:Number(se.payFactor);
-        if(!(isFinite(b)&&b>0)) b=null;
-      } else { a=1; b=null; }
-    } else {
-      var res=_bjtCalc(r, vv.cv, vv.pv, vv.prefer);
-      a=res.a; b=res.b;
+    var v=_bjtRowState(r);
+    var none=(v.a===null);
+    var cf=document.getElementById('bjtF'+i), cs=document.getElementById('bjtS'+i), cp=document.getElementById('bjtP'+i);
+    if(cf){ cf.textContent = none ? '—' : v.a.toFixed(5); }
+    if(cs){
+      var s1=none?0:r.s30*v.a;
+      cs.textContent = none ? '—' : _bjtN(s1);
+      cs.className = none ? '' : (v.a<1?'dn':(v.a>1?'up':''));
     }
-    var none=(a===1 && b===null);
-    // 補正後の金額は「指定期間」ぶん＝左の売上計・粗利計と同じ土俵で見比べられるようにする
-    var s1=r.sales*a;
-    var p1=(b===null)? _bjtProfitAt(r.pPos, r.pNeg, a) : (r.sales*a - (r.sales-r.profit)*b);
-    var cf=document.getElementById('bjtF'+i),
-        cs=document.getElementById('bjtS'+i), cp=document.getElementById('bjtP'+i);
-    if(cf){
-      cf.textContent = none ? '—' : (b===null ? a.toFixed(5) : a.toFixed(5)+' / '+b.toFixed(5));
-      cf.className = '';
+    if(cp){
+      var p1=none?0:(v.a>0?(r.pPos*v.a + r.pNeg/v.a):0);
+      var pph=(!none && r.n30>0) ? p1/r.n30 : 0;
+      cp.textContent = none ? '—' : _bjtN(pph);
+      cp.className = (!none && pph<0) ? 'dn' : '';
     }
-    if(cs){ cs.textContent=none?'—':_bjtN(s1); cs.className=none?'':(a<1?'dn':(a>1?'up':'')); }
-    if(cp){ cp.textContent=none?'—':_bjtN(p1); cp.className=(!none&&p1<0)?'dn':''; }
-    tr.className=none?'':'tuned';
-    // もう片方の入力欄を追従させる（今カーソルが入っている欄は触らない）
-    var coin=tr.querySelector('input.bjt-in'), prof=tr.querySelector('input.bjt-inp');
-    var act=document.activeElement;
-    if(coin && coin!==act) coin.value = (!edited) ? (vv.cv||'')
-                                        : (none ? '' : String(Math.round(r.price*a*10000)/10000));
-    if(prof && prof!==act) prof.value = (!edited) ? (vv.pv||'')
-                                        : (none ? '' : String(Math.round(r.n? p1/r.n : 0)));
+    tr.className = (v.entry || (v.edited && String(_bjtDraft[r.name]).trim()!=='')) ? 'tuned' : '';
+    // 状態バッジ
+    var bd=document.getElementById('bjtB'+i);
+    if(bd){
+      var h='';
+      if(v.edited) h='<span class="bjt-badge">未保存</span>';
+      else if(!v.entry && r.recent) h='<span class="bjt-badge ng">未入力</span>';
+      bd.innerHTML=h;
+    }
+    // 適用開始の選択（保存済みの機種を直すときだけ意味を持つ）
+    var sel=tr.querySelector('select.bjt-when');
+    if(sel){ sel.disabled=!v.edited; if(!v.edited) sel.value=(_bjtWhen[r.name]||'week'); }
   }
 
-  function _bjtSavedEntry(name){
-    var T=window.BJ_TUNE||{}, s=T[_bjtScopeKey()];
-    return (s && s[name]) || null;
+  function _bjtHistLine(entry){
+    var vs=(entry&&entry.vers)||[];
+    if(!vs.length) return '';
+    var parts=vs.map(function(v){ return _bjtWkLabel(v.from||'')+' '+(+v.price).toFixed(2)+'円'; });
+    return '<div class="bjt-hist">'+_bjtEsc(parts.join(' → '))+'</div>';
   }
 
-  // 上部（基準店の表示・期間・配布先チェック）を描く
-  function _bjtPaintHead(){
-    var ref=_bjtRef(), now=_bjtStoreName();
-    var el=document.getElementById('bjtRef');
-    if(el) el.textContent = ref || '未設定';
-    var btn=document.getElementById('bjtRefBtn'), hint=document.getElementById('bjtRefHint');
-    if(btn && hint){
-      if(!ref){
-        btn.textContent='「'+(now||'この店')+'」を基準店にする';
-        btn.style.display=now?'':'none';
-        hint.textContent='答え合わせできる実データが手元にある店を選んでください。一度決めたら変更しません。';
-      } else if(now && now!==ref){
-        btn.textContent='基準店を「'+now+'」に変更する';
-        btn.style.display='';
-        hint.textContent='変更すると、いま入っているチューニング設定はすべて消えます。';
-      } else {
-        btn.style.display='none';
-        hint.textContent='この店の実績で係数を決めます。表示する店を切り替えても、この画面は基準店のままです。';
-      }
-    }
-    var f=document.getElementById('bjtFrom'), t=document.getElementById('bjtTo');
-    if(f) f.value=_bjtFrom||''; if(t) t.value=_bjtTo||'';
-    var box=document.getElementById('bjtTgtBox'); if(!box) return;
-    var all=_bjtAllStores(), sel=_bjtTargets(), h='';
-    all.forEach(function(s,i){
-      var on=sel.indexOf(s.name)>=0, isRef=(s.name===_bjtRef());
-      h+='<label class="bjt-tgt"><input type="checkbox" data-s="'+_bjtEsc(s.name)+'"'+(on?' checked':'')+'> '
-        +_bjtEsc(s.name)+(isRef?'<span class="bjt-refmark">基準店</span>':'')+'</label>';
+  function _bjtVisibleRows(){
+    var st=_bjtStats();
+    return st.rows.filter(function(r){
+      if(!_bjtShowAll && !r.recent) return false;
+      // 「未入力のみ」でも、いま入力中（下書きあり）の行は消さない＝打っている最中に行が消えると困る
+      if(_bjtOnlyEmpty && _bjtSavedEntry(r.name) && _bjtDraft[r.name]===undefined) return false;
+      return true;
     });
-    box.innerHTML=h || '<span style="color:var(--text2)">店舗がありません</span>';
-    var c=document.getElementById('bjtTgtCount');
-    if(c) c.textContent=sel.length+' / '+all.length+' 店';
   }
 
   function _bjtRender(){
     var host=document.getElementById('bjtBody'); if(!host) return;
     var st=_bjtStats();
-    if(!_bjtRef()){
-      _bjtPaintHead();
-      host.innerHTML='<div class="bjt-empty">まず基準店を決めてください。<br>'
-        +'画面上部で「答え合わせできる実データが手元にある店」に切り替えて、上のボタンを押してください。</div>';
-      var sm=document.getElementById('bjtSum'); if(sm) sm.innerHTML='';
-      var sn=document.getElementById('bjtSumNote'); if(sn) sn.innerHTML='';
-      _bjtNotice(); return;
-    }
     if(!st.rows.length){
       if(_bjtRetry<15){ _bjtRetry++; setTimeout(_bjtRender,400); return; }   // 読み込み直後はデータが間に合わないことがある
-      _bjtPaintHead();   // 基準店の表示と変更ボタンは、データが無くても出す
-      host.innerHTML='<div class="bjt-empty">基準店「'+_bjtEsc(_bjtRef())+'」のデータが見つかりません。<br>'
-        +'店舗名が変わったか、まだ取り込んでいない可能性があります。基準店を変える場合は上のボタンから。</div>';
+      host.innerHTML='<div class="bjt-empty">機種一覧を作れるデータがありません。<br>Excelを取り込むと、20円スロット全店の機種がここに自動で並びます。</div>';
       var s1=document.getElementById('bjtSum'); if(s1) s1.innerHTML='';
       var s2=document.getElementById('bjtSumNote'); if(s2) s2.innerHTML='';
       _bjtNotice(); return;
     }
     _bjtRetry=0;
-    _bjtPaintHead();
-    var rows=st.rows, html=''
+    var mon=bjTuneMonday(_bjtToday()), monPrev=_bjbAddDays(mon,-7);
+    var rows=_bjtVisibleRows(), hidden=st.rows.length-rows.length;
+    _bjtRows=rows;   // 入力ハンドラはこのスナップショットを見る（後から再計算すると行がズレる）
+    var html=''
       +'<table class="bjt-t" id="bjtTable"><thead><tr>'
-      +'<th class="l">機種名</th><th>台数</th><th>営業日数</th><th>アウト計</th><th>売上計</th><th>粗利計</th>'
-      +'<th>台粗利<br><span class="bjt-sub">推定</span></th><th>コイン単価<br><span class="bjt-sub">推定</span></th>'
-      +'<th>実績台粗利<br><span class="bjt-sub">入力</span></th><th>補正後コイン単価<br><span class="bjt-sub">入力</span></th>'
-      +'<th>係数</th><th>補正後の売上計</th><th>補正後の粗利計</th>'
+      +'<th class="l">機種名</th><th>状態</th><th>台数</th><th>アウト計<br><span class="bjt-sub">直近30日</span></th>'
+      +'<th>売上計<br><span class="bjt-sub">直近30日</span></th><th>台粗利<br><span class="bjt-sub">直近30日/日</span></th>'
+      +'<th>推定単価<br><span class="bjt-sub">データから逆算</span></th>'
+      +'<th>正解単価<br><span class="bjt-sub">入力</span></th><th>いつから</th><th>係数</th>'
+      +'<th>補正後の売上計<br><span class="bjt-sub">直近30日</span></th><th>補正後の台粗利<br><span class="bjt-sub">直近30日/日</span></th>'
       +'</tr></thead><tbody>';
     for(var i=0;i<rows.length;i++){
       var r=rows[i];
-      var vv=_bjtVals(r), val=vv.cv, valP=vv.pv;
-      var noData=!r.out || !r.n;   // 指定した期間にこの機種のデータが無い＝係数を出せない
+      var entry=_bjtSavedEntry(r.name);
+      var pph=(r.n30>0)?(r.pPos+r.pNeg)/r.n30:0;
+      var noRecent=!r.recent;
       html+='<tr id="bjtR'+i+'" data-n="'+_bjtEsc(r.name)+'">'
-        +'<td class="l">'+_bjtEsc(r.name)+'</td>'
-        +'<td>'+(noData?'—':r.units)+'</td>'
-        +'<td>'+(noData?'—':r.days)+'</td>'
-        +'<td>'+(noData?'—':_bjtN(r.out))+'</td>'
-        +'<td>'+(noData?'—':_bjtN(r.sales))+'</td>'
-        +'<td>'+(noData?'—':_bjtN(r.profit))+'</td>'
-        +'<td>'+(noData?'—':_bjtN(r.pph))+'</td>'
+        +'<td class="l">'+_bjtEsc(r.name)+(noRecent?'<span class="bjt-badge">直近1ヶ月稼働なし</span>':'')+_bjtHistLine(entry)+'</td>'
+        +'<td class="l" id="bjtB'+i+'"></td>'
+        +'<td>'+(r.units||'—')+'</td>'
+        +'<td>'+(r.o30?_bjtN(r.o30):'—')+'</td>'
+        +'<td>'+(r.o30?_bjtN(r.s30):'—')+'</td>'
+        +'<td'+(pph<0?' class="dn"':'')+'>'+(r.n30?_bjtN(pph):'—')+'</td>'
         +'<td>'+(r.price?r.price.toFixed(2):'—')+'</td>'
-        +'<td>'+(noData ? '<span style="color:var(--text2)">期間外</span>'
-                 : '<input class="bjt-inp" type="number" step="1" data-i="'+i+'" value="'+_bjtEsc(valP)+'" placeholder="'+Math.round(r.pph)+'">')+'</td>'
-        +'<td>'+(noData ? '<span style="color:var(--text2)">期間外</span>'
-                 : '<input class="bjt-in" type="number" step="0.0001" min="0" data-i="'+i+'" value="'+_bjtEsc(val)+'" placeholder="'+r.price.toFixed(4)+'">')+'</td>'
+        +'<td>'+(r.price
+            ? '<input class="bjt-in" type="number" step="0.0001" min="0" data-i="'+i+'" value="'+_bjtEsc(_bjtRowState(r).val)+'" placeholder="'+r.price.toFixed(2)+'">'
+            : '<span style="color:var(--text2)">データなし</span>')+'</td>'
+        +'<td>'+(entry
+            ? ('<select class="bjt-when" data-i="'+i+'">'
+              +'<option value="week">今週（'+_bjtEsc(_bjtWkLabel(mon).replace('から',''))+'〜）</option>'
+              +'<option value="prevweek">先週（'+_bjtEsc(_bjtWkLabel(monPrev).replace('から',''))+'〜）</option>'
+              +'<option value="all">最初から（履歴ごと置き換え）</option>'
+              +'</select>')
+            : '<span style="color:var(--text2)">最初から</span>')+'</td>'
         +'<td id="bjtF'+i+'">—</td>'
         +'<td id="bjtS'+i+'">—</td><td id="bjtP'+i+'">—</td>'
         +'</tr>';
@@ -17346,13 +17256,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     html+='</tbody></table>';
     host.innerHTML='<div class="bjt-tablewrap">'+html+'</div>'
       +'<div class="bjt-note">'
-      +'左の 台数・アウト計・売上計・粗利計・推定コイン単価 は<b>上で指定した期間</b>の数字です。'
-      +'右の 売上の変化・粗利の変化 は<b>全期間</b>の数字です（補正は全期間に効くため）。<br>'
-      +'このデータの範囲：'+(st.first||'—')+' 〜 '+(st.last||'—')
-      +'　／　直近30日は '+(st.from30||'—')+' 以降'
-      +(st.gone?('　／　撤去済みとみて除いた機種 '+st.gone+' 件（最終日から3日以上データが無いもの）'):'')
-      +(st.nodata?('　／　指定期間にデータが無い機種 '+st.nodata+' 件'):'')+'<br>'
-      +'補正後コイン単価を空欄にすると、その機種の補正を外します。設定は「保存して反映」を押すまで画面に反映されません。</div>';
+      +'台数・アウト計・売上計・台粗利・推定単価は<b>直近30日（20円スロット全店の合算）</b>の数字です。'
+      +'補正そのものは入力した「いつから」に従って全期間に効きます。<br>'
+      +'このデータの範囲：〜 '+(st.last||'—')+'　／　直近30日は '+(st.from30||'—')+' 以降　／　対象 '+st.stores+' 店'
+      +(hidden?('　／　表示していない機種 '+hidden+' 件（検索・未入力のみ・直近1ヶ月稼働なし）。入力済みの補正は表示に関係なく効き続けます'):'')+'<br>'
+      +'行の「補正後」は入力した単価がそのまま効いた場合の目安です。「今週から」「先週から」を選んだ場合の正確な影響は上のカードに出ます。'
+      +'「今週から」を選ぶと、その週のデータを取り込むまで数字は変わりません。<br>'
+      +'正解単価を空欄にして保存すると、その機種の補正を（履歴ごと）全部外します。設定は「保存して反映」を押すまで画面に反映されません。</div>';
     for(var j=0;j<rows.length;j++) _bjtPaintRow(j, rows[j]);
     _bjtApplyFind();
     _bjtPaintSummary();
@@ -17371,68 +17281,52 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }
   }
 
-  // 保存：入力された目標単価をその場で係数に変換して確定する
+  // 保存：入力された正解単価を版（いつから）付きで確定する
   function _bjtApply(){
     var st=_bjtStats(), msg=document.getElementById('bjtMsg');
-    var T=window.BJ_TUNE||(window.BJ_TUNE={});
-    var warn=[], changed=0, pushKeys={};
-    var ref=_bjtRef();
-    var targets=_bjtTargets().slice();
-    if(!targets.length) targets=[ref].filter(Boolean);
-    if(!targets.length){
-      if(msg){ msg.className='bjt-msg ng'; msg.textContent='配布先の店舗が選ばれていません。'; }
+    var names=Object.keys(_bjtDraft);
+    if(!names.length){
+      if(msg){ msg.className='bjt-msg'; msg.textContent='変更がありません。'; }
       return;
     }
-    // 係数は「答えが分かっている基準店」の実績だけで決める。それを配布先へそのまま配る
-    st.rows.forEach(function(r){
-      if(_bjtDraft[r.name]===undefined && _bjtDraftP[r.name]===undefined) return;   // 触っていない行
-      var vv=_bjtVals(r), res=_bjtCalc(r, vv.cv, vv.pv, vv.prefer);
-      var blank=(vv.cv===''||vv.cv==null)&&(vv.pv===''||vv.pv==null);
-      var a=null, b=null;
-      if(!blank){
-        if(!r.price){ warn.push(r.name+'：指定した期間にデータが無いので係数を出せません'); return; }
-        a=Math.round(res.a*1e9)/1e9;    // 端数の揺れを丸める（0.8500000000000001 のような値を残さない）
-        b=(res.b===null)?null:Math.round(res.b*1e9)/1e9;
-        if(a<0.5||a>1.5) warn.push(r.name+'：係数 '+a.toFixed(3)+' は極端です。入力の打ち間違いがないかご確認ください');
+    var by={}; st.rows.forEach(function(r){ by[r.name]=r; });
+    var warn=[], changed=0, removed=0;
+    var nx=_bjtNextModels();
+    nx.bad.forEach(function(n){ warn.push(n+'：単価「'+String(_bjtDraft[n])+'」が数字として読めないため保存しませんでした'); });
+    names.forEach(function(n){
+      var raw=String(_bjtDraft[n]==null?'':_bjtDraft[n]).trim();
+      if(nx.bad.indexOf(n)>=0) return;
+      if(raw===''){ if(_bjtSavedEntry(n)) removed++; return; }
+      changed++;
+      var r=by[n];
+      if(r && r.price>0){
+        var a=Number(raw)/r.price;
+        if(a<0.5||a>1.5) warn.push(n+'：係数 '+a.toFixed(3)+' は極端です。入力の打ち間違いがないかご確認ください');
       }
-      targets.forEach(function(sn){
-        var slot=T[sn]||(T[sn]={});
-        pushKeys[sn]=1;
-        if(blank){ delete slot[r.name]; changed++; return; }               // 空欄＝補正を外す
-        if(Math.abs(a-1)<1e-9 && b===null){ delete slot[r.name]; changed++; return; }
-        var p1=(b===null)? _bjtProfitAt(r.pPos, r.pNeg, a) : (r.sales*a - (r.sales-r.profit)*b);
-        slot[r.name]={target:Math.round(r.price*a*10000)/10000, base:r.price,
-                      factor:a, payFactor:b, ref:ref,
-                      basePph:Math.round(r.pph),
-                      targetPph:(r.n? Math.round(p1/r.n) : 0),
-                      from:_bjtFrom, to:_bjtTo, at:_bjtNow()};
-        changed++;
-      });
     });
-    for(var k in T){ if(!Object.keys(T[k]).length) delete T[k]; }
+    window.BJ_TUNE = Object.keys(nx.models).length ? {v:2, models:nx.models} : {};
     _bjtRev++;                    // 遅れて届く読み込み結果に、この保存を消させない
     var ok=_bjtPersist();
-    _bjtDraft={}; _bjtDraftP={}; _bjtLast={};
+    _bjtDraft={}; _bjtWhen={};
     try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
     _bjtAfterChange();
     _bjtRender();
+    var head=changed+' 機種を保存'+(removed?('、'+removed+' 機種の補正を解除'):'')+'しました。';
     var tail=(warn.length?('　注意：'+warn.slice(0,3).join(' / ')+(warn.length>3?(' ほか'+(warn.length-3)+'件'):'')):'');
     if(msg){
       msg.className='bjt-msg '+(ok?'ok':'ng');
-      msg.textContent=(ok?('この画面に反映しました（'+changed+' 件）。')
-                         :'このPCに保存できませんでした（ブラウザの保存領域が使えません）。画面には反映しています。')+tail;
+      msg.textContent=(ok?head:'このPCに保存できませんでした（ブラウザの保存領域が使えません）。画面には反映しています。')+tail;
     }
     // サーバへ送る。落ちていても画面は動き続ける（送れなかったことだけはっきり伝える）
-    var keys=Object.keys(pushKeys);
     if(!_bjtApiEnabled()){
-      if(msg) msg.textContent='保存しました（'+changed+' 件）。このPCの中だけに保存しています。'+tail;
+      if(msg) msg.textContent=head+'このPCの中だけに保存しています。'+tail;
       return;
     }
-    if(msg) msg.textContent='保存しました（'+changed+' 件）。サーバへ送っています…'+tail;
-    _bjtPush(keys).then(_bjtPushMeta).then(function(){
+    if(msg) msg.textContent=head+'サーバへ送っています…'+tail;
+    _bjtPush().then(function(){
       _bjtSyncState='ok';
       if(msg){ msg.className='bjt-msg ok';
-        msg.textContent='保存しました（'+changed+' 件）。ほかのPCで開いても同じ設定になります。'+tail; }
+        msg.textContent=head+'ほかのPCで開いても同じ設定になります。'+tail; }
       _bjtSyncLine();
     }).catch(function(e){
       _bjtSyncState='fail';
@@ -17452,7 +17346,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // 念のため、bjOnStoreChange が扱っていないぶんも明示的に落とす
     window._bjReportDirty=true; window._bjPayoutDirty=true;
     try{ window._bjFullCache=null; window._bjFullKey=''; }catch(e){}
-    try{ if(typeof render==='function') render(); }catch(e){ console.error('tune render', e); }
+    // render() だけだと期間絞り込み済みの配列（filtered）が補正前のまま残り、
+    // ベーシックのKPIが古い数字を見続ける（2026-08-03 E2Eで発見）→ 絞り込みから作り直す
+    try{
+      if(typeof applyFilter==='function') applyFilter();
+      else if(typeof render==='function') render();
+    }catch(e){ console.error('tune render', e); }
     try{ if(window.bjDrawComp) setTimeout(window.bjDrawComp,120); }catch(e){}
   }
 
@@ -17463,8 +17362,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var el=document.getElementById('bjTuneNotice');
     if(!el){ el=document.createElement('div'); el.id='bjTuneNotice'; el.className='bjt-notice';
              nav.parentNode.insertBefore(el, nav.nextSibling); }
-    var f={}; try{ f=(typeof bjTuneFactors==='function')?bjTuneFactors(_bjtStoreName()):{}; }catch(e){ f={}; }
-    var names=Object.keys(f);
+    var names=Object.keys(bjTuneModels());
     // サーバから読めなかったときは、黙って違う数字を見せない＝必ず知らせる
     if(_bjtSyncState==='fail'){
       el.style.display='';
@@ -17483,34 +17381,19 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(!panel||document.getElementById('bjtBody')) return;
     panel.innerHTML=''
       +'<div class="bjt-head"><div class="bj-wordmark" style="font-size:21px;">MODEL TUNING</div></div>'
-            +'<div class="bjt-lead">取り込んだ数値は、データ提供元が<b>設定1のコイン単価</b>で推定したものです。実際のホールは設定1だけで営業しないので、売上も粗利も過大に出ています。<br>'
-      +'<b>実績台粗利</b>（手元の実データの値）を入れると<b>補正後コイン単価</b>が出ます。その比を売上と粗利の両方に掛けます。コイン単価の方に直接入れても構いません。<br>'
-      +'黒字の機種は係数を掛け、<b>赤字の機種は係数で割ります</b>（推定が楽観的なぶん、赤字は膨らむ向きに直します）。<br>'
-      +'アウトと差枚は触らないので<b>出玉率と勝率は変わりません</b>。補正は全期間に効きます。空欄に戻せば元の数字に戻ります。</div>'
-      +'<div class="bjt-bar">'
-      +'<label>基準店：<b id="bjtRef" style="color:var(--text)"></b></label>'
-      +'<button type="button" class="bjt-btn" id="bjtRefBtn"></button>'
-      +'<span id="bjtRefHint" style="color:var(--text2)"></span>'
-      +'</div>'
-      +'<div class="bjt-bar">'
-      +'<label>実績を見る期間：<input id="bjtFrom" type="date"> 〜 <input id="bjtTo" type="date"></label>'
-      +'<button type="button" class="bjt-btn" id="bjtPeriodAll">全期間に戻す</button>'
-      +'<span style="color:var(--text2)">答え合わせできる実データが手元にある期間を指定してください</span>'
-      +'</div>'
-      +'<div class="bjt-bar" style="align-items:flex-start;">'
-      +'<label style="padding-top:5px;">配布先：<b id="bjtTgtCount" style="color:var(--text)"></b></label>'
-      +'<div class="bjt-tgtbox" id="bjtTgtBox"></div>'
-      +'<div style="display:flex;flex-direction:column;gap:6px;">'
-      +'<button type="button" class="bjt-btn" id="bjtTgtAll">同じ部門を全部</button>'
-      +'<button type="button" class="bjt-btn" id="bjtTgtNone">基準店だけ</button>'
-      +'</div>'
-      +'</div>'
+      +'<div class="bjt-lead">取り込んだ数値は、データ提供元が<b>設定1のコイン単価</b>で推定したものです。実際のホールは設定1だけで営業しないので、売上も粗利も過大に出ています。<br>'
+      +'機種ごとに<b>正解のコイン単価</b>を入力すると、その比率で売上と粗利を補正します。黒字の機種は係数を掛け、<b>赤字の機種は係数で割ります</b>（赤字は膨らむ向き）。<br>'
+      +'一覧は法人の<b>20円スロット全店</b>から自動で作られ、新しい機種はデータを取り込むと「未入力」として現れます。毎回ゼロから入れ直す必要はありません。<br>'
+      +'単価は時期で変わるため、入力済みの機種を直すときは<b>いつから</b>（今週・先週・最初から）を選べます。最初の入力は全期間に効きます。<br>'
+      +'アウトと差枚は触らないので<b>出玉率と勝率は変わりません</b>。空欄にして保存すると、その機種の補正を外します。</div>'
       +'<div class="bjt-bar">'
       +'<label>機種をさがす：<input id="bjtFind" type="text" placeholder="機種名の一部"></label>'
+      +'<label><input id="bjtOnlyEmpty" type="checkbox"> 未入力の機種だけ表示</label>'
+      +'<label><input id="bjtShowAll" type="checkbox"> 直近1ヶ月に稼働のない機種も表示</label>'
       +'<span class="bjt-sp"></span>'
       +'<button type="button" class="bjt-btn on" id="bjtSaveBtn">保存して反映</button>'
       +'<button type="button" class="bjt-btn" id="bjtUndoBtn">入力を取り消す</button>'
-      +'<button type="button" class="bjt-btn" id="bjtClearBtn">配布先の設定を全部消す</button>'
+      +'<button type="button" class="bjt-btn" id="bjtClearBtn">入力済みの単価を全部消す</button>'
       +'</div>'
       +'<div class="bjt-msg" id="bjtMsg"></div>'
       +'<div class="bjt-note" id="bjtSync" style="margin:0 0 12px;"></div>'
@@ -17518,111 +17401,31 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<div class="bjt-note" id="bjtSumNote" style="margin:-4px 0 14px;"></div>'
       +'<div id="bjtBody"></div>';
 
-    // 基準店の設定・変更
-    var rb=document.getElementById('bjtRefBtn');
-    if(rb) rb.addEventListener('click', function(){
-      var now=_bjtStoreName(), cur=_bjtRef();
-      if(!now){ return; }
-      if(!cur){
-        _bjtSetRef(now); _bjtSetTargets([now]); _bjtRev++;
-        _bjtDraft={}; _bjtDraftP={}; _bjtLast={};
-        _bjtRender();
-        var m0=document.getElementById('bjtMsg');
-        if(m0){ m0.className='bjt-msg ok'; m0.textContent='基準店を「'+now+'」にしました。'; }
-        _bjtPushMeta().catch(function(){ _bjtSyncState='fail'; _bjtSyncLine();
-          if(m0){ m0.className='bjt-msg ng'; m0.textContent='基準店をこのPCには記録しましたが、サーバに送れませんでした。'; } });
-        return;
-      }
-      var T=window.BJ_TUNE||{}, cnt=0, keys=[];
-      for(var k in T){ var c=Object.keys(T[k]||{}).length; if(c){ cnt+=c; keys.push(k); } }
-      if(!confirm('基準店を「'+cur+'」から「'+now+'」に変更します。\n\n'
-          +'いま入っているチューニング設定（'+keys.length+' 店・のべ '+cnt+' 件）は\nすべて消えます。'
-          +'\n\n係数は基準店の実績を基に決めた値なので、基準店が変わると意味が変わってしまうためです。'
-          +'\n\nよろしいですか？')) return;
-      keys.forEach(function(k){ try{ delete T[k]; }catch(e){} });
-      _bjtRev++; _bjtPersist();
-      try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
-      _bjtSetRef(now); _bjtSetTargets([now]); _bjtDraft={}; _bjtDraftP={}; _bjtLast={};
-      _bjtAfterChange(); _bjtRender();
-      var m=document.getElementById('bjtMsg');
-      if(!_bjtApiEnabled()){
-        if(m){ m.className='bjt-msg ok'; m.textContent='基準店を「'+now+'」に変更し、設定を消しました（このPCの中だけ）。'; }
-        return;
-      }
-      if(m){ m.className='bjt-msg'; m.textContent='基準店を変更しました。サーバへ送っています…'; }
-      _bjtPush(keys).then(_bjtPushMeta).then(function(){
-        _bjtSyncState='ok'; _bjtSyncLine();
-        if(m){ m.className='bjt-msg ok'; m.textContent='基準店を「'+now+'」に変更し、設定を消しました。'; }
-      }).catch(function(){
-        _bjtSyncState='fail'; _bjtSyncLine(); _bjtNotice();
-        if(m){ m.className='bjt-msg ng'; m.textContent='サーバから消せませんでした。この画面では消えていますが、ほかのPCには残っています。'; }
-      });
-    });
-
-    // 期間
-    ['bjtFrom','bjtTo'].forEach(function(id){
-      var e=document.getElementById(id);
-      if(e) e.addEventListener('change', function(){
-        // 入れ替えはしない（黙って別の期間になるため）。触った方に合わせてもう一方を寄せる
-        if(id==='bjtFrom'){ _bjtFrom=e.value; if(_bjtFrom && _bjtTo && _bjtFrom>_bjtTo) _bjtTo=_bjtFrom; }
-        else              { _bjtTo=e.value;   if(_bjtFrom && _bjtTo && _bjtFrom>_bjtTo) _bjtFrom=_bjtTo; }
-        _bjtStat=null; _bjtStatKey=''; _bjtDraft={}; _bjtDraftP={}; _bjtLast={};
-        _bjtRender();
-        var m=document.getElementById('bjtMsg');
-        if(m){ m.className='bjt-msg'; m.textContent='期間を変えたので、入力中の値は取り消しました（保存済みの設定は残っています）。'; }
-      });
-    });
-    var pa=document.getElementById('bjtPeriodAll');
-    if(pa) pa.addEventListener('click', function(){
-      var st=_bjtStats(); _bjtFrom=st.first; _bjtTo=st.last;
-      _bjtStat=null; _bjtStatKey=''; _bjtDraft={}; _bjtDraftP={}; _bjtLast={}; _bjtRender();
-    });
-
-    // 配布先
-    var box=document.getElementById('bjtTgtBox');
-    if(box) box.addEventListener('change', function(ev){
-      var el=ev.target; if(!el||el.type!=='checkbox') return;
-      var sel=_bjtTargets().slice(), n=el.getAttribute('data-s'), i=sel.indexOf(n);
-      if(el.checked){ if(i<0) sel.push(n); } else if(i>=0){ sel.splice(i,1); }
-      _bjtSetTargets(sel); _bjtRev++; _bjtPaintHead(); _bjtPaintSummary();
-      _bjtPushMeta().catch(function(){ _bjtSyncState='fail'; _bjtSyncLine(); });
-    });
-    var ta=document.getElementById('bjtTgtAll');
-    if(ta) ta.addEventListener('click', function(){
-      var d=_bjtDept(_bjtRef());
-      _bjtSetTargets(_bjtAllStores().filter(function(s){ return _bjtDept(s.name)===d; }).map(function(s){ return s.name; }));
-      _bjtRev++; _bjtPaintHead(); _bjtPaintSummary();
-      _bjtPushMeta().catch(function(){ _bjtSyncState='fail'; _bjtSyncLine(); });
-    });
-    var tn=document.getElementById('bjtTgtNone');
-    if(tn) tn.addEventListener('click', function(){
-      _bjtSetTargets([_bjtRef()].filter(Boolean));
-      _bjtRev++; _bjtPaintHead(); _bjtPaintSummary();
-      _bjtPushMeta().catch(function(){ _bjtSyncState='fail'; _bjtSyncLine(); });
-    });
-
     var fi=document.getElementById('bjtFind');
     if(fi) fi.addEventListener('input', function(){ _bjtFind=fi.value; _bjtApplyFind(); });
+    var oe=document.getElementById('bjtOnlyEmpty');
+    if(oe) oe.addEventListener('change', function(){ _bjtOnlyEmpty=oe.checked; _bjtRender(); });
+    var sa=document.getElementById('bjtShowAll');
+    if(sa) sa.addEventListener('change', function(){ _bjtShowAll=sa.checked; _bjtRender(); });
     var sv=document.getElementById('bjtSaveBtn');
     if(sv) sv.addEventListener('click', function(){ try{ _bjtApply(); }catch(e){ console.error('tune apply', e); } });
     var un=document.getElementById('bjtUndoBtn');
-    if(un) un.addEventListener('click', function(){ _bjtDraft={}; _bjtDraftP={}; _bjtLast={}; _bjtRender();
+    if(un) un.addEventListener('click', function(){ _bjtDraft={}; _bjtWhen={}; _bjtRender();
              var m=document.getElementById('bjtMsg'); if(m){ m.className='bjt-msg'; m.textContent='入力を取り消しました（保存済みの設定は残っています）。'; } });
     var cl=document.getElementById('bjtClearBtn');
     if(cl) cl.addEventListener('click', function(){
-             var ks=_bjtTargets().slice();
-             if(!ks.length){ return; }
-             if(!confirm('配布先 '+ks.length+' 店に保存した機種別チューニングを全部消します。\n\n'+ks.slice(0,6).join('\n')+(ks.length>6?('\nほか '+(ks.length-6)+' 店'):'')+'\n\nよろしいですか？')) return;
-             ks.forEach(function(k){ try{ delete (window.BJ_TUNE||{})[k]; }catch(e){} });
-             var k=ks;
+             var n=Object.keys(bjTuneModels()).length;
+             if(!n){ var m0=document.getElementById('bjtMsg'); if(m0){ m0.className='bjt-msg'; m0.textContent='入力済みの単価はありません。'; } return; }
+             if(!confirm('入力済みの正解単価（'+n+' 機種・履歴を含む）を全部消して、\n素の数字に戻します。\n\nよろしいですか？')) return;
+             window.BJ_TUNE={};
              _bjtRev++;                    // 遅れて届く読み込み結果に、この削除を戻させない
-             _bjtDraft={}; _bjtDraftP={}; _bjtLast={}; _bjtPersist();
+             _bjtDraft={}; _bjtWhen={}; _bjtPersist();
              try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
              _bjtAfterChange(); _bjtRender();
              var m=document.getElementById('bjtMsg');
              if(!_bjtApiEnabled()){ if(m){ m.className='bjt-msg ok'; m.textContent='設定を消して、元の数字に戻しました（このPCの中だけ）。'; } return; }
              if(m){ m.className='bjt-msg'; m.textContent='設定を消しました。サーバへ送っています…'; }
-             _bjtPush(k).then(function(){
+             _bjtPush().then(function(){
                _bjtSyncState='ok'; _bjtSyncLine();
                if(m){ m.className='bjt-msg ok'; m.textContent='設定を消して、元の数字に戻しました。ほかのPCにも反映されます。'; }
              }).catch(function(){
@@ -17630,21 +17433,27 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
                if(m){ m.className='bjt-msg ng'; m.textContent='サーバから消せませんでした。この画面では消えていますが、ほかのPCには残っています。時間をおいてもう一度お試しください。'; }
              }); });
 
-    // 入力するたびに、その行と店全体のプレビューを更新する（保存はしない）
+    // 入力するたびに、その行と上のカードのプレビューを更新する（保存はしない）
     var body=document.getElementById('bjtBody');
-    if(body) body.addEventListener('input', function(ev){
-      var el=ev.target; if(!el||!el.classList) return;
-      var isCoin=el.classList.contains('bjt-in'), isProf=el.classList.contains('bjt-inp');
-      if(!isCoin && !isProf) return;
-      var i=+el.getAttribute('data-i'), st=_bjtStats(), r=st.rows[i];
-      if(!r) return;
-      if(isCoin) _bjtDraft[r.name]=el.value; else _bjtDraftP[r.name]=el.value;
-      _bjtLast[r.name]=isCoin?'c':'p';
-      _bjtPaintRow(i, r);
-      _bjtPaintSummary();
-      var m=document.getElementById('bjtMsg');
-      if(m){ m.className='bjt-msg'; m.textContent='まだ保存していません。「保存して反映」を押すと画面全体に反映されます。'; }
-    });
+    if(body){
+      body.addEventListener('input', function(ev){
+        var el=ev.target; if(!el||!el.classList||!el.classList.contains('bjt-in')) return;
+        var i=+el.getAttribute('data-i'), r=_bjtRows[i];
+        if(!r) return;
+        _bjtDraft[r.name]=el.value;
+        _bjtPaintRow(i, r);
+        _bjtQueueSummary();
+        var m=document.getElementById('bjtMsg');
+        if(m){ m.className='bjt-msg'; m.textContent='まだ保存していません。「保存して反映」を押すと画面全体に反映されます。'; }
+      });
+      body.addEventListener('change', function(ev){
+        var el=ev.target; if(!el||!el.classList||!el.classList.contains('bjt-when')) return;
+        var i=+el.getAttribute('data-i'), r=_bjtRows[i];
+        if(!r) return;
+        _bjtWhen[r.name]=el.value;
+        _bjtQueueSummary();
+      });
+    }
   }
 
   try{ if('scrollRestoration' in history) history.scrollRestoration='manual'; }catch(e){}   // リロード時のスクロール位置復元を無効化（非同期描画で"変な位置スタート"になるのを防ぐ）
@@ -18202,10 +18011,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(window._bjRoom==='payout'){ try{ _bjpRender(); }catch(e){} }
     _bjbMemoKey=''; _bjbMemo=null; _bjbRetry=0;                          // AIの朝礼：店舗変更で再生成
     _bjwkMemoKey=''; _bjwkMemo=null; _bjwkRetry=0;                       // AIの週報：同上
-    _bjtStat=null; _bjtStatKey=''; _bjtDraft={}; _bjtDraftP={}; _bjtLast={}; _bjtRetry=0;            // 機種別チューニング：店ごとに機種も実績も違うので作り直す
-    try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}    // 店が変われば効く係数も変わる＝キャッシュを捨てる
+    _bjtRetry=0;                                                         // 機種別チューニング：一覧は法人全体＝店切替では作り直さない（入力途中の値も保持）
     try{ _bjtNotice(); }catch(e){}
-    if(window._bjRoom==='tune'){ try{ _bjtRender(); }catch(e){} }
+    if(window._bjRoom==='tune'){ try{ _bjtRender(); }catch(e){} }        // 「表示中の店への影響」カードを描き直す
     if(window._bjRoom==='weekly'){ _bjShowLoading(); setTimeout(function(){ try{ _bjwkRender(); }catch(e){} finally { _bjHideLoading(); } },60); }
     if(window._bjRoom==='briefing'){
       _bjShowLoading();
