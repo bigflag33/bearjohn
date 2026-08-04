@@ -1890,7 +1890,7 @@ const USER_LABEL = 'アビバさん専用';               // 例: '田中さん�
 const USER_ID = 'aviva';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260804-072636';
+const BJ_VERSION = '20260804-084902';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -17266,9 +17266,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       else if(!v.entry && r.recent) h='<span class="bjt-badge ng">未入力</span>';
       bd.innerHTML=h;
     }
-    // 適用開始の選択（保存済みの機種を直すときだけ意味を持つ）
-    var sel=tr.querySelector('select.bjt-when');
-    if(sel){ sel.disabled=!v.edited; if(!v.edited) sel.value=(_bjtWhen[r.name]||'week'); }
+    // 「いつから」は入力を始めた行だけ表示（未編集は — のまま。いま効いている内容は履歴が正）
+    var dash=tr.querySelector('.bjt-when-dash'), sel=tr.querySelector('select.bjt-when'), fst=tr.querySelector('.bjt-when-first');
+    if(dash) dash.style.display = v.edited ? 'none' : '';
+    if(sel){ sel.style.display = v.edited ? '' : 'none'; sel.disabled=!v.edited; if(!v.edited) sel.value=(_bjtWhen[r.name]||'week'); }
+    if(fst) fst.style.display = v.edited ? '' : 'none';
   }
 
   function _bjtHistLine(entry){
@@ -17326,13 +17328,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         +'<td>'+(r.price
             ? '<input class="bjt-in" type="number" step="0.0001" min="0" data-i="'+i+'" value="'+_bjtEsc(_bjtRowState(r).val)+'" placeholder="'+r.price.toFixed(2)+'">'
             : '<span style="color:var(--text2)">データなし</span>')+'</td>'
-        +'<td>'+(entry
-            ? ('<select class="bjt-when" data-i="'+i+'">'
+        // 「いつから」は入力を始めた行だけ出す（未編集の行に選択肢が見えると、いま効いている
+        // 設定と紛らわしい＝2026-08-04ユーザー指摘。いま効いている内容は機種名の下の履歴が正）
+        +'<td><span class="bjt-when-dash" style="color:var(--text2)">—</span>'+(entry
+            ? ('<select class="bjt-when" data-i="'+i+'" style="display:none;">'
               +'<option value="week">今週（'+_bjtEsc(_bjtWkLabel(mon).replace('から',''))+'〜）</option>'
               +'<option value="prevweek">先週（'+_bjtEsc(_bjtWkLabel(monPrev).replace('から',''))+'〜）</option>'
               +'<option value="all">最初から（履歴ごと置き換え）</option>'
               +'</select>')
-            : '<span style="color:var(--text2)">最初から</span>')+'</td>'
+            : '<span class="bjt-when-first" style="display:none;color:var(--text2)">最初から</span>')+'</td>'
         +'<td id="bjtF'+i+'">—</td>'
         +'<td id="bjtS'+i+'">—</td><td id="bjtP'+i+'">—</td>'
         +'</tr>';
