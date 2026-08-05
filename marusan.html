@@ -1890,7 +1890,7 @@ const USER_LABEL = '丸三さん専用';               // 例: '田中さん専�
 const USER_ID = 'marusan';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260804-084902';
+const BJ_VERSION = '20260805-130219';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2296,9 +2296,95 @@ async function _bjDecryptJSON(wrapper, password){
 }
 
 // ── リモートデータ読み込み（ユーザー用 GitHub Pages JSON）──
+// ── 配信データの読み込み ──────────────────────────────────────
+// 2026-08-04 月別配信に対応。データは月ごとのファイル（{user}_data_YYYYMM.json）で配られ、
+// 過去月のファイルは中身が変わらないのでブラウザのキャッシュが効く＝毎日実際に落とすのは当月分だけ。
+// 入口は「今月」（月初で無ければ先月）のファイル。その中の months が全月の一覧（目次）。
+// 全月そろってから DB_CACHE に反映する＝読み込み途中の中途半端な数字を見せない。
+// 月別ファイルがまだ無い法人は、従来の1本ファイル（{user}_data.json）に自動で切り替わる。
+function _bjRemoteBadge(msg) {
+  const badge = document.getElementById('remoteDataBadge');
+  if (badge) { badge.textContent = msg; badge.style.display = ''; }
+}
+// 配信ペイロードの stores を「店名→レコード配列」に展開して merged に追記する
+function _bjRemoteExpand(data, merged) {
+  if (!data || !data.stores) return;
+  for (const storeName of Object.keys(data.stores)) {
+    const raw = data.stores[storeName];
+    let arr;
+    if (raw && raw.cols && raw.rows) {
+      // カラム形式 → オブジェクト配列に展開
+      const cols = raw.cols;
+      arr = raw.rows.map(row => {
+        const obj = {};
+        cols.forEach((c, i) => { obj[c] = row[i]; });
+        return obj;
+      });
+    } else {
+      arr = Array.isArray(raw) ? raw : [];
+    }
+    (merged[storeName] = merged[storeName] || []).push(arr);
+  }
+}
 async function loadRemoteData() {
   if (USER_ID === 'admin') return;
   try {
+    // ── まず月別配信を探す。入口ファイルだけは毎回取り直す（?t=）＝目次と当月データを新鮮に保つ
+    const ym = d => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0');
+    const now = new Date();
+    const prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    let head = null, headMonth = '';
+    for (const m of [ym(now), ym(prevM)]) {
+      try {
+        const r = await fetch(`./${USER_ID}_data_${m}.json?t=${Date.now()}`);
+        if (r.ok) { head = await r.json(); headMonth = m; break; }
+      } catch (e) {}
+    }
+    if (head) {
+      if (head.enc === 'v1') {
+        try { head = await _bjDecryptJSON(head, window._bjPw || ''); }
+        catch (e) {
+          console.error('[remote] 復号失敗（パスワード不一致 or データ更新中）', e);
+          _bjRemoteBadge('データを開けませんでした（更新中の可能性・しばらくして再読み込み）');
+          return;
+        }
+      }
+      const months = (head && Array.isArray(head.months) && head.months.length) ? head.months.slice().sort() : [headMonth];
+      const rest = months.filter(m => m !== headMonth);
+      // 過去月は普通に取りに行く＝変わっていないファイルはブラウザキャッシュで済む
+      let restData = null;
+      try {
+        restData = await Promise.all(rest.map(async m => {
+          const r = await fetch(`./${USER_ID}_data_${m}.json`);
+          if (!r.ok) throw new Error('missing ' + m);
+          let d = await r.json();
+          if (d && d.enc === 'v1') d = await _bjDecryptJSON(d, window._bjPw || '');
+          return d;
+        }));
+      } catch (e) {
+        // 一部の月が欠けたまま黙って表示すると合計がおかしくなる＝正直に伝えて何も出さない
+        console.error('[remote] 月別データの取得に失敗', e);
+        _bjRemoteBadge('データの一部が読み込めませんでした（配信が途中の可能性・しばらくして再読み込み）');
+        return;
+      }
+      const byMonth = {}; byMonth[headMonth] = head;
+      rest.forEach((m, i) => { byMonth[m] = restData[i]; });
+      const merged = {};
+      months.forEach(m => _bjRemoteExpand(byMonth[m], merged));   // 月の昇順で連結
+      let total = 0;
+      for (const storeName of Object.keys(merged)) {
+        const store = findOrCreateStore(storeName);
+        DB_CACHE[store.key] = [].concat.apply([], merged[storeName]);
+        total += DB_CACHE[store.key].length;
+      }
+      console.log(`[remote] 月別 ${months.length}ファイルから ${total}件 ロード完了`);
+      const d0 = head.generated ? new Date(head.generated) : null;
+      const dateStr = d0 ? `${d0.getMonth() + 1}/${d0.getDate()} ${String(d0.getHours()).padStart(2, '0')}:${String(d0.getMinutes()).padStart(2, '0')}` : '';
+      _bjRemoteBadge(`データ配信済み ${dateStr}`);
+      return;
+    }
+
+    // ── 従来の1本ファイル（月別がまだ配信されていない法人のための互換）──
     const url = `./${USER_ID}_data.json?t=${Date.now()}`;
     const resp = await fetch(url);
     if (!resp.ok) return;
@@ -2309,38 +2395,23 @@ async function loadRemoteData() {
         data = await _bjDecryptJSON(data, window._bjPw || '');
       } catch(e) {
         console.error('[remote] 復号失敗（パスワード不一致 or データ更新中）', e);
-        const badge = document.getElementById('remoteDataBadge');
-        if (badge) { badge.textContent = 'データを開けませんでした（更新中の可能性・しばらくして再読み込み）'; badge.style.display = ''; }
+        _bjRemoteBadge('データを開けませんでした（更新中の可能性・しばらくして再読み込み）');
         return;
       }
     }
     if (!data || !data.stores) return;
+    const merged1 = {};
+    _bjRemoteExpand(data, merged1);
     let total = 0;
-    for (const storeName of Object.keys(data.stores)) {
+    for (const storeName of Object.keys(merged1)) {
       const store = findOrCreateStore(storeName);
-      const raw = data.stores[storeName];
-      if (raw && raw.cols && raw.rows) {
-        // カラム形式 → オブジェクト配列に展開
-        const cols = raw.cols;
-        DB_CACHE[store.key] = raw.rows.map(row => {
-          const obj = {};
-          cols.forEach((c, i) => { obj[c] = row[i]; });
-          return obj;
-        });
-      } else {
-        DB_CACHE[store.key] = Array.isArray(raw) ? raw : [];
-      }
+      DB_CACHE[store.key] = [].concat.apply([], merged1[storeName]);
       total += DB_CACHE[store.key].length;
     }
     console.log(`[remote] ${USER_ID}_data.json から ${total}件 ロード完了`);
-    // データ配信済みバッジを表示
-    const badge = document.getElementById('remoteDataBadge');
-    if (badge) {
-      const d = data.generated ? new Date(data.generated) : null;
-      const dateStr = d ? `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '';
-      badge.textContent = `データ配信済み ${dateStr}`;
-      badge.style.display = '';
-    }
+    const d = data.generated ? new Date(data.generated) : null;
+    const dateStr = d ? `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}` : '';
+    _bjRemoteBadge(`データ配信済み ${dateStr}`);
   } catch(e) {
     console.log('[remote] データファイルなし、ローカルのみ使用');
   }
@@ -2436,45 +2507,73 @@ async function exportUserData() {
   console.log(`[benchmark] ${Object.keys(benchByDate).length}日分・1日あたり平均台数=${benchByDate[Object.keys(benchByDate)[0]]?.count||0}台ベースで算出`);
   // ──────────────────────────────────────────────────────────────
 
-  for (const userConf of USERS_CONFIG) {
-    const exportData = { generated: new Date().toISOString(), user: userConf.file, stores: {} };
-    let storeCount = 0;
-    let recordCount = 0;
+  // ── 月別書き出し（2026-08-04）─────────────────────────────
+  // {file}_data_YYYYMM.json を月ごとに作る。各ファイルに months（その法人の全月一覧＝目次）を同梱。
+  // 前回書き出したときの「指紋」（件数＋金額合計）を控えておき、変わった月だけ書き出す
+  // ＝毎日の書き出し・アップは実質当月分だけになり、過去月はブラウザキャッシュが効き続ける。
+  // 最新月は変化がなくても毎回書き出す（generated＝配信時刻と目次を新鮮に保つため）。
+  // データを消して入れ直した月も、指紋（金額込み）が変わるので自動で書き出しに含まれる。
+  let _fpAll = {};
+  try { _fpAll = JSON.parse(localStorage.getItem('admin_bj_export_fp') || '{}') || {}; } catch(e) { _fpAll = {}; }
+  let skippedMonths = 0;
 
-    // 6ヶ月カットオフ日を計算
+  for (const userConf of USERS_CONFIG) {
+    // 12ヶ月カットオフ日を計算
     const cutoffDate = new Date();
     cutoffDate.setMonth(cutoffDate.getMonth() - 12);
     const cutoffStr = cutoffDate.toISOString().slice(0, 10);
 
+    // 店ごとの対象レコードを月（YYYYMM）に振り分ける
+    const byMonth = {};      // YYYYMM -> { 店名 -> rows[] }
+    const stat = {};         // YYYYMM -> { cnt, sum }（指紋用）
+    const colsByStore = {};
+    const addRec = (r, storeName, cols) => {
+      const m = r.date.slice(0, 7).replace('-', '');
+      (byMonth[m] = byMonth[m] || {});
+      (byMonth[m][storeName] = byMonth[m][storeName] || []).push(cols.map(c => r[c] !== undefined ? r[c] : null));
+      const st = stat[m] || (stat[m] = { cnt: 0, sum: 0 });
+      st.cnt++;
+      st.sum += (r['台売上'] || 0) + (r['台粗利'] || 0) + (r['IN枚数'] || 0);
+    };
     for (const storeName of userConf.stores) {
       const store = allStores.find(s => normName(s.name) === normName(storeName));
-      if (store) {
-        const allRecords = DB_CACHE[store.key] && DB_CACHE[store.key].length
-          ? DB_CACHE[store.key]
-          : await _idbGet(store.key);
-        const records = allRecords.filter(r => r.date && r.date >= cutoffStr);
-        if (records.length > 0) {
-          const cols = Object.keys(records[0]);
-          exportData.stores[storeName] = {
-            cols,
-            rows: records.map(r => cols.map(c => r[c] !== undefined ? r[c] : null))
-          };
-          storeCount++;
-          recordCount += records.length;
-        }
-      }
+      if (!store) continue;
+      const allRecords = DB_CACHE[store.key] && DB_CACHE[store.key].length
+        ? DB_CACHE[store.key]
+        : await _idbGet(store.key);
+      const records = allRecords.filter(r => r.date && r.date >= cutoffStr);
+      if (!records.length) continue;
+      const cols = Object.keys(records[0]);
+      colsByStore[storeName] = cols;
+      for (const r of records) addRec(r, storeName, cols);
     }
-    // 業界ベンチマークを全ユーザーに追加（6ヶ月カットオフ適用 + カラム形式）
-    if (benchmarkRecords.length > 0) {
-      const benchFiltered = benchmarkRecords.filter(r => r.date && r.date >= cutoffStr);
-      const bCols = benchFiltered.length > 0 ? Object.keys(benchFiltered[0]) : [];
-      exportData.stores[BENCHMARK_NAME] = {
-        cols: bCols,
-        rows: benchFiltered.map(r => bCols.map(c => r[c] !== undefined ? r[c] : null))
-      };
+    // 業界ベンチマークを全ユーザーに追加（カットオフ適用 + カラム形式・月ごと）
+    const benchFiltered = benchmarkRecords.filter(r => r.date && r.date >= cutoffStr);
+    if (benchFiltered.length > 0) {
+      const bCols = Object.keys(benchFiltered[0]);
+      colsByStore[BENCHMARK_NAME] = bCols;
+      for (const r of benchFiltered) addRec(r, BENCHMARK_NAME, bCols);
     }
 
-    results.push({ name: `${userConf.file}_data.json`, data: exportData, pw: userConf.pw || '', storeCount, recordCount });
+    const months = Object.keys(byMonth).sort();
+    if (!months.length) continue;
+    const latest = months[months.length - 1];
+    const corpFp = _fpAll[userConf.file] || {};
+    const nextFp = {};
+    for (const m of months) {
+      const fp = stat[m].cnt + '|' + Math.round(stat[m].sum) + '|' + Object.keys(byMonth[m]).length;
+      nextFp[m] = fp;
+      const write = (m === latest) || (corpFp[m] !== fp);
+      if (!write) { skippedMonths++; continue; }
+      const exportData = { generated: new Date().toISOString(), user: userConf.file,
+                           month: m, months: months, stores: {} };
+      for (const sn of Object.keys(byMonth[m])) {
+        exportData.stores[sn] = { cols: colsByStore[sn], rows: byMonth[m][sn] };
+      }
+      results.push({ name: `${userConf.file}_data_${m}.json`, data: exportData,
+                     pw: userConf.pw || '', storeCount: Object.keys(byMonth[m]).length, recordCount: stat[m].cnt });
+    }
+    _fpAll[userConf.file] = nextFp;
   }
 
   // ダウンロード（pwがある法人は圧縮＋暗号化して書き出し。直URLで取られても読めない）
@@ -2497,8 +2596,12 @@ async function exportUserData() {
     await new Promise(r => setTimeout(r, 400));
   }
 
+  // 書き出しが済んだので、次回のために各月の指紋を控える
+  try { localStorage.setItem('admin_bj_export_fp', JSON.stringify(_fpAll)); } catch(e) {}
+
   const summary = results.map(f => `${f.name}（${f.storeCount}店舗・${f.recordCount}件）`).join('\n');
-  console.log('[export] 書き出し完了:\n' + summary);
+  console.log('[export] 書き出し完了:\n' + summary
+    + (skippedMonths ? `\n（変更のない ${skippedMonths} ヶ月分はスキップ＝前回アップしたファイルのままでOK）` : ''));
 
   // 未マッチ店舗の警告＋デバッグログ
   const unmatched = [];
@@ -2520,7 +2623,8 @@ async function exportUserData() {
   }
   console.log('[診断] --- 診断終了 ---');
 
-  showMsg(`✓ ${results.length}ファイル書き出し完了！GitHubにアップしてください`, 'ok');
+  showMsg(`✓ ${results.length}ファイル書き出し完了！GitHubにアップしてください`
+    + (skippedMonths ? `（変更のない ${skippedMonths} ヶ月分は省略）` : ''), 'ok');
 }
 
 // ── 管理者専用：全データ一括バックアップ ──
@@ -14966,10 +15070,45 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjt-badge{ display:inline-block; font-size:10.5px; color:var(--accent); border:1px solid var(--accent);
               border-radius:3px; padding:0 4px; margin-left:6px; vertical-align:1px; white-space:nowrap; }
   .bjt-badge.ng{ color:var(--red); border-color:var(--red); }
-  .bjt-hist{ font-size:10.5px; color:var(--text2); margin-top:2px; white-space:normal; max-width:360px; }
-  table.bjt-t select.bjt-when{ padding:3px 4px; border:1px solid var(--border); border-radius:4px;
-              background:var(--card); color:var(--text); font-size:11.5px; }
-  table.bjt-t select.bjt-when:disabled{ opacity:.45; }
+  /* 「いまの設定」列（現在値・経緯の要約・保存予告） */
+  table.bjt-t td.bjt-now{ white-space:normal; line-height:1.55; min-width:200px; max-width:300px; }
+  .bjt-cw{ color:var(--text2); font-size:11px; }
+  .bjt-cd{ color:var(--accent); font-size:11.5px; margin-top:2px; }
+  /* 詳細パネル（経緯の表・過去の打ち替え・新しい単価を積む） */
+  .bjtp-ov{ position:fixed; inset:0; background:rgba(20,40,50,.35); z-index:9999;
+            display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; }
+  .bjtp{ background:var(--card); border-radius:8px; max-width:700px; width:100%;
+         box-shadow:0 12px 40px rgba(0,0,0,.25); overflow:hidden; }
+  .bjtp-hd{ padding:16px 22px 12px; border-bottom:1px solid var(--border); }
+  .bjtp-name{ font-size:16px; font-weight:700; color:var(--text); }
+  .bjtp-meta{ font-size:12px; color:var(--text2); margin-top:3px; }
+  .bjtp-bd{ padding:16px 22px 20px; }
+  .bjtp-sec{ font-size:11.5px; color:var(--text2); letter-spacing:.04em; margin:2px 0 8px; }
+  table.bjtp-h{ border-collapse:collapse; width:100%; font-size:12.5px; margin-bottom:18px; }
+  table.bjtp-h th{ font-weight:500; color:var(--text2); text-align:left; padding:5px 8px;
+                   border-bottom:1px solid var(--border); font-size:11.5px; }
+  table.bjtp-h th.n, table.bjtp-h td.n{ text-align:right; }
+  table.bjtp-h td{ padding:7px 8px; border-bottom:1px solid var(--border); color:var(--text); }
+  table.bjtp-h input.bjtp-price{ width:82px; padding:4px 6px; border:1px solid var(--border);
+                   border-radius:4px; text-align:right; font-size:13px; background:var(--card); color:var(--text); }
+  tr.bjtp-now td{ background:rgba(0,152,212,.08); font-weight:700; }
+  tr.bjtp-now td input.bjtp-price{ border-color:var(--accent); }
+  tr.bjtp-delrow td{ text-decoration:line-through; opacity:.55; }
+  .bjtp-nowtag{ display:inline-block; font-size:10.5px; color:var(--accent); border:1px solid var(--accent);
+                border-radius:3px; padding:0 5px; margin-left:8px; font-weight:400; }
+  .bjtp-del-btn{ color:var(--text2); text-decoration:none; }
+  .bjtp-del-btn:hover{ color:var(--red); }
+  .bjtp-form{ background:var(--card2); border:1px solid var(--border); border-radius:6px; padding:14px 16px; }
+  .bjtp-row{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .bjtp-row label{ font-size:12.5px; color:var(--text); display:inline-flex; align-items:center; gap:5px; }
+  .bjtp-row input[type=number]{ width:90px; padding:6px 8px; border:1px solid var(--border);
+                   border-radius:4px; text-align:right; font-size:13px; background:var(--card); color:var(--text); }
+  .bjtp-row input[type=date]{ padding:5px 8px; border:1px solid var(--border); border-radius:4px;
+                   font-size:12.5px; background:var(--card); color:var(--text); }
+  .bjtp-preview{ margin-top:12px; padding:10px 12px; background:rgba(0,152,212,.08);
+                 border-left:3px solid var(--accent); font-size:12.5px; line-height:1.8; color:var(--text); }
+  .bjtp-ft{ display:flex; justify-content:flex-end; gap:10px; padding:14px 22px;
+            border-top:1px solid var(--border); background:var(--card2); }
 </style>
 <script>
 (function(){
@@ -16929,8 +17068,14 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   //  ・単価は時期で変わるので「どの週から」を版で持つ（週の区切りは週報と同じ 月〜日）
   //  ・新台はデータを取り込んだ時点で「未入力」として自動で現れる。毎回ゼロから入れ直す必要はない
   //  ・実際に掛ける処理は loadAllData()（本体上部）。ここは一覧を見せて単価を入力する画面
-  var _bjtRetry=0, _bjtDraft={}, _bjtWhen={}, _bjtFind='', _bjtOnlyEmpty=false, _bjtShowAll=false,
-      _bjtStat=null, _bjtStatKey='', _bjtSumT=null, _bjtRows=[];   // _bjtRows＝描画した行の並び（入力欄のdata-iはこれを指す）
+  // 画面の役割分担（2026-08-05 全面刷新。ユーザー承認済みのモック _mockups/tune_edit_mock.html が原型）:
+  //  ・一覧 … 単価を打つだけ（いつからは自動: 未入力=最初から／入力済み=今週から）。
+  //           「いまの設定」列に現在値・経緯の要約・保存すると何になるかを常時表示
+  //  ・詳細パネル … 経緯の表（適用期間・単価の打ち替え・係数・×削除・←いま印）＋
+  //           新しい単価を積む（今週／週を指定／最初から）＋保存前の説明文。その機種だけ即保存
+  var _bjtRetry=0, _bjtDraft={}, _bjtFind='', _bjtOnlyEmpty=false, _bjtShowAll=false,
+      _bjtStat=null, _bjtStatKey='', _bjtSumT=null, _bjtRows=[],   // _bjtRows＝描画した行の並び（入力欄のdata-iはこれを指す）
+      _bjtPanel=null;   // 詳細パネルの編集状態 {name, stages:[{from,price,del}], newPrice, newWhen, newDate}
 
   function _bjtStoreName(){ try{ var s=_activeStore(); return (s&&s.name)||''; }catch(e){ return ''; } }
 
@@ -17146,16 +17291,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return entry ? bjTunePriceAt(entry, (st&&st.last)||'9999-12-31') : null;
   }
 
-  // その機種の適用開始（下書き用）。保存済みが無ければ「最初から」＝全期間に効く
+  // 一覧の入力の適用開始は自動で決まる（時期を選びたいときは詳細パネルで）:
+  //   未入力の機種＝最初から（全期間）／ 入力済みの機種＝今週から
   function _bjtFromOf(name){
-    var has=!!_bjtSavedEntry(name);
-    var w=_bjtWhen[name] || (has?'week':'all');
-    if(w==='all') return '';
-    var mon=bjTuneMonday(_bjtToday());
-    return (w==='prevweek') ? _bjbAddDays(mon,-7) : mon;
+    return _bjtSavedEntry(name) ? bjTuneMonday(_bjtToday()) : '';
   }
 
-  // 下書きを反映した機種マスタ（保存前のプレビューと保存の両方で使う）
+  // 下書き（一覧の入力）を反映した機種マスタ（保存前のプレビューと保存の両方で使う）
   function _bjtNextModels(){
     var M=bjTuneModels(), out={}, n, bad=[];
     for(n in M) out[n]={vers:(M[n].vers||[]).slice()};
@@ -17174,6 +17316,38 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       out[n]={vers:vs, at:_bjtNow()};
     }
     return {models:out, bad:bad};
+  }
+
+  // 詳細パネルの編集内容から新しい版の並びを作る（保存とプレビューの共通ロジック・純粋関数）
+  //   stages: [{from, price(文字列可), del}] ／ newPrice: 追加する単価（''なら追加なし）
+  //   newWhen: 'week'|'pick'|'all' ／ newDate: pick用の日付
+  //   戻り: {vers:[...] or null(全部消えた=補正解除), bad:[問題の説明,...]}
+  function _bjtPanelBuildVers(stages, newPrice, newWhen, newDate){
+    var bad=[], vs=[];
+    (stages||[]).forEach(function(s){
+      if(s.del) return;                                // ×の付いた段は消す
+      var p=Number(String(s.price==null?'':s.price).trim());
+      if(!isFinite(p)||p<=0){ bad.push(_bjtWkLabel(s.from||'')+'の単価「'+s.price+'」が数字として読めません'); return; }
+      vs.push({from:(s.from||''), price:Math.round(p*10000)/10000});
+    });
+    var raw=String(newPrice==null?'':newPrice).trim();
+    if(raw!==''){
+      var p2=Number(raw);
+      if(!isFinite(p2)||p2<=0){ bad.push('新しい単価「'+raw+'」が数字として読めません'); }
+      else{
+        p2=Math.round(p2*10000)/10000;
+        var from = (newWhen==='all') ? ''
+                 : (newWhen==='pick') ? (bjTuneMonday(newDate||_bjtToday())||bjTuneMonday(_bjtToday()))
+                 : bjTuneMonday(_bjtToday());
+        if(from===''){ vs=[{from:'', price:p2}]; }     // 最初から＝履歴ごと置き換え
+        else{
+          vs=vs.filter(function(v){ return (v.from||'')!==from; });   // 同じ週は置き換え
+          vs.push({from:from, price:p2});
+        }
+      }
+    }
+    vs.sort(function(x,y){ return (x.from||'')<(y.from||'')?-1:1; });
+    return {vers: vs.length?vs:null, bad:bad};
   }
 
   // ── 上部カード（入力状況・カバー率・表示中の店への影響）──────────────
@@ -17266,18 +17440,52 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       else if(!v.entry && r.recent) h='<span class="bjt-badge ng">未入力</span>';
       bd.innerHTML=h;
     }
-    // 「いつから」は入力を始めた行だけ表示（未編集は — のまま。いま効いている内容は履歴が正）
-    var dash=tr.querySelector('.bjt-when-dash'), sel=tr.querySelector('select.bjt-when'), fst=tr.querySelector('.bjt-when-first');
-    if(dash) dash.style.display = v.edited ? 'none' : '';
-    if(sel){ sel.style.display = v.edited ? '' : 'none'; sel.disabled=!v.edited; if(!v.edited) sel.value=(_bjtWhen[r.name]||'week'); }
-    if(fst) fst.style.display = v.edited ? '' : 'none';
+    // 「いまの設定」列（現在値・経緯の要約・保存するとどうなるか）
+    var cc=document.getElementById('bjtC'+i);
+    if(cc) cc.innerHTML=_bjtNowCell(r, v);
   }
 
-  function _bjtHistLine(entry){
-    var vs=(entry&&entry.vers)||[];
-    if(!vs.length) return '';
-    var parts=vs.map(function(v){ return _bjtWkLabel(v.from||'')+' '+(+v.price).toFixed(2)+'円'; });
-    return '<div class="bjt-hist">'+_bjtEsc(parts.join(' → '))+'</div>';
+  // いま効いている「段」そのもの（最新データ日の週で選ぶ。適用側と同じ選び方）
+  function _bjtCurStage(vs){
+    var wk=bjTuneMonday((_bjtStat&&_bjtStat.last)||_bjtToday());
+    var cur=null;
+    (vs||[]).forEach(function(x){
+      var f=x.from||'';
+      if(f && wk && f>wk) return;                    // まだ始まっていない段
+      if(!cur || f>=(cur.from||'')) cur=x;
+    });
+    return cur;
+  }
+
+  // 「いまの設定」列の中身。パネルを開かなくても状況が分かるようにする
+  function _bjtNowCell(r, v){
+    var h='';
+    var vs=(v.entry&&v.entry.vers)||[];
+    if(vs.length){
+      var curV=_bjtCurStage(vs);
+      // 現在値の行（いくらで・いつから・何段め）
+      if(curV){
+        var idx=vs.indexOf(curV)+1;
+        h+='<div><b>'+(+curV.price).toFixed(2)+'円</b><span class="bjt-cw">（'
+          +_bjtEsc(_bjtWkLabel(curV.from||''))+(vs.length>1?('・'+idx+'段め'):'')+'）</span></div>';
+      } else {
+        h+='<div><span class="bjt-cw">まだ効いていません（開始週のデータ待ち）</span></div>';
+      }
+      // 経緯の要約（全段。多い場合は詳細へ誘導）
+      var parts=vs.map(function(x){ return (+x.price).toFixed(2)+(x.from?('（'+_bjtEsc(_bjtWkLabel(x.from).replace('の週から','週'))+'）'):''); });
+      var line=(vs.length>4)? (parts.slice(0,3).join(' → ')+' → … 全'+vs.length+'段') : parts.join(' → ');
+      if(vs.length>1) h+='<div class="bjt-cw">経緯: '+line+'</div>';
+    } else if(!v.edited){
+      h+='<div><span class="bjt-cw">補正なし</span></div>';
+    }
+    // 下書きの予告（一覧の入力は いつから が自動なので、何が起きるかを文字で見せる）
+    if(v.edited){
+      var raw=String(_bjtDraft[r.name]||'').trim();
+      if(raw===''){ if(v.entry) h+='<div class="bjt-cd">保存すると: 補正を解除</div>'; }
+      else if(!v.entry) h+='<div class="bjt-cd">保存すると: 最初から '+_bjtEsc(raw)+'円（全期間）</div>';
+      else h+='<div class="bjt-cd">保存すると: 今週（'+_bjtEsc(_bjtWkLabel(bjTuneMonday(_bjtToday())).replace('から',''))+'〜）'+_bjtEsc(raw)+'円</div>';
+    }
+    return h;
   }
 
   function _bjtVisibleRows(){
@@ -17301,24 +17509,25 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       _bjtNotice(); return;
     }
     _bjtRetry=0;
-    var mon=bjTuneMonday(_bjtToday()), monPrev=_bjbAddDays(mon,-7);
     var rows=_bjtVisibleRows(), hidden=st.rows.length-rows.length;
     _bjtRows=rows;   // 入力ハンドラはこのスナップショットを見る（後から再計算すると行がズレる）
     var html=''
       +'<table class="bjt-t" id="bjtTable"><thead><tr>'
+      +'<th></th>'
       +'<th class="l">機種名</th><th>状態</th><th>台数</th><th>アウト計<br><span class="bjt-sub">直近30日</span></th>'
       +'<th>売上計<br><span class="bjt-sub">直近30日</span></th><th>台粗利<br><span class="bjt-sub">直近30日/日</span></th>'
       +'<th>推定単価<br><span class="bjt-sub">データから逆算</span></th>'
-      +'<th>正解単価<br><span class="bjt-sub">入力</span></th><th>いつから</th><th>係数</th>'
+      +'<th>正解単価<br><span class="bjt-sub">入力</span></th>'
+      +'<th class="l" style="min-width:200px;">いまの設定</th><th>係数</th>'
       +'<th>補正後の売上計<br><span class="bjt-sub">直近30日</span></th><th>補正後の台粗利<br><span class="bjt-sub">直近30日/日</span></th>'
       +'</tr></thead><tbody>';
     for(var i=0;i<rows.length;i++){
       var r=rows[i];
-      var entry=_bjtSavedEntry(r.name);
       var pph=(r.n30>0)?r.p30/r.n30:0;
       var noRecent=!r.recent;
       html+='<tr id="bjtR'+i+'" data-n="'+_bjtEsc(r.name)+'">'
-        +'<td class="l">'+_bjtEsc(r.name)+(noRecent?'<span class="bjt-badge">直近1ヶ月稼働なし</span>':'')+_bjtHistLine(entry)+'</td>'
+        +'<td><button type="button" class="bjt-btn bjt-detail" data-i="'+i+'">詳細</button></td>'
+        +'<td class="l">'+_bjtEsc(r.name)+(noRecent?'<span class="bjt-badge">直近1ヶ月稼働なし</span>':'')+'</td>'
         +'<td class="l" id="bjtB'+i+'"></td>'
         +'<td>'+(r.units||'—')+'</td>'
         +'<td>'+(r.o30?_bjtN(r.o30):'—')+'</td>'
@@ -17328,15 +17537,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         +'<td>'+(r.price
             ? '<input class="bjt-in" type="number" step="0.0001" min="0" data-i="'+i+'" value="'+_bjtEsc(_bjtRowState(r).val)+'" placeholder="'+r.price.toFixed(2)+'">'
             : '<span style="color:var(--text2)">データなし</span>')+'</td>'
-        // 「いつから」は入力を始めた行だけ出す（未編集の行に選択肢が見えると、いま効いている
-        // 設定と紛らわしい＝2026-08-04ユーザー指摘。いま効いている内容は機種名の下の履歴が正）
-        +'<td><span class="bjt-when-dash" style="color:var(--text2)">—</span>'+(entry
-            ? ('<select class="bjt-when" data-i="'+i+'" style="display:none;">'
-              +'<option value="week">今週（'+_bjtEsc(_bjtWkLabel(mon).replace('から',''))+'〜）</option>'
-              +'<option value="prevweek">先週（'+_bjtEsc(_bjtWkLabel(monPrev).replace('から',''))+'〜）</option>'
-              +'<option value="all">最初から（履歴ごと置き換え）</option>'
-              +'</select>')
-            : '<span class="bjt-when-first" style="display:none;color:var(--text2)">最初から</span>')+'</td>'
+        +'<td class="l bjt-now" id="bjtC'+i+'"></td>'
         +'<td id="bjtF'+i+'">—</td>'
         +'<td id="bjtS'+i+'">—</td><td id="bjtP'+i+'">—</td>'
         +'</tr>';
@@ -17344,13 +17545,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     html+='</tbody></table>';
     host.innerHTML='<div class="bjt-tablewrap">'+html+'</div>'
       +'<div class="bjt-note">'
-      +'台数・アウト計・売上計・台粗利・推定単価は<b>直近30日（20円スロット全店の合算）</b>の数字です。'
-      +'補正そのものは入力した「いつから」に従って全期間に効きます。<br>'
+      +'台数・アウト計・売上計・台粗利・推定単価は<b>直近30日（20円スロット全店の合算）</b>の数字です。<br>'
+      +'一覧の入力は、未入力の機種＝<b>最初から（全期間）</b>／入力済みの機種＝<b>今週から</b>で効きます（「いまの設定」に予告が出ます）。'
+      +'時期を選びたい・過去を直したい・経緯を見たいときは行の<b>詳細</b>ボタンへ。<br>'
       +'このデータの範囲：〜 '+(st.last||'—')+'　／　直近30日は '+(st.from30||'—')+' 以降　／　対象 '+st.stores+' 店'
       +(hidden?('　／　表示していない機種 '+hidden+' 件（検索・未入力のみ・直近1ヶ月稼働なし）。入力済みの補正は表示に関係なく効き続けます'):'')+'<br>'
-      +'行の「補正後」は入力した単価がそのまま効いた場合の目安です。「今週から」「先週から」を選んだ場合の正確な影響は上のカードに出ます。'
-      +'「今週から」を選ぶと、その週のデータを取り込むまで数字は変わりません。<br>'
-      +'正解単価を空欄にして保存すると、その機種の補正を（履歴ごと）全部外します。設定は「保存して反映」を押すまで画面に反映されません。</div>';
+      +'正解単価を空欄にして保存すると、その機種の補正を（履歴ごと）全部外します。一覧の入力は「保存して反映」を押すまで画面に反映されません。</div>';
     for(var j=0;j<rows.length;j++) _bjtPaintRow(j, rows[j]);
     _bjtApplyFind();
     _bjtPaintSummary();
@@ -17369,7 +17569,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }
   }
 
-  // 保存：入力された正解単価を版（いつから）付きで確定する
+  // 保存：一覧で入力された正解単価を確定する（いつからは自動: 未入力=最初から／入力済み=今週から）
   function _bjtApply(){
     var st=_bjtStats(), msg=document.getElementById('bjtMsg');
     var names=Object.keys(_bjtDraft);
@@ -17395,11 +17595,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     window.BJ_TUNE = Object.keys(nx.models).length ? {v:2, models:nx.models} : {};
     _bjtRev++;                    // 遅れて届く読み込み結果に、この保存を消させない
     var ok=_bjtPersist();
-    _bjtDraft={}; _bjtWhen={};
+    _bjtDraft={};
     try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
     _bjtAfterChange();
     _bjtRender();
-    var head=changed+' 機種を保存'+(removed?('、'+removed+' 機種の補正を解除'):'')+'しました。';
+    var head=(changed?changed+' 機種を保存':'')
+      +(removed?((changed?'、':'')+removed+' 機種の補正を解除'):'')
+      +'しました。';
     var tail=(warn.length?('　注意：'+warn.slice(0,3).join(' / ')+(warn.length>3?(' ほか'+(warn.length-3)+'件'):'')):'');
     if(msg){
       msg.className='bjt-msg '+(ok?'ok':'ng');
@@ -17465,6 +17667,164 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     el.innerHTML='<b>チューニング有</b>';
   }
 
+  // ── 詳細パネル（経緯の表・過去の打ち替え・段の削除・新しい単価を積む・保存前の説明）──
+  // 承認済みモック _mockups/tune_edit_mock.html が原型。この機種だけを即保存する
+  function _bjtRowByName(name){ var st=_bjtStats(), out=null; st.rows.forEach(function(r){ if(r.name===name) out=r; }); return out; }
+
+  function _bjtPanelOpen(name){
+    var entry=_bjtSavedEntry(name);
+    var stages=((entry&&entry.vers)||[]).map(function(v){ return {from:(v.from||''), price:String(+v.price), del:false}; });
+    // 一覧にこの機種の打ちかけの値があれば「新しい単価」に引き継ぐ
+    var carry='';
+    if(_bjtDraft[name]!==undefined){ carry=String(_bjtDraft[name]); delete _bjtDraft[name]; }
+    _bjtPanel={name:name, stages:stages, newPrice:carry, newWhen:(stages.length?'week':'all'), newDate:_bjtToday()};
+    _bjtPanelRender();
+  }
+  function _bjtPanelClose(){
+    _bjtPanel=null;
+    var ov=document.getElementById('bjtPanelOv'); if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+    _bjtRender();   // 一覧を描き直す（引き継いだ下書きの消え方・保存結果も反映）
+  }
+
+  // パネルの状態から「保存したらどうなるか」の説明文を作る
+  function _bjtPanelPreview(bv, r){
+    if(bv.bad.length) return '<span style="color:var(--red)">'+_bjtEsc(bv.bad[0])+'</span>';
+    if(bv.vers===null) return '保存すると: この機種の補正を<b>すべて解除</b>します（素の数字に戻ります）。';
+    var t='保存すると: '+bv.vers.map(function(v){
+      return _bjtEsc(_bjtWkLabel(v.from||''))+' <b>'+(+v.price).toFixed(2)+'円</b>';
+    }).join(' → ')+'。';
+    var cur=_bjtCurStage(bv.vers);
+    if(cur && r && r.price>0){
+      var a=(+cur.price)/r.price;
+      t+='<br>いま効く値は <b>'+(+cur.price).toFixed(2)+'円</b>（係数 '+a.toFixed(3)+'）になります。';
+      if(a<0.5||a>1.5) t+='<br><span style="color:var(--red)">注意: 係数が極端です。入力の打ち間違いがないかご確認ください。</span>';
+    } else if(!cur){
+      t+='<br><span class="bjt-cw">開始週がまだ先なので、その週のデータを取り込むまで数字は変わりません。</span>';
+    }
+    return t;
+  }
+  function _bjtPanelPreviewRepaint(){
+    var P=_bjtPanel; if(!P) return;
+    var el=document.getElementById('bjtpPrev'); if(!el) return;
+    el.innerHTML=_bjtPanelPreview(_bjtPanelBuildVers(P.stages,P.newPrice,P.newWhen,P.newDate), _bjtRowByName(P.name));
+  }
+
+  function _bjtPanelRender(){
+    var P=_bjtPanel; if(!P) return;
+    var ov=document.getElementById('bjtPanelOv'); if(!ov) return;
+    var r=_bjtRowByName(P.name);
+    // 適用期間の区切りは「生きている段」だけで計算する（削除予定の段は期間から抜く）
+    var alive=P.stages.filter(function(s){ return !s.del; });
+    function mdLabel(ds){ return ds ? (String(+ds.slice(5,7))+'/'+String(+ds.slice(8,10))) : ''; }
+    function periodOf(s){
+      if(s.del) return '（削除予定）';
+      var idx=alive.indexOf(s);
+      var from=s.from ? mdLabel(s.from)+'（月）' : '最初';
+      var next=alive[idx+1];
+      var to=next ? mdLabel(_bjbAddDays(next.from,-1))+' まで' : 'いま';
+      return from+' 〜 '+to;
+    }
+    var curVs=alive.map(function(s){ return {from:s.from, price:Number(s.price)||0}; });
+    var cur=_bjtCurStage(curVs);
+    var rowsH=P.stages.map(function(s,si){
+      var isCur=!!(cur && !s.del && (s.from||'')===(cur.from||''));
+      var a=(r&&r.price>0&&Number(s.price)>0)?(Number(s.price)/r.price):null;
+      return '<tr class="'+(s.del?'bjtp-delrow':(isCur?'bjtp-now':''))+'">'
+        +'<td>'+_bjtEsc(periodOf(s))+(isCur?'<span class="bjtp-nowtag">いま効いている値</span>':'')+'</td>'
+        +'<td class="n"><input type="number" step="0.0001" min="0" class="bjtp-price" data-si="'+si+'" value="'+_bjtEsc(s.price)+'"'+(s.del?' disabled':'')+'> 円</td>'
+        +'<td class="n">'+(a?a.toFixed(3):'—')+'</td>'
+        +'<td class="n"><a href="javascript:void(0)" class="bjtp-del-btn" data-si="'+si+'">'+(s.del?'削除をやめる':'× 削除')+'</a></td>'
+        +'</tr>';
+    }).join('');
+    if(!P.stages.length) rowsH='<tr><td colspan="4" style="color:var(--text2)">まだ設定がありません。下で最初の単価を入れてください。</td></tr>';
+    var bv=_bjtPanelBuildVers(P.stages, P.newPrice, P.newWhen, P.newDate);
+    var monNow=bjTuneMonday(_bjtToday());
+    ov.innerHTML=''
+      +'<div class="bjtp"><div class="bjtp-hd">'
+      +'<div class="bjtp-name">'+_bjtEsc(P.name)+'</div>'
+      +'<div class="bjtp-meta">推定単価（直近30日・全店合算） '+(r&&r.price?r.price.toFixed(2):'—')+'円'
+      +(r&&r.units?('　／　設置 '+r.units+'台'):'')+'</div></div>'
+      +'<div class="bjtp-bd">'
+      +'<div class="bjtp-sec">これまでの設定（経緯）— 過去の単価はこの表の欄を打ち替えるだけで直せます</div>'
+      +'<table class="bjtp-h"><thead><tr><th>適用期間</th><th class="n">正解単価（打ち替え可）</th><th class="n">係数</th><th></th></tr></thead>'
+      +'<tbody>'+rowsH+'</tbody></table>'
+      +'<div class="bjtp-sec">新しい単価を積む（次の切り替え）</div>'
+      +'<div class="bjtp-form">'
+      +'<div class="bjtp-row">'
+      +'<label>正解単価 <input type="number" step="0.0001" min="0" id="bjtpNew" value="'+_bjtEsc(P.newPrice)+'"> 円</label>'
+      +'<label><input type="radio" name="bjtpW" value="week"'+(P.newWhen==='week'?' checked':'')+'> 今週（'+_bjtEsc(_bjtWkLabel(monNow).replace('から',''))+'〜）から</label>'
+      +'<label><input type="radio" name="bjtpW" value="pick"'+(P.newWhen==='pick'?' checked':'')+'> 週を指定 <input type="date" id="bjtpDate" value="'+_bjtEsc(P.newDate)+'"></label>'
+      +'<label><input type="radio" name="bjtpW" value="all"'+(P.newWhen==='all'?' checked':'')+'> 最初から（履歴ごと置き換え）</label>'
+      +'</div>'
+      +(P.newWhen==='pick'?('<div style="color:var(--text2);font-size:11.5px;margin-top:2px;">→ '+_bjtEsc(_bjtWkLabel(bjTuneMonday(P.newDate||_bjtToday())))+'適用（どの日を選んでも週の月曜に丸めます。未来の週は予約になります）</div>'):'')
+      +'</div>'
+      +'<div class="bjtp-preview" id="bjtpPrev">'+_bjtPanelPreview(bv, r)+'</div>'
+      +'</div>'
+      +'<div class="bjtp-ft">'
+      +'<button type="button" class="bjt-btn" id="bjtpCancel">キャンセル</button>'
+      +'<button type="button" class="bjt-btn on" id="bjtpSave">保存して反映</button>'
+      +'</div></div>';
+    ov.style.display='flex';
+    document.getElementById('bjtpCancel').addEventListener('click', _bjtPanelClose);
+    document.getElementById('bjtpSave').addEventListener('click', _bjtPanelSave);
+    ov.querySelectorAll('input.bjtp-price').forEach(function(inp){
+      inp.addEventListener('input', function(){
+        var si=+inp.getAttribute('data-si');
+        _bjtPanel.stages[si].price=inp.value;
+        _bjtPanelPreviewRepaint();
+      });
+    });
+    ov.querySelectorAll('a.bjtp-del-btn').forEach(function(a2){
+      a2.addEventListener('click', function(){
+        var si=+a2.getAttribute('data-si');
+        _bjtPanel.stages[si].del=!_bjtPanel.stages[si].del;
+        _bjtPanelRender();   // 期間の区切りが変わるので描き直し（打ちかけの値はstateに保持済み）
+      });
+    });
+    var np=document.getElementById('bjtpNew');
+    if(np) np.addEventListener('input', function(){ _bjtPanel.newPrice=np.value; _bjtPanelPreviewRepaint(); });
+    ov.querySelectorAll('input[name=bjtpW]').forEach(function(rb){
+      rb.addEventListener('change', function(){ _bjtPanel.newWhen=rb.value; _bjtPanelRender(); });
+    });
+    var dtp=document.getElementById('bjtpDate');
+    if(dtp) dtp.addEventListener('change', function(){ _bjtPanel.newDate=dtp.value||_bjtToday(); _bjtPanel.newWhen='pick'; _bjtPanelRender(); });
+  }
+
+  function _bjtPanelSave(){
+    var P=_bjtPanel; if(!P) return;
+    var bv=_bjtPanelBuildVers(P.stages, P.newPrice, P.newWhen, P.newDate);
+    if(bv.bad.length){ _bjtPanelPreviewRepaint(); return; }   // 問題はプレビュー欄に赤字で出る
+    var M=bjTuneModels(), next={}, n;
+    for(n in M) next[n]={vers:(M[n].vers||[]).slice(), at:M[n].at};
+    if(bv.vers===null) delete next[P.name];
+    else next[P.name]={vers:bv.vers, at:_bjtNow()};
+    window.BJ_TUNE = Object.keys(next).length ? {v:2, models:next} : {};
+    _bjtRev++;                    // 遅れて届く読み込み結果に、この保存を消させない
+    _bjtPersist();
+    try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
+    _bjtAfterChange();
+    var name=P.name, removedAll=(bv.vers===null);
+    _bjtPanelClose();
+    var msg=document.getElementById('bjtMsg');
+    var head=removedAll?('「'+name+'」の補正を解除しました。'):('「'+name+'」を保存しました。');
+    if(!_bjtApiEnabled()){
+      if(msg){ msg.className='bjt-msg ok'; msg.textContent=head+'このPCの中だけに保存しています。'; }
+      return;
+    }
+    if(msg){ msg.className='bjt-msg'; msg.textContent=head+'サーバへ送っています…'; }
+    _bjtPush().then(function(){
+      _bjtSyncState='ok';
+      if(msg){ msg.className='bjt-msg ok'; msg.textContent=head+'ほかのPCで開いても同じ設定になります。'; }
+      _bjtSyncLine();
+    }).catch(function(e){
+      _bjtSyncState='fail';
+      console.warn('[tune] サーバに保存できませんでした', e);
+      if(msg){ msg.className='bjt-msg ng';
+        msg.textContent='サーバに保存できませんでした。この画面とこのPCには反映していますが、ほかのPCには伝わっていません。しばらくして詳細からもう一度保存してください。'; }
+      _bjtSyncLine(); _bjtNotice();
+    });
+  }
+
   function buildTuneTab(panel){
     if(!panel||document.getElementById('bjtBody')) return;
     panel.innerHTML=''
@@ -17472,7 +17832,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<div class="bjt-lead">取り込んだ数値は、データ提供元が<b>設定1のコイン単価</b>で推定したものです。実際のホールは設定1だけで営業しないので、売上も粗利も過大に出ています。<br>'
       +'機種ごとに<b>正解のコイン単価</b>を入力すると、その比率で売上と粗利を補正します。粗利は<b>週トータルで黒字の機種は係数を掛け、赤字の機種は係数で割ります</b>（赤字は膨らむ向き。判定は店×機種×週のトータル）。<br>'
       +'一覧は法人の<b>20円スロット全店</b>から自動で作られ、新しい機種はデータを取り込むと「未入力」として現れます。毎回ゼロから入れ直す必要はありません。<br>'
-      +'単価は時期で変わるため、入力済みの機種を直すときは<b>いつから</b>（今週・先週・最初から）を選べます。最初の入力は全期間に効きます。<br>'
+      +'ふだんの作業は<b>一覧に単価を打って「保存して反映」</b>だけ（未入力の機種＝最初から／入力済み＝今週から、で自動的に効きます）。<br>'
+      +'時期を選んで切り替える・過去の単価を直す・経緯を見る、は行の<b>詳細</b>ボタンから。'
       +'アウトと差枚は触らないので<b>出玉率と勝率は変わりません</b>。空欄にして保存すると、その機種の補正を外します。</div>'
       +'<div class="bjt-bar">'
       +'<label>機種をさがす：<input id="bjtFind" type="text" placeholder="機種名の一部"></label>'
@@ -17487,7 +17848,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<div class="bjt-note" id="bjtSync" style="margin:0 0 12px;"></div>'
       +'<div class="bjt-sum" id="bjtSum"></div>'
       +'<div class="bjt-note" id="bjtSumNote" style="margin:-4px 0 14px;"></div>'
-      +'<div id="bjtBody"></div>';
+      +'<div id="bjtBody"></div>'
+      +'<div id="bjtPanelOv" class="bjtp-ov" style="display:none;"></div>';
+
+    // 詳細パネル: 背景クリックで閉じる（中身のクリックでは閉じない）
+    var pov=document.getElementById('bjtPanelOv');
+    if(pov) pov.addEventListener('click', function(ev){ if(ev.target===pov) _bjtPanelClose(); });
 
     var fi=document.getElementById('bjtFind');
     if(fi) fi.addEventListener('input', function(){ _bjtFind=fi.value; _bjtApplyFind(); });
@@ -17498,7 +17864,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var sv=document.getElementById('bjtSaveBtn');
     if(sv) sv.addEventListener('click', function(){ try{ _bjtApply(); }catch(e){ console.error('tune apply', e); } });
     var un=document.getElementById('bjtUndoBtn');
-    if(un) un.addEventListener('click', function(){ _bjtDraft={}; _bjtWhen={}; _bjtRender();
+    if(un) un.addEventListener('click', function(){ _bjtDraft={}; _bjtRender();
              var m=document.getElementById('bjtMsg'); if(m){ m.className='bjt-msg'; m.textContent='入力を取り消しました（保存済みの設定は残っています）。'; } });
     var cl=document.getElementById('bjtClearBtn');
     if(cl) cl.addEventListener('click', function(){
@@ -17507,7 +17873,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
              if(!confirm('入力済みの正解単価（'+n+' 機種・履歴を含む）を全部消して、\n素の数字に戻します。\n\nよろしいですか？')) return;
              window.BJ_TUNE={};
              _bjtRev++;                    // 遅れて届く読み込み結果に、この削除を戻させない
-             _bjtDraft={}; _bjtWhen={}; _bjtPersist();
+             _bjtDraft={}; _bjtPersist();
              try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
              _bjtAfterChange(); _bjtRender();
              var m=document.getElementById('bjtMsg');
@@ -17534,12 +17900,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         var m=document.getElementById('bjtMsg');
         if(m){ m.className='bjt-msg'; m.textContent='まだ保存していません。「保存して反映」を押すと画面全体に反映されます。'; }
       });
-      body.addEventListener('change', function(ev){
-        var el=ev.target; if(!el||!el.classList||!el.classList.contains('bjt-when')) return;
+      // 詳細パネルを開く
+      body.addEventListener('click', function(ev){
+        var el=ev.target; if(!el||!el.classList||!el.classList.contains('bjt-detail')) return;
         var i=+el.getAttribute('data-i'), r=_bjtRows[i];
-        if(!r) return;
-        _bjtWhen[r.name]=el.value;
-        _bjtQueueSummary();
+        if(r) _bjtPanelOpen(r.name);
       });
     }
   }
