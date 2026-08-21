@@ -1890,7 +1890,7 @@ const USER_LABEL = 'マタハリーさん専用';               // 例: '田中�
 const USER_ID = 'matahari';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260805-130219';
+const BJ_VERSION = '20260821-115001';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -18522,6 +18522,27 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       }
     });
   }
+  // 期間内データが空のとき: ドーナツの枠を隠して案内を出す。
+  // 空のまま放置すると前に見ていた店のグラフが残り、別の店のデータに見えてしまう
+  //（2026-08-21 コンコルドさん指摘: 豊田インターの配信が7/28で止まり、8月指定でパチンコ店の絵が残った）
+  function _bjCompEmptyMsg(show){
+    var grid=document.querySelector('.bj-comp-grid'); if(!grid) return;
+    var el=document.getElementById('bjCompEmpty');
+    if(!show){ if(el) el.style.display='none'; grid.style.display=''; return; }
+    if(!el){
+      el=document.createElement('div'); el.id='bjCompEmpty';
+      el.style.cssText='padding:26px 16px;text-align:center;color:var(--text2);font-size:13.5px;'
+        +'border:1px dashed var(--border);border-radius:8px;background:var(--card);margin-bottom:16px;line-height:1.9;';
+      grid.parentNode.insertBefore(el, grid);
+    }
+    var last='';
+    try{ (loadAllData()||[]).forEach(function(r){ if(r.date && r.date>last) last=r.date; }); }catch(e){}
+    el.innerHTML = '<b style="color:var(--text)">この期間のデータがありません。</b><br>'
+      + (last ? ('この店の配信データは <b>'+(+last.slice(5,7))+'/'+(+last.slice(8,10))+'</b> までです。期間の指定を変えるとグラフが表示されます。')
+              : 'この店にはまだデータが取り込まれていません。');
+    el.style.display='';
+    grid.style.display='none';
+  }
   function bjDrawComp(){
     if(bjDrawing) return;
     var basic=document.getElementById('bj-basic');
@@ -18535,10 +18556,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         cv.width=Math.round(w); cv.height=Math.round(h);
       });
       var agg=_bjCompAgg();
-      if(agg && Object.keys(agg).length){
+      var hasData = !!(agg && Object.keys(agg).length);
+      try{ _bjCompEmptyMsg(!hasData); }catch(e){}
+      if(hasData){
         bjPChart=_bjDonut('modelProfitChart', _bjComp(agg,'profit',true),  bjPChart);
         bjOChart=_bjDonut('modelINChart',     _bjComp(agg,'inmai', false), bjOChart);
         bjTChart=_bjDonut('modelTaiChart',    _bjComp(agg,'tai',   false), bjTChart);
+      } else {
+        // 前の店のチャートを必ず破棄する（インスタンスが生きていると後から再描画されて絵が蘇る）
+        [['modelProfitChart',bjPChart],['modelINChart',bjOChart],['modelTaiChart',bjTChart]].forEach(function(p){
+          if(p[1]){ try{ p[1].destroy(); }catch(e){} }
+          var cv=document.getElementById(p[0]);
+          if(cv){ try{ cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }catch(e){} }
+        });
+        bjPChart=bjOChart=bjTChart=null;
       }
     }catch(e){}
     bjDrawing=false;
