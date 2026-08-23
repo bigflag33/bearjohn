@@ -1715,12 +1715,12 @@ const JAPAN_HOLIDAYS = new Set([
   '2025-11-03','2025-11-23','2025-11-24',
   // 2026
   '2026-01-01','2026-01-12','2026-02-11','2026-02-23',
-  '2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05',
+  '2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06',
   '2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23',
   '2026-10-12','2026-11-03','2026-11-23',
   // 2027
   '2027-01-01','2027-01-11','2027-02-11','2027-02-23',
-  '2027-03-21','2027-04-29','2027-05-03','2027-05-04','2027-05-05',
+  '2027-03-21','2027-03-22','2027-04-29','2027-05-03','2027-05-04','2027-05-05',
   '2027-07-19','2027-08-11','2027-09-20','2027-09-23',
   '2027-10-11','2027-11-03','2027-11-23',
 ]);
@@ -1890,7 +1890,7 @@ const USER_LABEL = '北上文化さん専用';               // 例: '田中さ�
 const USER_ID = 'kitakami';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260821-115001';
+const BJ_VERSION = '20260823-140823';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2088,7 +2088,9 @@ function _invalidateLoadAllCache() {
 //   レコードの日付が属する週で版を選ぶので、過去に入れた値は過去のまま動かない。
 //
 // アウト(IN枚数)と差枚は触らないので出玉率・勝率は不変。機種ごとの粗利率も不変。
-// パチンコ（店舗名が（4P）で終わる店）はコイン単価の話ではないので対象外。
+// 部門は2つ（2026-08-28 パチンコ対応）: 20円スロット＝コイン単価／4円パチンコ＝玉単価。
+//   マスタも推定単価のプールも部門ごとに完全に分ける（同名機種があっても互いに影響しない）。
+//   店舗名の末尾（4P）でパチンコの店と判定する。計算式・週の区切り・黒×赤÷のルールは両部門で同一。
 // 設定が空のときは元の配列をそのまま返すため、従来と完全に同じ動きになる。
 window.BJ_TUNE = window.BJ_TUNE || {};
 
@@ -2100,6 +2102,15 @@ function bjTuneModels() {
   if (!T || T.v !== 2 || !T.models || typeof T.models !== 'object') return {};
   return T.models;
 }
+// パチンコ部門のマスタ（玉単価）。models と同じ形で BJ_TUNE.pachi に持つ
+function bjTunePachi() {
+  const T = window.BJ_TUNE;
+  if (!T || T.v !== 2 || !T.pachi || typeof T.pachi !== 'object') return {};
+  return T.pachi;
+}
+// 部門→マスタ／店→部門
+function bjTuneDeptOf(store) { return bjTuneIsPachi(store && store.name) ? '4P' : '20S'; }
+function bjTuneDeptModels(dept) { return dept === '4P' ? bjTunePachi() : bjTuneModels(); }
 
 // その日が属する週の月曜。日付文字列ごとにメモ化（レコード数ぶん呼ばれるため）
 const _bjTuneMonCache = {};
@@ -2132,30 +2143,33 @@ function bjTunePriceAt(entry, dateStr) {
   return (isFinite(p) && p > 0) ? p : null;
 }
 
-// パチンコ店（店舗名の末尾が（4P））は対象外
+// パチンコ店（店舗名の末尾が（4P））の判定
 function bjTuneIsPachi(name) { return /[（(]4P[）)]\s*$/.test(String(name || '')); }
 
-// 推定単価の合算対象＝法人の20円スロット店（ベンチマーク・システム店舗・パチンコは除く）
-function _bjTuneCorpStores() {
+// 推定単価の合算対象＝その部門の店だけ（ベンチマーク・システム店舗は除く）
+function _bjTuneCorpStores(dept) {
   const skip = { 'デフォルト店舗': 1, '機種フォーマッタテスト店舗': 1 };
+  const wantPachi = (dept === '4P');
   const out = [];
   try {
     (typeof getStores === 'function' ? (getStores() || []) : []).forEach(s => {
-      if (s && s.name && s.id !== '__benchmark__' && !skip[s.name] && !bjTuneIsPachi(s.name)) out.push(s);
+      if (s && s.name && s.id !== '__benchmark__' && !skip[s.name] && bjTuneIsPachi(s.name) === wantPachi) out.push(s);
     });
   } catch (e) {}
   return out;
 }
 
-// 週ごとの推定単価表（全店合算・全機種）。key = 機種名|週の月曜
+// 週ごとの推定単価表（部門の全店合算・全機種）。key = 機種名|週の月曜
 // データが増えたら作り直す（店数＋総レコード数で判定）。設定を変えても表は変わらない
-let _bjTuneEstCache = { key: '', tbl: null };
-function bjTuneCorpEst() {
-  const stores = _bjTuneCorpStores();
+let _bjTuneEstCache = {};   // 部門ごとに {key, tbl}
+function bjTuneCorpEst(dept) {
+  dept = dept === '4P' ? '4P' : '20S';
+  const stores = _bjTuneCorpStores(dept);
   let total = 0;
   stores.forEach(s => { total += ((typeof DB_CACHE !== 'undefined' && DB_CACHE[s.key]) || []).length; });
   const key = stores.length + '|' + total + '|' + _bjDataGen;
-  if (_bjTuneEstCache.tbl && _bjTuneEstCache.key === key) return _bjTuneEstCache.tbl;
+  const c = _bjTuneEstCache[dept];
+  if (c && c.tbl && c.key === key) return c.tbl;
   const tbl = {};
   stores.forEach(s => {
     const rr = (typeof DB_CACHE !== 'undefined' && DB_CACHE[s.key]) || [];
@@ -2167,7 +2181,7 @@ function bjTuneCorpEst() {
       e.s += r['台売上'] || 0; e.o += r['IN枚数'] || 0;
     }
   });
-  _bjTuneEstCache = { key: key, tbl: tbl };
+  _bjTuneEstCache[dept] = { key: key, tbl: tbl };
   return tbl;
 }
 
@@ -2197,11 +2211,12 @@ function _bjTuneSignTable(records, models) {
 }
 
 // 補正の本体。models を差し替えられる形＝保存前のプレビューでも同じ計算を使う
+// models はその店の部門のマスタを渡すこと（スロット店にパチンコのマスタを渡さない）
 function _bjApplyTuneWith(records, store, models) {
-  // 業界ベンチマークは他社比較の物差しなので補正しない。パチンコ店も対象外
-  if (!store || store.id === '__benchmark__' || bjTuneIsPachi(store.name)) return records;
+  // 業界ベンチマークは他社比較の物差しなので補正しない
+  if (!store || store.id === '__benchmark__') return records;
   if (!models || !Object.keys(models).length) return records;   // 設定なし＝素のまま（同じ配列を返す）
-  const est = bjTuneCorpEst();   // 全店合算＝店固有のスケール差を消さない
+  const est = bjTuneCorpEst(bjTuneDeptOf(store));   // 部門の全店合算＝店固有のスケール差を消さない
   const sign = _bjTuneSignTable(records, models);   // 符号はこの店の週トータルで見る
   return records.map(r => {
     const a = _bjTuneFactorFor(r, models, est);
@@ -2215,14 +2230,15 @@ function _bjApplyTuneWith(records, store, models) {
   });
 }
 
-function _bjApplyTune(records, store) { return _bjApplyTuneWith(records, store, bjTuneModels()); }
+function _bjApplyTune(records, store) { return _bjApplyTuneWith(records, store, bjTuneDeptModels(bjTuneDeptOf(store))); }
 
 // 合計だけ欲しい場面（保存前の「店全体への影響」）用。配列を複製せず合計だけ出す
+// models はその店の部門のマスタを渡すこと
 function bjTuneTotals(records, store, models) {
   const t = { s0: 0, p0: 0, s1: 0, p1: 0 };
-  const on = store && store.id !== '__benchmark__' && !bjTuneIsPachi(store.name)
+  const on = store && store.id !== '__benchmark__'
              && models && Object.keys(models).length;
-  const est = on ? bjTuneCorpEst() : null;
+  const est = on ? bjTuneCorpEst(bjTuneDeptOf(store)) : null;
   const sign = on ? _bjTuneSignTable(records, models) : null;
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
@@ -15033,6 +15049,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
                background:var(--card); color:var(--text); font-size:12.5px; }
   .bjt-bar input[type=text]{ width:180px; }
   .bjt-sp{ flex:1 1 auto; }
+  .bjt-deptsw{ display:inline-flex; border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+  .bjt-deptsw button{ padding:6px 14px; border:0; background:var(--card); color:var(--text2);
+                      font-size:12.5px; cursor:pointer; }
+  .bjt-deptsw button+button{ border-left:1px solid var(--border); }
+  .bjt-deptsw button.on{ background:var(--accent); color:#fff; }
   .bjt-btn{ padding:6px 14px; border:1px solid var(--border); border-radius:4px; background:var(--card);
             color:var(--text); font-size:12.5px; cursor:pointer; }
   .bjt-btn:hover{ border-color:var(--accent); }
@@ -15149,7 +15170,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
       if(room==='briefing'){ _bjbRetry=0; try{ _bjbRender(); }catch(e){ console.error('briefing', e); } }   // AIの朝礼：開くたび生成（メモ化済みで軽い）
       if(room==='weekly'){ _bjwkRetry=0; try{ _bjwkRender(); }catch(e){ console.error('weekly', e); } }   // AIの週報：開くたび生成
-      if(room==='tune'){ _bjtRetry=0; try{ _bjtRender(); }catch(e){ console.error('tune', e); } }         // 機種別チューニング：開くたび実績を集計
+      if(room==='tune'){ _bjtRetry=0; try{ _bjtSyncDeptToStore(); _bjtRender(); }catch(e){ console.error('tune', e); } }   // 機種別チューニング：開くたび表示中の店の部門に合わせて集計
     };
     if(needHeavy){ _bjShowLoading(); setTimeout(function(){ try{ work(); } finally { _bjHideLoading(); } }, 60); }   // 60ms＝オーバーレイ描画を待ってから重い処理（rAFは裏タブで止まるため不使用）
     else { work(); }
@@ -17073,7 +17094,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   //           「いまの設定」列に現在値・経緯の要約・保存すると何になるかを常時表示
   //  ・詳細パネル … 経緯の表（適用期間・単価の打ち替え・係数・×削除・←いま印）＋
   //           新しい単価を積む（今週／週を指定／最初から）＋保存前の説明文。その機種だけ即保存
-  var _bjtRetry=0, _bjtDraft={}, _bjtFind='', _bjtOnlyEmpty=false, _bjtShowAll=false,
+  var _bjtDept='20S',   // 表示中の部門（'20S'=スロット/'4P'=パチンコ）。タブを開くたび表示中の店の部門に合わせる
+      _bjtRetry=0, _bjtDraft={}, _bjtFind='', _bjtOnlyEmpty=false, _bjtShowAll=false,
       _bjtStat=null, _bjtStatKey='', _bjtSumT=null, _bjtRows=[],   // _bjtRows＝描画した行の並び（入力欄のdata-iはこれを指す）
       _bjtPanel=null;   // 詳細パネルの編集状態 {name, stages:[{from,price,del}], newPrice, newWhen, newDate}
 
@@ -17090,7 +17112,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return out;
   }
   // 20円スロットの店だけが対象（パチンコ＝（4P）はコイン単価の話ではない）
-  function _bjtSlotStores(){ return _bjtAllStores().filter(function(s){ return !bjTuneIsPachi(s.name); }); }
+  // 表示中の部門の店だけ（'20S'=スロット/'4P'=パチンコ）
+  function _bjtDeptStores(){ var p=(_bjtDept==='4P'); return _bjtAllStores().filter(function(s){ return bjTuneIsPachi(s.name)===p; }); }
+  // 表示中の部門のマスタ・単価の呼び名
+  function _bjtM(){ return bjTuneDeptModels(_bjtDept); }
+  function _bjtTankaName(){ return _bjtDept==='4P' ? '玉単価' : 'コイン単価'; }
+  function _bjtDeptName(){ return _bjtDept==='4P' ? 'パチンコ（4円）' : 'スロット（20円）'; }
+  // タブを開いたとき、表示中の店の部門に合わせる（部門が変わったら入力中の値は捨てる）
+  function _bjtSyncDeptToStore(){
+    var d='20S';
+    try{ d=bjTuneDeptOf(_activeStore()); }catch(e){}
+    if(d!==_bjtDept){ _bjtDept=d; _bjtDraft={}; }
+    var sw=document.getElementById('bjtDeptSw');
+    if(sw) sw.querySelectorAll('button').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-d')===_bjtDept); });
+  }
 
   function _bjtLsKey(){ return (typeof USER_ID!=='undefined'?USER_ID:'admin')+'_bj_tune'; }
   function _bjtEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -17184,13 +17219,21 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         // 読み込んでいる間にこのPCで保存されたら、こちらの方が新しい＝返事は捨てる（保存を消さないため）
         if(rev!==_bjtRev){ _bjtSyncState='ok'; _bjtNotice();
           if(window._bjRoom==='tune'){ try{ _bjtSyncLine(); }catch(e){} } return; }
-        var models=null, meta=null;
+        var models=null, pachi=null, meta=null;
         (j.items||[]).forEach(function(it){
           // 旧方式（kind='coin'/'coinmeta'＝基準店の係数）は読まない。新方式で入れ直す
-          if(it.kind!=='coinv2') return;
-          try{ var v=JSON.parse(it.value); if(v && typeof v==='object'){ models=v; meta={at:it.updatedAt, by:it.updatedBy}; } }catch(e){}
+          // coinv2=スロット（コイン単価）／coinv2p=パチンコ（玉単価）
+          if(it.kind!=='coinv2' && it.kind!=='coinv2p') return;
+          try{
+            var v=JSON.parse(it.value);
+            if(v && typeof v==='object'){
+              if(it.kind==='coinv2') models=v; else pachi=v;
+              if(!meta || String(it.updatedAt||'')>String(meta.at||'')) meta={at:it.updatedAt, by:it.updatedBy};
+            }
+          }catch(e){}
         });
-        var next=(models && Object.keys(models).length) ? {v:2, models:models} : {};
+        var hasAny=(models && Object.keys(models).length) || (pachi && Object.keys(pachi).length);
+        var next=hasAny ? {v:2, models:(models||{}), pachi:(pachi||{})} : {};
         var before=JSON.stringify(window.BJ_TUNE||{});
         window.BJ_TUNE=next; _bjtMeta=meta; _bjtPersist();
         _bjtSyncState='ok';
@@ -17212,9 +17255,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 
   function _bjtPush(){
     if(!_bjtApiEnabled()) return Promise.reject(new Error('local'));
+    // スロットとパチンコは別の箱に保存する（片方の保存が他方を消さない）
     return _bjtCall('settings',{method:'PUT',headers:{'content-type':'application/json'},
       body:JSON.stringify({kind:'coinv2', scope:'*', value:JSON.stringify(bjTuneModels()), updatedBy:_bjtWho()})})
-      .then(function(r){ if(!r.ok) throw new Error('put '+r.status); });
+      .then(function(r){ if(!r.ok) throw new Error('put '+r.status); })
+      .then(function(){
+        return _bjtCall('settings',{method:'PUT',headers:{'content-type':'application/json'},
+          body:JSON.stringify({kind:'coinv2p', scope:'*', value:JSON.stringify(bjTunePachi()), updatedBy:_bjtWho()})});
+      })
+      .then(function(r){ if(!r.ok) throw new Error('put p '+r.status); });
   }
 
   window._bjtSyncNow=function(){ try{ return _bjtPull(); }catch(e){ return Promise.resolve(); } };
@@ -17235,13 +17284,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     el.className='bjt-note'+(_bjtSyncState==='fail'?' ng':'');
   }
 
-  // ── 集計（法人の20円スロット全店・機種ごと・素の値）──────────────────
-  // 一覧も推定単価もここから作る。キーは店数＋総レコード数＝取り込みがあれば自動で作り直す
+  // ── 集計（表示中の部門の全店・機種ごと・素の値）──────────────────
+  // 一覧も推定単価もここから作る。キーは部門＋店数＋総レコード数＝取り込みがあれば自動で作り直す
   function _bjtStats(){
-    var stores=_bjtSlotStores(), total=0;
+    var stores=_bjtDeptStores(), total=0;
     var recsOf=function(s){ return (typeof DB_CACHE!=='undefined' && DB_CACHE[s.key])||[]; };
     stores.forEach(function(s){ total+=recsOf(s).length; });
-    var key=stores.length+'|'+total+'|'+(typeof _bjDataGen!=='undefined'?_bjDataGen:0);
+    var key=_bjtDept+'|'+stores.length+'|'+total+'|'+(typeof _bjDataGen!=='undefined'?_bjDataGen:0);
     if(_bjtStat && _bjtStatKey===key) return _bjtStat;
     var last='';
     stores.forEach(function(s){ var rr=recsOf(s); for(var i=0;i<rr.length;i++){ var d=rr[i].date; if(d&&d>last) last=d; } });
@@ -17284,7 +17333,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return _bjtStat;
   }
 
-  function _bjtSavedEntry(name){ var M=bjTuneModels(); return M[name]||null; }
+  function _bjtSavedEntry(name){ var M=_bjtM(); return M[name]||null; }   // 表示中の部門のマスタから
   // いま効いている正解単価（最新データ日の週のもの）
   function _bjtCurPrice(entry){
     var st=_bjtStat;   // render中は必ず計算済み
@@ -17297,9 +17346,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return _bjtSavedEntry(name) ? bjTuneMonday(_bjtToday()) : '';
   }
 
+  // 表示中の部門のマスタを差し替えた保存形を作る（もう片方の部門はそのまま）
+  function _bjtComposeSave(deptDict){
+    var slots = (_bjtDept==='4P') ? bjTuneModels() : deptDict;
+    var pachi = (_bjtDept==='4P') ? deptDict : bjTunePachi();
+    var any = Object.keys(slots).length || Object.keys(pachi).length;
+    return any ? {v:2, models:slots, pachi:pachi} : {};
+  }
+
   // 下書き（一覧の入力）を反映した機種マスタ（保存前のプレビューと保存の両方で使う）
+  // 表示中の部門のぶんだけを組み立てる
   function _bjtNextModels(){
-    var M=bjTuneModels(), out={}, n, bad=[];
+    var M=_bjtM(), out={}, n, bad=[];
     for(n in M) out[n]={vers:(M[n].vers||[]).slice()};
     for(n in _bjtDraft){
       var raw=String(_bjtDraft[n]==null?'':_bjtDraft[n]).trim();
@@ -17356,28 +17414,30 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var recent=st.rows.filter(function(r){ return r.recent; });
     var nAll=recent.length, nIn=0, outAll=0, outIn=0;
     recent.forEach(function(r){ outAll+=r.o30; if(M[r.name]){ nIn++; outIn+=r.o30; } });
-    var s=null, eff=null, pachi=false;
+    var s=null, eff=null, otherDept=false;
     try{ s=_activeStore(); }catch(e){}
-    if(s && bjTuneIsPachi(s.name)) pachi=true;
-    if(s && s.id!=='__benchmark__' && !pachi){
+    // 表示中の店が別部門なら、この部門の影響はその店には出ない
+    if(s && s.id!=='__benchmark__' && bjTuneDeptOf(s)!==_bjtDept) otherDept=true;
+    if(s && s.id!=='__benchmark__' && !otherDept){
       var recs=(typeof DB_CACHE!=='undefined' && DB_CACHE[s.key])||[];
       eff=bjTuneTotals(recs, s, M);
     }
-    return {nAll:nAll, nIn:nIn, outAll:outAll, outIn:outIn, eff:eff, store:(s&&s.name)||'', pachi:pachi};
+    return {nAll:nAll, nIn:nIn, outAll:outAll, outIn:outIn, eff:eff, store:(s&&s.name)||'', otherDept:otherDept};
   }
 
   function _bjtPaintSummary(){
     var el=document.getElementById('bjtSum'); if(!el) return;
     var s=_bjtSummary();
     var cov=s.outAll>0 ? (s.outIn/s.outAll*100) : 0;
+    var deptStores=(_bjtDept==='4P')?'パチンコ全店':'スロット全店';
     var h=''
-      +'<div class="c"><div class="k">単価の入力状況</div><div class="v">'+s.nIn+' / '+s.nAll+' 機種</div>'
-      +'<div class="d">直近1ヶ月に稼働のある機種（20円スロット全店）</div></div>'
+      +'<div class="c"><div class="k">単価の入力状況（'+_bjtDeptName()+'）</div><div class="v">'+s.nIn+' / '+s.nAll+' 機種</div>'
+      +'<div class="d">直近1ヶ月に稼働のある機種（'+deptStores+'）</div></div>'
       +'<div class="c"><div class="k">アウトのカバー率</div><div class="v">'+cov.toFixed(1)+' %</div>'
       +'<div class="d">入力済みの機種が直近30日のアウトに占める割合。上位の機種から入れると早く上がります</div></div>';
-    if(s.pachi){
-      h+='<div class="c"><div class="k">表示中の店（'+_bjtEsc(s.store)+'）</div><div class="v">対象外</div>'
-        +'<div class="d">パチンコの店はコイン単価の補正対象外です。数字は変わりません</div></div>';
+    if(s.otherDept){
+      h+='<div class="c"><div class="k">表示中の店（'+_bjtEsc(s.store)+'）</div><div class="v">別部門</div>'
+        +'<div class="d">いま編集しているのは'+_bjtDeptName()+'です。この店への影響は、'+((_bjtDept==='4P')?'パチンコ':'スロット')+'の店を表示すると出ます</div></div>';
     } else if(s.eff && !s.eff.s0 && !s.eff.p0){
       h+='<div class="c"><div class="k">表示中の店（'+_bjtEsc(s.store)+'）</div><div class="v">データなし</div>'
         +'<div class="d">画面上部で店を切り替えると、その店への影響がここに出ます</div></div>';
@@ -17393,7 +17453,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var note=document.getElementById('bjtSumNote');
     if(note){
       note.innerHTML='「表示中の店」は画面上部で選んでいる店（'+_bjtEsc(s.store||'—')+'）です。'
-        +'入力した単価は法人の20円スロット全店に同じように効きます。下書き（未保存の入力）も含めた見込みです。';
+        +'入力した'+_bjtTankaName()+'は法人の'+deptStores+'に同じように効きます。下書き（未保存の入力）も含めた見込みです。';
     }
   }
   function _bjtQueueSummary(){
@@ -17545,7 +17605,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     html+='</tbody></table>';
     host.innerHTML='<div class="bjt-tablewrap">'+html+'</div>'
       +'<div class="bjt-note">'
-      +'台数・アウト計・売上計・台粗利・推定単価は<b>直近30日（20円スロット全店の合算）</b>の数字です。<br>'
+      +'台数・アウト計・売上計・台粗利・推定単価は<b>直近30日（'+_bjtDeptName()+'の全店合算）</b>の数字です。<br>'
       +'一覧の入力は、未入力の機種＝<b>最初から（全期間）</b>／入力済みの機種＝<b>今週から</b>で効きます（「いまの設定」に予告が出ます）。'
       +'時期を選びたい・過去を直したい・経緯を見たいときは行の<b>詳細</b>ボタンへ。<br>'
       +'このデータの範囲：〜 '+(st.last||'—')+'　／　直近30日は '+(st.from30||'—')+' 以降　／　対象 '+st.stores+' 店'
@@ -17592,7 +17652,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         if(a<0.5||a>1.5) warn.push(n+'：係数 '+a.toFixed(3)+' は極端です。入力の打ち間違いがないかご確認ください');
       }
     });
-    window.BJ_TUNE = Object.keys(nx.models).length ? {v:2, models:nx.models} : {};
+    window.BJ_TUNE = _bjtComposeSave(nx.models);   // 表示中の部門だけ差し替え（もう片方は無傷）
     _bjtRev++;                    // 遅れて届く読み込み結果に、この保存を消させない
     var ok=_bjtPersist();
     _bjtDraft={};
@@ -17652,7 +17712,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var el=document.getElementById('bjTuneNotice');
     if(!el){ el=document.createElement('div'); el.id='bjTuneNotice'; el.className='bjt-notice';
              nav.parentNode.insertBefore(el, nav.nextSibling); }
-    var names=Object.keys(bjTuneModels());
+    var names=Object.keys(bjTuneModels()).concat(Object.keys(bjTunePachi()));   // 両部門ぶん
     // サーバから読めなかったときは、黙って違う数字を見せない＝必ず知らせる
     if(_bjtSyncState==='fail'){
       el.style.display='';
@@ -17742,7 +17802,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     ov.innerHTML=''
       +'<div class="bjtp"><div class="bjtp-hd">'
       +'<div class="bjtp-name">'+_bjtEsc(P.name)+'</div>'
-      +'<div class="bjtp-meta">推定単価（直近30日・全店合算） '+(r&&r.price?r.price.toFixed(2):'—')+'円'
+      +'<div class="bjtp-meta">推定'+_bjtTankaName()+'（直近30日・'+_bjtDeptName()+'の全店合算） '+(r&&r.price?r.price.toFixed(2):'—')+'円'
       +(r&&r.units?('　／　設置 '+r.units+'台'):'')+'</div></div>'
       +'<div class="bjtp-bd">'
       +'<div class="bjtp-sec">これまでの設定（経緯）— 過去の単価はこの表の欄を打ち替えるだけで直せます</div>'
@@ -17794,11 +17854,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var P=_bjtPanel; if(!P) return;
     var bv=_bjtPanelBuildVers(P.stages, P.newPrice, P.newWhen, P.newDate);
     if(bv.bad.length){ _bjtPanelPreviewRepaint(); return; }   // 問題はプレビュー欄に赤字で出る
-    var M=bjTuneModels(), next={}, n;
+    var M=_bjtM(), next={}, n;
     for(n in M) next[n]={vers:(M[n].vers||[]).slice(), at:M[n].at};
     if(bv.vers===null) delete next[P.name];
     else next[P.name]={vers:bv.vers, at:_bjtNow()};
-    window.BJ_TUNE = Object.keys(next).length ? {v:2, models:next} : {};
+    window.BJ_TUNE = _bjtComposeSave(next);   // 表示中の部門だけ差し替え
     _bjtRev++;                    // 遅れて届く読み込み結果に、この保存を消させない
     _bjtPersist();
     try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
@@ -17829,13 +17889,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(!panel||document.getElementById('bjtBody')) return;
     panel.innerHTML=''
       +'<div class="bjt-head"><div class="bj-wordmark" style="font-size:21px;">MODEL TUNING</div></div>'
-      +'<div class="bjt-lead">取り込んだ数値は、データ提供元が<b>設定1のコイン単価</b>で推定したものです。実際のホールは設定1だけで営業しないので、売上も粗利も過大に出ています。<br>'
-      +'機種ごとに<b>正解のコイン単価</b>を入力すると、その比率で売上と粗利を補正します。粗利は<b>週トータルで黒字の機種は係数を掛け、赤字の機種は係数で割ります</b>（赤字は膨らむ向き。判定は店×機種×週のトータル）。<br>'
-      +'一覧は法人の<b>20円スロット全店</b>から自動で作られ、新しい機種はデータを取り込むと「未入力」として現れます。毎回ゼロから入れ直す必要はありません。<br>'
-      +'ふだんの作業は<b>一覧に単価を打って「保存して反映」</b>だけ（未入力の機種＝最初から／入力済み＝今週から、で自動的に効きます）。<br>'
-      +'時期を選んで切り替える・過去の単価を直す・経緯を見る、は行の<b>詳細</b>ボタンから。'
+      +'<div class="bjt-lead">取り込んだ数値は、データ提供元が想定単価（スロットは<b>設定1のコイン単価</b>）で推定したものです。実際のホールの営業とはズレるので、売上も粗利も実態と差が出ます。<br>'
+      +'機種ごとに<b>正解の単価</b>（スロット＝コイン単価／パチンコ＝玉単価）を入力すると、その比率で売上と粗利を補正します。粗利は<b>週トータルで黒字の機種は係数を掛け、赤字の機種は係数で割ります</b>（赤字は膨らむ向き。判定は店×機種×週のトータル）。<br>'
+      +'部門は上の<b>スロット／パチンコ</b>で切り替えます（タブを開くと表示中の店の部門になります）。設定は部門ごとに別々で、互いに影響しません。<br>'
+      +'一覧は選んだ部門の<b>全店</b>から自動で作られ、新しい機種はデータを取り込むと「未入力」として現れます。毎回ゼロから入れ直す必要はありません。<br>'
+      +'ふだんの作業は<b>一覧に単価を打って「保存して反映」</b>だけ（未入力の機種＝最初から／入力済み＝今週から、で自動的に効きます）。'
+      +'時期を選んで切り替える・過去の単価を直す・経緯を見る、は行の<b>詳細</b>ボタンから。<br>'
       +'アウトと差枚は触らないので<b>出玉率と勝率は変わりません</b>。空欄にして保存すると、その機種の補正を外します。</div>'
       +'<div class="bjt-bar">'
+      +'<span class="bjt-deptsw" id="bjtDeptSw">'
+      +'<button type="button" data-d="20S" class="on">スロット（20円）</button>'
+      +'<button type="button" data-d="4P">パチンコ（4円）</button>'
+      +'</span>'
       +'<label>機種をさがす：<input id="bjtFind" type="text" placeholder="機種名の一部"></label>'
       +'<label><input id="bjtOnlyEmpty" type="checkbox"> 未入力の機種だけ表示</label>'
       +'<label><input id="bjtShowAll" type="checkbox"> 直近1ヶ月に稼働のない機種も表示</label>'
@@ -17855,6 +17920,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var pov=document.getElementById('bjtPanelOv');
     if(pov) pov.addEventListener('click', function(ev){ if(ev.target===pov) _bjtPanelClose(); });
 
+    // 部門切替（スロット/パチンコ）。入力中の値は部門をまたげないので捨てる
+    var dsw=document.getElementById('bjtDeptSw');
+    if(dsw) dsw.addEventListener('click', function(ev){
+      var b=ev.target.closest('button'); if(!b) return;
+      var d=b.getAttribute('data-d');
+      if(d===_bjtDept) return;
+      var hadDraft=Object.keys(_bjtDraft).length>0;
+      _bjtDept=d; _bjtDraft={};
+      dsw.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-d')===d); });
+      _bjtRender();
+      var m=document.getElementById('bjtMsg');
+      if(m){ m.className='bjt-msg'; m.textContent=_bjtDeptName()+'に切り替えました。'+(hadDraft?'入力中の値は取り消しました（保存済みは残っています）。':''); }
+    });
+
     var fi=document.getElementById('bjtFind');
     if(fi) fi.addEventListener('input', function(){ _bjtFind=fi.value; _bjtApplyFind(); });
     var oe=document.getElementById('bjtOnlyEmpty');
@@ -17868,10 +17947,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
              var m=document.getElementById('bjtMsg'); if(m){ m.className='bjt-msg'; m.textContent='入力を取り消しました（保存済みの設定は残っています）。'; } });
     var cl=document.getElementById('bjtClearBtn');
     if(cl) cl.addEventListener('click', function(){
-             var n=Object.keys(bjTuneModels()).length;
-             if(!n){ var m0=document.getElementById('bjtMsg'); if(m0){ m0.className='bjt-msg'; m0.textContent='入力済みの単価はありません。'; } return; }
-             if(!confirm('入力済みの正解単価（'+n+' 機種・履歴を含む）を全部消して、\n素の数字に戻します。\n\nよろしいですか？')) return;
-             window.BJ_TUNE={};
+             var n=Object.keys(_bjtM()).length;   // 消すのは表示中の部門だけ（もう片方は無傷）
+             if(!n){ var m0=document.getElementById('bjtMsg'); if(m0){ m0.className='bjt-msg'; m0.textContent='この部門に入力済みの単価はありません。'; } return; }
+             if(!confirm(_bjtDeptName()+'の入力済み単価（'+n+' 機種・履歴を含む）を全部消して、\n素の数字に戻します。もう片方の部門の設定は残ります。\n\nよろしいですか？')) return;
+             window.BJ_TUNE=_bjtComposeSave({});
              _bjtRev++;                    // 遅れて届く読み込み結果に、この削除を戻させない
              _bjtDraft={}; _bjtPersist();
              try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
