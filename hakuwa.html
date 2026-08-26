@@ -1890,7 +1890,7 @@ const USER_LABEL = '伯和さん専用';               // 例: '田中さん専�
 const USER_ID = 'hakuwa';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260824-065025';
+const BJ_VERSION = '20260827-084210';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2975,7 +2975,6 @@ function parseOneFile(file) {
         });
 
         const newRecords = [];
-        const currentAdded = getAddedData();
         const addedDatesSet = new Set();
 
         for (let i = 1; i < rows.length; i++) {
@@ -2997,10 +2996,10 @@ function parseOneFile(file) {
           const num = Number(r[col]) || 0;
           if (!num) continue;
 
-          // 重複チェック
-          const key = date + '_' + num;
-          if (currentAdded.some(d => d.date === date && d['台番'] === num)) continue;
-          // 上田インター(default)の場合のみRAW_DATAと重複チェック
+          // 既存データとの重複スキップは廃止（2026-08-26）: 同じ日付は handleUpload 側で
+          // 「最新版に丸ごと差し替え」するため、ここで落とすと差し替え用の新データが消えてしまう。
+          // ※旧チェックは4Pファイル（解析後に「店名（4P）」へ振替）には効いておらず二重計上事故の原因だった
+          // 上田インター(default)の場合のみRAW_DATAと重複チェック（RAW_DATAは差し替え対象外のため維持）
           const store = _activeStore();
           if (store.id === 'ueda' && RAW_DATA.some(d => d.date === date && d['台番'] === num)) continue;
 
@@ -3148,8 +3147,10 @@ async function handleUpload(event) {
   }
 
   let totalAdded = 0;
-  const summaries = []; // { storeName, dates, count }
+  const summaries = []; // { storeName, dates, count, replaced }
   const errors = [];
+  // 同日差し替えの確認はアップロード操作ごとに1回だけ（null=未確認 / true=承認 / false=拒否）
+  let replaceConfirmed = null;
   // ファイル名で店舗が判別できなかったファイルをエラーリストに追加（処理は一切行わない）
   for (const fn of rejectedFiles) {
     errors.push(`${fn}: ファイル名から店舗を判別できません。ファイル名の先頭を店舗名にしてください（例：${getStores().filter(s=>s.name&&s.name!=='業界ベンチマーク')[0]?.name||'店舗名'}_YYYYMMDD.xlsx）。アップロードを中止しました。`);
@@ -3157,11 +3158,7 @@ async function handleUpload(event) {
   let lastStore = _activeStore();
 
   for (const { store, files: groupFiles } of Object.values(storeGroups)) {
-    // この店舗のデータを取得（重複チェック用）— DB_CACHE はすでにロード済み
-    const existingAdded = DB_CACHE[store.key] || [];
-    const baseData = store.id === 'ueda' ? RAW_DATA : [];
-
-    // ファイル解析（_activeStoreを一時的にこの店舗にして重複チェック）
+    // ファイル解析（_activeStore を一時的にこの店舗へ。parseOneFile内の上田インターRAW_DATA特例が参照する）
     const origStoreId = localStorage.getItem(_NS + 'bi_active_store');
     localStorage.setItem(_NS + 'bi_active_store', store.id);
 
@@ -3183,7 +3180,7 @@ async function handleUpload(event) {
       if (result.status === 'fulfilled') {
         const { addedDates: aDates, count, records, name, isMonthly, isPachinko } = result.value;
         if (count === 0) {
-          errors.push(`${name}: 重複またはデータなし`);
+          errors.push(`${name}: データなし`);
         } else {
           // 4円パチンコは「店舗名（4P）」として別店舗に振り分け
           let tStore = store;
@@ -3192,7 +3189,6 @@ async function handleUpload(event) {
           }
           if (!targetMap[tStore.id]) targetMap[tStore.id] = { store: tStore, records: [], dates: [] };
           targetMap[tStore.id].records.push(...records);
-          totalAdded += count;
           if (isMonthly && aDates && aDates.length) {
             targetMap[tStore.id].dates.push(`${aDates[0].slice(5)}〜${aDates[aDates.length-1].slice(5)}(${aDates.length}日)`);
           } else if (aDates && aDates.length) {
@@ -3206,10 +3202,62 @@ async function handleUpload(event) {
 
     for (const { store: tStore, records: tRecords, dates: tDates } of Object.values(targetMap)) {
       if (tRecords.length > 0) {
-        const prev = DB_CACHE[tStore.key] || [];
-        const merged = [...prev, ...tRecords];
+        // 同一バッチ内の重複（同じファイルを2回選んだ等）は後勝ちで1件に畳む
+        const uniq = new Map();
+        for (const r of tRecords) uniq.set(r.date + '|' + r['台番'], r);
+        let newRecs = [...uniq.values()];
+        // 既存データはメモリ→IndexedDBの順で必ず読む（読み込み完了前のアップロードで既存分を消さないため）
+        const prev = DB_CACHE[tStore.key] !== undefined ? DB_CACHE[tStore.key] : (await _idbGet(tStore.key)) || [];
+        // ── 同日差し替え（2026-08-26〜）: アップしたファイルに含まれる日付の既存データは最新版に丸ごと置き換える ──
+        const prevCountByDate = {};
+        for (const r of prev) prevCountByDate[r.date] = (prevCountByDate[r.date] || 0) + 1;
+        const newCountByDate = {};
+        for (const r of newRecs) newCountByDate[r.date] = (newCountByDate[r.date] || 0) + 1;
+        let overlapDates = Object.keys(newCountByDate).filter(d => prevCountByDate[d]).sort();
+
+        // 台数が半分未満に減る日は「全台入りでない部分ファイル」の疑い → バッチ承認済みでも店舗ごとに必ず確認
+        const shrink = overlapDates.filter(d => newCountByDate[d] < prevCountByDate[d] * 0.5);
+        if (shrink.length > 0) {
+          const ok = window.confirm(
+            `${tStore.name}: 台数が大きく減る日があります（全台入りでない部分ファイルの可能性）。\n` +
+            shrink.slice(0, 5).map(d => `  ${d}: ${prevCountByDate[d]}台 → ${newCountByDate[d]}台`).join('\n') +
+            (shrink.length > 5 ? `\n  …ほか${shrink.length - 5}日` : '') +
+            `\n\nこのまま置き換えますか？（キャンセルするとこれらの日は既存のまま残し、アップ分も取り込みません）`);
+          if (!ok) {
+            const skip = new Set(shrink);
+            newRecs = newRecs.filter(r => !skip.has(r.date));
+            overlapDates = overlapDates.filter(d => !skip.has(d));
+            errors.push(`${tStore.name}: 台数減の${shrink.length}日分は既存のまま残しました`);
+          }
+        }
+
+        if (overlapDates.length > 0 && replaceConfirmed === null) {
+          const span = overlapDates.length === 1 ? overlapDates[0] : `${overlapDates[0]}〜${overlapDates[overlapDates.length - 1]}`;
+          const repN = overlapDates.reduce((a, d) => a + prevCountByDate[d], 0);
+          replaceConfirmed = window.confirm(
+            `${tStore.name} には ${span}（${overlapDates.length}日・${repN}台分）のデータが既にあります。\n` +
+            `アップロードした最新の内容に置き換えます（同じ日付を二重にはしません）。\n` +
+            `この操作の残りのファイルにも同じルールを適用します。よろしいですか？\n\n` +
+            `※キャンセルすると、既に入っている日付はそのまま残し、新しい日付のぶんだけ追加します`);
+        }
+        let replacedCount = 0;
+        let kept = prev;
+        if (overlapDates.length > 0) {
+          const ov = new Set(overlapDates);
+          if (replaceConfirmed === false) {
+            // 置き換え拒否: 既存日付はそのまま残し、その日付ぶんの新データは取り込まない（新しい日付だけ追加）
+            newRecs = newRecs.filter(r => !ov.has(r.date));
+            errors.push(`${tStore.name}: 既存${overlapDates.length}日分は置き換えず残しました`);
+          } else {
+            replacedCount = overlapDates.reduce((a, d) => a + prevCountByDate[d], 0);
+            kept = prev.filter(r => !ov.has(r.date));
+          }
+        }
+        if (newRecs.length === 0) continue;
+        const merged = [...kept, ...newRecs];
         await _idbPut(tStore.key, merged);   // DB_CACHE も同時に更新される
-        summaries.push({ storeName: tStore.name, dates: tDates, count: tRecords.length });
+        totalAdded += newRecs.length;
+        summaries.push({ storeName: tStore.name, dates: [...new Set(tDates)], count: newRecs.length, replaced: replacedCount });
         lastStore = tStore;
       }
     }
@@ -3225,9 +3273,9 @@ async function handleUpload(event) {
 
   // 結果メッセージ
   if (totalAdded === 0) {
-    showMsg('追加データなし（重複 or 空ファイル）', 'err');
+    showMsg('追加データなし（空ファイル or キャンセル）', 'err');
   } else {
-    const parts = summaries.map(s => `【${s.storeName}】${s.dates.join('・')} ${s.count}台`);
+    const parts = summaries.map(s => `【${s.storeName}】${s.dates.join('・')} ${s.count}台` + (s.replaced ? `（既存${s.replaced}台分を最新に置き換え）` : ''));
     let msg = `✓ ${parts.join(' / ')} を追加`;
     if (errors.length > 0) msg += ` / ${errors.length}件スキップ`;
     showMsg(msg, 'ok');
@@ -18732,7 +18780,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       { name: 'Lカバネリ', type: 'ind' },
       { name: 'L戦国乙女5', type: 'ind' },
       { name: 'LSAO2', type: 'ind' },
-      { name: '', type: 'spacer' },
+      // ※テンプレ由来のAD空白スペーサー列は2026-08-26ユーザー指示で廃止（列エディタからspacer型の追加は引き続き可能）
       { name: 'Lからくり2', type: 'ind' },
       { name: '沖ドキ！', type: 'seg' },
       { name: 'S沖ドキBLACK', type: 'ind' },
@@ -18856,7 +18904,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
 
   // 日別表: ym='YYYY-MM' → rows[dayIdx] = {day, dow, fill:'sat'|'red'|null, values:{group→[台数,稼働,台粗] or null}}
-  function dailyTable(byDate, groups, ym) {
+  // fromDs/toDs('YYYY-MM-DD'・省略可)を渡すと、その範囲外の日は日付・曜日だけ出して数値を空欄にする
+  function dailyTable(byDate, groups, ym, fromDs, toDs) {
     const [y, m] = ym.split('-').map(Number);
     const daysInMonth = new Date(y, m, 0).getDate();
     const rows = [];
@@ -18865,7 +18914,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       const dowIdx = new Date(y, m - 1, d).getDay();
       const dow = '日月火水木金土'[dowIdx];
       const fill = (dowIdx === 0 || isHoliday(ds)) ? 'red' : (dowIdx === 6 ? 'sat' : null);
-      const slot = byDate[ds];
+      const inRange = (!fromDs || ds >= fromDs) && (!toDs || ds <= toDs);
+      const slot = inRange ? byDate[ds] : null;
       const values = {};
       for (const g of groups) {
         const a = slot && slot[g.name];
@@ -18874,6 +18924,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       rows.push({ day: d, dow, fill, values });
     }
     return rows;
+  }
+
+  // 期間(YYYY-MM-DD×2)に含まれる月のリスト('YYYY-MM'、古→新)
+  function monthsInRange(fromDs, toDs) {
+    const list = [];
+    let [y, m] = fromDs.slice(0, 7).split('-').map(Number);
+    const end = toDs.slice(0, 7);
+    for (let i = 0; i < 24; i++) {
+      const ym = y + '-' + String(m).padStart(2, '0');
+      list.push(ym);
+      if (ym === end) break;
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return list;
   }
 
   // 直近13か月のリスト（古→新、末尾=選択月）
@@ -18934,14 +18998,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return s;
   }
 
-  // layout: computeLayout()の戻り / storeName: タイトル用店舗名 / ym: 'YYYY-MM'
-  function buildWorkbook(ExcelJS, kind, layout, storeName, ym, dailyRows, monthlyRows) {
+  // 1シートぶんを既存ワークブックに追加する。layout: computeLayout()の戻り / ym: 'YYYY-MM'
+  function addSheet(wb, kind, layout, storeName, ym, dailyRows, monthlyRows, sheetName) {
     const groups = layout.groups;
     const lastCol = layout.lastCol;
     const monthNum = Number(ym.slice(5));
-    const wb = new ExcelJS.Workbook();
-    const sheetName = String(storeName).replace(/[\\\/\?\*\[\]:]/g, '').slice(0, 31) || 'Sheet1';
-    const ws = wb.addWorksheet(sheetName);
+    const safeName = String(sheetName || storeName).replace(/[\\\/\?\*\[\]:]/g, '').slice(0, 31) || 'Sheet1';
+    const ws = wb.addWorksheet(safeName);
 
     // 列幅（テンプレ準拠: A/B細い・台数5.5・稼働/台粗8.6。スペーサー列はテンプレ同様に既定幅のまま）
     ws.getColumn(1).width = 3.4;
@@ -19166,6 +19229,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     };
     // 画面表示倍率（横長の表なので全体が見える倍率で開く=テンプレ準拠）
     ws.views = [{ zoomScale: kind === 'slot' ? 75 : 56 }];
+    return ws;
+  }
+
+  // 単月(1シート)のワークブック
+  function buildWorkbook(ExcelJS, kind, layout, storeName, ym, dailyRows, monthlyRows) {
+    const wb = new ExcelJS.Workbook();
+    addSheet(wb, kind, layout, storeName, ym, dailyRows, monthlyRows, storeName);
+    return wb;
+  }
+
+  // 複数月(月ごとに1シート)のワークブック。sheets=[{ym, daily, monthly, sheetName}]
+  function buildWorkbookMulti(ExcelJS, kind, layout, storeName, sheets) {
+    const wb = new ExcelJS.Workbook();
+    for (const s of sheets) addSheet(wb, kind, layout, storeName, s.ym, s.daily, s.monthly, s.sheetName);
     return wb;
   }
 
@@ -19174,8 +19251,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     TOTAL_NAME, TITLE_SUFFIX,
     DEFAULT_COLUMNS, computeLayout, colNames,
     suggest,
-    aggregateByDate, dailyTable, monthlyTable, monthWindow,
-    buildWorkbook, colLetter,
+    aggregateByDate, dailyTable, monthlyTable, monthWindow, monthsInRange,
+    buildWorkbook, buildWorkbookMulti, colLetter,
   };
 });
 
@@ -19213,7 +19290,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function saveAssign(a) { localStorage.setItem(ASSIGN_KEY, JSON.stringify(a)); }
   function loadColumns() {
     var c = loadJSON(COLUMNS_KEY, USER_ID === 'admin' ? 'kadouArari_columns_v1' : null);
-    return (c && Array.isArray(c.slot) && Array.isArray(c.pachi)) ? c : deepCopy(KACore.DEFAULT_COLUMNS);
+    if (!(c && Array.isArray(c.slot) && Array.isArray(c.pachi))) {
+      localStorage.setItem(_NS + 'kadouArari_spacer_removed_v1', '1');
+      return deepCopy(KACore.DEFAULT_COLUMNS);
+    }
+    // テンプレ由来のAD空白列の廃止(2026-08-26)に伴う1回だけの掃除。以後ユーザーが自分で足したspacerは残る
+    if (!localStorage.getItem(_NS + 'kadouArari_spacer_removed_v1')) {
+      c.slot = c.slot.filter(function (x) { return x.type !== 'spacer'; });
+      c.pachi = c.pachi.filter(function (x) { return x.type !== 'spacer'; });
+      localStorage.setItem(COLUMNS_KEY, JSON.stringify(c));
+      localStorage.setItem(_NS + 'kadouArari_spacer_removed_v1', '1');
+    }
+    return c;
   }
   function saveColumns(c) { localStorage.setItem(COLUMNS_KEY, JSON.stringify(c)); }
 
@@ -19260,7 +19348,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     + '#bjkaModal{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;}'
     + '#bjkaModal .bjka-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 24px;width:min(880px,94vw);max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.35);color:var(--text);font-size:12.5px;}'
     + '#bjkaModal .bjka-head{font-size:14px;font-weight:800;margin-bottom:12px;}'
-    + '#bjkaModal select,#bjkaModal input[type=text]{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font:inherit;}'
+    + '#bjkaModal select,#bjkaModal input[type=text],#bjkaModal input[type=date]{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font:inherit;}'
     + '#bjkaModal .bjka-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;}'
     + '#bjkaModal .bjka-row label{font-size:11px;color:var(--text2);display:block;}'
     + '#bjkaModal .bjka-tabs{display:flex;border-bottom:1px solid var(--border);margin:10px 0 0;}'
@@ -19296,10 +19384,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '<div class="bjka-head">稼働粗利表の作成</div>'
         + '<div class="bjka-row">'
         + '<label>店舗<br><select id="bjkaStore" style="min-width:240px"></select></label>'
-        + '<label>対象月<br><select id="bjkaMonth" style="min-width:130px"></select></label>'
+        + '<label>期間（開始）<br><input type="date" id="bjkaFrom"></label>'
+        + '<label>期間（終了）<br><input type="date" id="bjkaTo"></label>'
         + '<span style="flex:1"></span>'
         + '<button class="bjka-ghost" id="bjkaClose">閉じる</button>'
         + '</div>'
+        + '<div class="bjka-note" style="margin-top:2px">月をまたぐ期間を選ぶと、月ごとのシートが1つのExcelにまとまって出ます。</div>'
         + '<div class="bjka-status" id="bjkaLoad"></div>'
         + '<div class="bjka-tabs"><button id="bjkaTabSlot" class="on">スロット（20S）</button><button id="bjkaTabPachi">パチンコ（4P）</button></div>'
         + '<details class="bjka-coled" id="bjkaColEd"><summary>列の設定（セグメント・個別機種列の追加 / 削除 / 並べ替え / 名前変更）</summary><div id="bjkaColBody"></div></details>'
@@ -19368,7 +19458,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     models = { slot: [], pachi: [] };
     $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">読み込み中...</div>';
     $('bjkaGenSlot').disabled = $('bjkaGenPachi').disabled = $('bjkaSave').disabled = true;
-    $('bjkaMonth').innerHTML = '';
+    $('bjkaFrom').value = ''; $('bjkaTo').value = '';
     $('bjkaCount').textContent = '';
     if (!h) {
       $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">店舗を選ぶと機種一覧が表示されます</div>';
@@ -19377,6 +19467,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }
     setStatus($('bjkaLoad'), '読み込み中...');
     var months = {};
+    var minDs = '', maxDs = '';
     var total = 0;
     var jobs = [['slot', h.slot], ['pachi', h.pachi]].filter(function (p) { return p[1]; });
     (function next(i) {
@@ -19394,7 +19485,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           if (!n) return;
           if (!cnt[n]) cnt[n] = { name: n, count: 0 };
           if (r.date === latest) cnt[n].count++;
-          if (r.date) months[r.date.slice(0, 7)] = 1;
+          if (r.date) {
+            months[r.date.slice(0, 7)] = 1;
+            if (!minDs || r.date < minDs) minDs = r.date;
+            if (r.date > maxDs) maxDs = r.date;
+          }
         });
         models[kind] = Object.keys(cnt).map(function (k) { return cnt[k]; })
           .sort(function (a, b) { return b.count - a.count || a.name.localeCompare(b.name, 'ja'); });
@@ -19413,7 +19508,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         return;
       }
       var ml = Object.keys(months).sort().reverse();
-      $('bjkaMonth').innerHTML = ml.map(function (m) { return '<option value="' + esc(m) + '">' + Number(m.slice(0, 4)) + '年' + Number(m.slice(5)) + '月</option>'; }).join('');
+      // 期間の初期値: 最新月の1日〜最新データ日(カレンダーで自由に変更可)
+      var defFrom = maxDs.slice(0, 7) + '-01';
+      [$('bjkaFrom'), $('bjkaTo')].forEach(function (el) { el.min = minDs; el.max = maxDs; });
+      $('bjkaFrom').value = defFrom > minDs ? defFrom : minDs;
+      $('bjkaTo').value = maxDs;
       setStatus($('bjkaLoad'), h.base + ': スロット' + (h.slot ? 'あり' : 'なし') + ' / パチンコ' + (h.pachi ? 'あり' : 'なし') + ' ・ 全' + total.toLocaleString() + 'レコード ・ ' + ml[ml.length - 1] + ' 〜 ' + ml[0], 'ok');
       initUiValues();
       curKind = (focusKind && models[focusKind].length) ? focusKind : (models.slot.length ? 'slot' : 'pachi');
@@ -19635,8 +19734,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var h = hall;
     if (!h) return;
     var st = kind === 'slot' ? h.slot : h.pachi;
-    var ym = $('bjkaMonth').value;
-    if (!st || !ym) return;
+    if (!st) return;
+    var from = $('bjkaFrom').value, to = $('bjkaTo').value;
+    if (!from || !to) { setStatus($('bjkaGenSt'), '期間（開始日と終了日）を選んでください。', 'err'); return; }
+    if (from > to) { setStatus($('bjkaGenSt'), '開始日が終了日より後になっています。', 'err'); return; }
+    var ymList = KACore.monthsInRange(from, to);
+    if (ymList.length > 13) { setStatus($('bjkaGenSt'), '期間は13か月以内にしてください。', 'err'); return; }
     var assign = { seg: {}, ind: {} };
     var pend = 0;
     models[kind].forEach(function (m) {
@@ -19652,22 +19755,30 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var records = recCache[st.key] || [];
       var layout = KACore.computeLayout(kind, columns[kind]);
       var byDate = KACore.aggregateByDate(records, kind, assign);
-      var daysInYm = Object.keys(byDate).filter(function (d) { return d.slice(0, 7) === ym; }).length;
-      var daily = KACore.dailyTable(byDate, layout.groups, ym);
-      var monthly = KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym));
-      var wb = KACore.buildWorkbook(EJ, kind, layout, h.base, ym, daily, monthly);
+      var daysInRange = Object.keys(byDate).filter(function (d) { return d >= from && d <= to; }).length;
+      var sheets = ymList.map(function (ym) {
+        return {
+          ym: ym,
+          daily: KACore.dailyTable(byDate, layout.groups, ym, from, to),
+          monthly: KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym)),
+          sheetName: ymList.length === 1 ? h.base : Number(ym.slice(0, 4)) + '年' + Number(ym.slice(5)) + '月',
+        };
+      });
+      var wb = KACore.buildWorkbookMulti(EJ, kind, layout, h.base, sheets);
       return wb.xlsx.writeBuffer().then(function (buf) {
         var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         var label = kind === 'slot' ? 'スロットメイン稼働粗利表' : 'パチンコメイン稼働粗利表';
-        a.download = h.base + '_' + label + '_' + Number(ym.slice(0, 4)) + '年' + Number(ym.slice(5)) + '月.xlsx';
+        a.download = h.base + '_' + label + '_' + from + '〜' + to + '.xlsx';
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 30000);
         var warns = [];
-        if (!daysInYm) warns.push('選択月にこの部門のデータが無いため日別表は空です');
+        if (!daysInRange) warns.push('選択期間にこの部門のデータが無いため日別表は空です');
         if (pend) warns.push('未確定の振り分けが' + pend + '機種あります（画面の表示どおり反映済み）。確認して保存してください');
-        setStatus($('bjkaGenSt'), 'ダウンロードしました: ' + a.download + (warns.length ? '（' + warns.join('。') + '）' : ''), 'ok');
+        setStatus($('bjkaGenSt'), 'ダウンロードしました: ' + a.download
+          + (ymList.length > 1 ? '（' + ymList.length + 'か月分を月ごとのシートで収録）' : '')
+          + (warns.length ? '（' + warns.join('。') + '）' : ''), 'ok');
       });
     }).catch(function (e) {
       console.error(e);
