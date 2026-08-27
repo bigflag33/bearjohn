@@ -1890,7 +1890,7 @@ const USER_LABEL = '株式会社フェイスグループさん専用';          
 const USER_ID = 'facegroup';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260827-084210';
+const BJ_VERSION = '20260827-093101';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -19198,17 +19198,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       cl.alignment = { vertical: 'middle' };
     }
 
-    // ── 条件付き書式（月別表の稼働・台粗: 上位2=赤 / 下位2=緑。競合店の数字なので高い=警戒色=テンプレ準拠）──
+    // ── 条件付き書式（月別表の稼働・台粗: 赤=最も高い月 / 緑=最も悪い月）──
+    // 色の数はその列にデータがある月数で決める(2026-08-27ユーザー指定):
+    //   3か月以下=色なし / 4〜6か月=赤緑1つずつ / 7か月以上=赤緑2つずつ
     let prio = 1;
     for (const g of groups) {
+      const monthsWithData = monthlyRows.filter(r => r.values[g.name]).length;
+      const rank = monthsWithData >= 7 ? 2 : (monthsWithData >= 4 ? 1 : 0);
+      if (!rank) continue;
       for (const cc of [1, 2]) {
         const L = colLetter(g.start + cc);
         ws.addConditionalFormatting({
           ref: L + '38:' + L + '50',
           rules: [
-            { type: 'top10', rank: 2, percent: false, bottom: false, priority: prio++,
+            { type: 'top10', rank, percent: false, bottom: false, priority: prio++,
               style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFFFC7CE' } }, font: { color: { argb: 'FF9C0006' } } } },
-            { type: 'top10', rank: 2, percent: false, bottom: true, priority: prio++,
+            { type: 'top10', rank, percent: false, bottom: true, priority: prio++,
               style: { fill: { type: 'pattern', pattern: 'solid', bgColor: { argb: 'FFC6EFCE' } }, font: { color: { argb: 'FF006100' } } } },
           ],
         });
