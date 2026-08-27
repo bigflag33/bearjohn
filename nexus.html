@@ -1890,7 +1890,7 @@ const USER_LABEL = 'NEXUSさん専用';               // 例: '田中さん専�
 const USER_ID = 'nexus';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260827-093101';
+const BJ_VERSION = '20260827-113334';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -18768,6 +18768,25 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   const TOTAL_NAME = { slot: '20S', pachi: '4P' };
   const TITLE_SUFFIX = { slot: '20Sメイン機種稼働粗利表', pachi: '4Pメイン機種稼働粗利表' };
 
+  // ── 店舗の総台数（1パチ・5スロ等も含む店全体。A52に入り、D52の総台数比の分母になる）──
+  // 2026-08-27ユーザー提供の一覧。キーはBIの登録店舗名（基底名）。増減台は画面の入力欄から上書き保存できる
+  const DEFAULT_TOTALS = {
+    'キクヤ春日井': 1283,
+    'ZENT木曽川': 1040,
+    'ZENT梅坪': 1167,
+    'ZENT豊田本店': 1040,
+    'メガガイア一宮': 1515,
+    'リブレ遊援館': 1100,
+    'ラッキープラザ名古屋西インター七宝': 1338,
+    'プレイランドキャッスル天白': 1111,
+    'プレイランドキャッスル大垣': 1320,
+    'キクヤ穂積': 1242,
+    'キクヤ一宮': 1377,
+    'ZENT稲沢': 1360,
+    '玉越東郷': 1050,
+    'ZENT長久手': 1040,
+  };
+
   // ── 既定の列構成（完成品テンプレの並びそのまま。合計列は常に先頭で固定なので含めない）──
   // type: seg=セグメント列 / ind=個別機種列 / spacer=空白のスペーサー列(テンプレ由来)
   const DEFAULT_COLUMNS = {
@@ -18999,7 +19018,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
 
   // 1シートぶんを既存ワークブックに追加する。layout: computeLayout()の戻り / ym: 'YYYY-MM'
-  function addSheet(wb, kind, layout, storeName, ym, dailyRows, monthlyRows, sheetName) {
+  // totalMachines: 店全体の総台数(あればA52に入る。無ければ空欄=後から手打ち可)
+  function addSheet(wb, kind, layout, storeName, ym, dailyRows, monthlyRows, sheetName, totalMachines) {
     const groups = layout.groups;
     const lastCol = layout.lastCol;
     const monthNum = Number(ym.slice(5));
@@ -19177,8 +19197,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }
 
     // ── 構成比 (52行) ──
-    // A52=店舗の総台数（1パチ等も含む）を後から手入力する欄。入力するとD52に総台数比が出る
+    // A52=店舗の総台数（1パチ等も含む店全体）。総台数マスタにあれば自動で入り、無ければ空欄=後から手打ち可
     ws.mergeCells(52, 1, 52, 2);
+    if (totalMachines) cell(52, 1).value = totalMachines;
     cell(52, 1).font = Object.assign({}, FONT);
     cell(52, 1).alignment = { vertical: 'middle', horizontal: 'center', shrinkToFit: true };
     const totalStart = groups[0].start;   // C
@@ -19238,22 +19259,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
 
   // 単月(1シート)のワークブック
-  function buildWorkbook(ExcelJS, kind, layout, storeName, ym, dailyRows, monthlyRows) {
+  function buildWorkbook(ExcelJS, kind, layout, storeName, ym, dailyRows, monthlyRows, totalMachines) {
     const wb = new ExcelJS.Workbook();
-    addSheet(wb, kind, layout, storeName, ym, dailyRows, monthlyRows, storeName);
+    addSheet(wb, kind, layout, storeName, ym, dailyRows, monthlyRows, storeName, totalMachines);
     return wb;
   }
 
   // 複数月(月ごとに1シート)のワークブック。sheets=[{ym, daily, monthly, sheetName}]
-  function buildWorkbookMulti(ExcelJS, kind, layout, storeName, sheets) {
+  function buildWorkbookMulti(ExcelJS, kind, layout, storeName, sheets, totalMachines) {
     const wb = new ExcelJS.Workbook();
-    for (const s of sheets) addSheet(wb, kind, layout, storeName, s.ym, s.daily, s.monthly, s.sheetName);
+    for (const s of sheets) addSheet(wb, kind, layout, storeName, s.ym, s.daily, s.monthly, s.sheetName, totalMachines);
     return wb;
   }
 
   return {
     JAPAN_HOLIDAYS, isHoliday,
-    TOTAL_NAME, TITLE_SUFFIX,
+    TOTAL_NAME, TITLE_SUFFIX, DEFAULT_TOTALS,
     DEFAULT_COLUMNS, computeLayout, colNames,
     suggest,
     aggregateByDate, dailyTable, monthlyTable, monthWindow, monthsInRange,
@@ -19309,6 +19330,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return c;
   }
   function saveColumns(c) { localStorage.setItem(COLUMNS_KEY, JSON.stringify(c)); }
+  var TOTALS_KEY = _NS + 'kadouArari_totals_v1';
+  function loadTotals() {
+    var t = loadJSON(TOTALS_KEY, USER_ID === 'admin' ? 'kadouArari_totals_v1' : null);
+    return (t && typeof t === 'object') ? t : {};
+  }
+  function saveTotals(t) { localStorage.setItem(TOTALS_KEY, JSON.stringify(t)); }
+  var totals = null;
+  function totalFor(base) {
+    if (totals[base] != null) return totals[base];
+    if (KACore.DEFAULT_TOTALS[base] != null) return KACore.DEFAULT_TOTALS[base];
+    return '';
+  }
 
   /* ── データ読み: DB_CACHE(メモリ)優先 → IndexedDB。法人ページ経路を必ず先に見る ── */
   function getRecords(key) {
@@ -19353,7 +19386,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     + '#bjkaModal{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;}'
     + '#bjkaModal .bjka-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px 24px;width:min(880px,94vw);max-height:92vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.35);color:var(--text);font-size:12.5px;}'
     + '#bjkaModal .bjka-head{font-size:14px;font-weight:800;margin-bottom:12px;}'
-    + '#bjkaModal select,#bjkaModal input[type=text],#bjkaModal input[type=date]{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font:inherit;}'
+    + '#bjkaModal select,#bjkaModal input[type=text],#bjkaModal input[type=date],#bjkaModal input[type=number]{padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);font:inherit;}'
     + '#bjkaModal .bjka-row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;}'
     + '#bjkaModal .bjka-row label{font-size:11px;color:var(--text2);display:block;}'
     + '#bjkaModal .bjka-tabs{display:flex;border-bottom:1px solid var(--border);margin:10px 0 0;}'
@@ -19391,10 +19424,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '<label>店舗<br><select id="bjkaStore" style="min-width:240px"></select></label>'
         + '<label>期間（開始）<br><input type="date" id="bjkaFrom"></label>'
         + '<label>期間（終了）<br><input type="date" id="bjkaTo"></label>'
+        + '<label>総台数（店全体）<br><input type="number" id="bjkaTotal" min="1" style="width:100px" placeholder="例: 1242"></label>'
         + '<span style="flex:1"></span>'
         + '<button class="bjka-ghost" id="bjkaClose">閉じる</button>'
         + '</div>'
-        + '<div class="bjka-note" style="margin-top:2px">月をまたぐ期間を選ぶと、月ごとのシートが1つのExcelにまとまって出ます。</div>'
+        + '<div class="bjka-note" style="margin-top:2px">月をまたぐ期間を選ぶと、月ごとのシートが1つのExcelにまとまって出ます。総台数は完成ExcelのA52に入り、総台数比(黄色の%)の分母になります。直した値は次回から記憶されます。</div>'
         + '<div class="bjka-status" id="bjkaLoad"></div>'
         + '<div class="bjka-tabs"><button id="bjkaTabSlot" class="on">スロット（20S）</button><button id="bjkaTabPachi">パチンコ（4P）</button></div>'
         + '<details class="bjka-coled" id="bjkaColEd"><summary>列の設定（セグメント・個別機種列の追加 / 削除 / 並べ替え / 名前変更）</summary><div id="bjkaColBody"></div></details>'
@@ -19423,10 +19457,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         var x = v === '' ? null : storeIndex[Number(v)];
         selectHall(x ? x.hall : null, x ? x.kind : 'slot');
       });
+      $('bjkaTotal').onchange = function () {
+        if (!hall) return;
+        var v = Number($('bjkaTotal').value);
+        if (v > 0) totals[hall.base] = v;
+        else delete totals[hall.base];
+        saveTotals(totals);
+      };
     }
     m.style.display = 'flex';
     saved = loadAssign();
     columns = loadColumns();
+    totals = loadTotals();
     ensureExcelJS().catch(function () { /* 生成時に再試行してエラー表示する */ });
     buildStoreIndex();
   }
@@ -19463,7 +19505,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     models = { slot: [], pachi: [] };
     $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">読み込み中...</div>';
     $('bjkaGenSlot').disabled = $('bjkaGenPachi').disabled = $('bjkaSave').disabled = true;
-    $('bjkaFrom').value = ''; $('bjkaTo').value = '';
+    $('bjkaFrom').value = ''; $('bjkaTo').value = ''; $('bjkaTotal').value = '';
     $('bjkaCount').textContent = '';
     if (!h) {
       $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">店舗を選ぶと機種一覧が表示されます</div>';
@@ -19518,6 +19560,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       [$('bjkaFrom'), $('bjkaTo')].forEach(function (el) { el.min = minDs; el.max = maxDs; });
       $('bjkaFrom').value = defFrom > minDs ? defFrom : minDs;
       $('bjkaTo').value = maxDs;
+      $('bjkaTotal').value = totalFor(h.base);
       setStatus($('bjkaLoad'), h.base + ': スロット' + (h.slot ? 'あり' : 'なし') + ' / パチンコ' + (h.pachi ? 'あり' : 'なし') + ' ・ 全' + total.toLocaleString() + 'レコード ・ ' + ml[ml.length - 1] + ' 〜 ' + ml[0], 'ok');
       initUiValues();
       curKind = (focusKind && models[focusKind].length) ? focusKind : (models.slot.length ? 'slot' : 'pachi');
@@ -19769,7 +19812,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           sheetName: ymList.length === 1 ? h.base : Number(ym.slice(0, 4)) + '年' + Number(ym.slice(5)) + '月',
         };
       });
-      var wb = KACore.buildWorkbookMulti(EJ, kind, layout, h.base, sheets);
+      var totalMachines = Number($('bjkaTotal').value) || null;
+      var wb = KACore.buildWorkbookMulti(EJ, kind, layout, h.base, sheets, totalMachines);
       return wb.xlsx.writeBuffer().then(function (buf) {
         var blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
         var a = document.createElement('a');
