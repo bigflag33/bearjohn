@@ -1890,7 +1890,7 @@ const USER_LABEL = '株式会社フェイスグループさん専用';          
 const USER_ID = 'facegroup';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260827-113334';
+const BJ_VERSION = '20260831-165934';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -19291,6 +19291,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   'use strict';
   if (typeof USER_ID === 'undefined' || (USER_ID !== 'central' && USER_ID !== 'admin')) return;   // セントラル限定(adminはローカル検証用)
 
+  /* ── 中央共有 (2026-08-28): 振り分け・列の設定・総台数を法人内の全PCで共有 ──
+     bearjohn-api の /judgments (type='kadou') に相乗り。サーバー側が updatedAt の新しい方を残す(機種ごとの後勝ち)。
+     このトークンは kadou 種別しか読み書きできない専用のもの(顔認証のデータには一切触れない)。
+     通信できない時はこのPCの保存(localStorage)だけで動き続ける。 */
+  var KADOU_API = 'https://f97y7gnlej.execute-api.ap-northeast-1.amazonaws.com';
+  var KADOU_TOKEN = 'st090.911a587265d259964cdf9b84c45c45bab586dfd64c7551b7194a45a60be1bd57';
+
   var EXCELJS_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
   var EXCELJS_SRI = 'sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw==';
   var ASSIGN_KEY = _NS + 'kadouArari_assign_v1';
@@ -19378,6 +19385,138 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var uiValues = { slot: {}, pachi: {} };
   var colDraft = null, colDraftKind = null;
   var loadGen = 0;
+  var dirty = { slot: {}, pachi: {} };   // このPCで変更した機種(保存時に中央へ送る対象)
+  var syncOk = null;                      // null=未接続 / true=同期済み / false=オフライン
+
+  /* ── 中央共有の通信 ── */
+  function sha40(s) {
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function (buf) {
+      var u = new Uint8Array(buf), h = '';
+      for (var i = 0; i < u.length; i++) h += ('0' + u[i].toString(16)).slice(-2);
+      return h.slice(0, 40);
+    });
+  }
+  function kadouFetch(url, opt, timeoutMs) {
+    var ctl = new AbortController();
+    var t = setTimeout(function () { ctl.abort(); }, timeoutMs || 6000);
+    opt = opt || {}; opt.signal = ctl.signal;
+    return fetch(url, opt).then(function (r) { clearTimeout(t); return r; },
+                                function (e) { clearTimeout(t); throw e; });
+  }
+  function centralGet() {
+    return kadouFetch(KADOU_API + '/judgments', { headers: { 'x-bearjohn-token': KADOU_TOKEN } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) {
+        return (d.judgments || []).filter(function (j) { return j.type === 'kadou' && j.value != null; });
+      });
+  }
+  function centralPut(items) {   // items: [{key, value, updatedAt}] → 200件ずつ送る
+    if (!items.length) return Promise.resolve(true);
+    var chunks = [];
+    for (var i = 0; i < items.length; i += 200) chunks.push(items.slice(i, i + 200));
+    var p = Promise.resolve(true);
+    chunks.forEach(function (ch) {
+      p = p.then(function (okSoFar) {
+        return kadouFetch(KADOU_API + '/judgments', {
+          method: 'PUT',
+          headers: { 'x-bearjohn-token': KADOU_TOKEN, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: ch.map(function (i2) { return { type: 'kadou', key: i2.key, value: i2.value, updatedAt: i2.updatedAt }; }) }),
+        }).then(function (r) { return r.ok && okSoFar; });
+      });
+    });
+    return p;
+  }
+  function setSyncNote() {
+    var el = $('bjkaSync');
+    if (!el) return;
+    if (syncOk === true) { el.textContent = '共有: 同期済み'; el.style.color = 'var(--accent)'; }
+    else if (syncOk === false) { el.textContent = '共有: 接続できないためこのPCの保存で動作中'; el.style.color = '#e0a020'; }
+    else { el.textContent = '共有: 接続中...'; el.style.color = 'var(--text2)'; }
+  }
+  function colsIsDefault(kind) {
+    return JSON.stringify(columns[kind]) === JSON.stringify(KACore.DEFAULT_COLUMNS[kind]);
+  }
+  // 起動時の取り込み: 中央を正として上書きし、中央に無いこのPCの登録だけ自動で合流させる
+  function syncFromCentral() {
+    return centralGet().then(function (js) {
+      var central = {};   // key → {v(パース済み), at}
+      js.forEach(function (j) {
+        try { central[j.key] = { v: JSON.parse(j.value), at: j.updatedAt || '' }; } catch (e) {}
+      });
+      var now = new Date().toISOString();
+      var up = [];        // 中央に無いローカル分(初回合流)
+      var hashJobs = [];  // [key生成のPromise]
+      ['slot', 'pachi'].forEach(function (kind) {
+        var tag = kind === 'slot' ? 'sl' : 'pc';
+        var centralNames = {};
+        Object.keys(central).forEach(function (k) {
+          if (k.indexOf('a_' + tag + '_') !== 0) return;
+          var v = central[k].v;
+          if (v && v.n) centralNames[v.n] = { seg: v.s || '', ind: v.i || '' };
+        });
+        Object.keys(centralNames).forEach(function (n) { saved[kind][n] = centralNames[n]; });
+        Object.keys(saved[kind]).forEach(function (n) {
+          if (centralNames[n]) return;
+          hashJobs.push(sha40(kind + '|' + n).then(function (h) {
+            var sv = saved[kind][n];
+            up.push({ key: 'a_' + tag + '_' + h, value: JSON.stringify({ n: n, s: sv.seg || '', i: sv.ind || '' }), updatedAt: now });
+          }));
+        });
+        var ck = 'cols_' + kind;
+        if (central[ck] && central[ck].v && Array.isArray(central[ck].v.list) && central[ck].v.list.length) {
+          columns[kind] = central[ck].v.list;
+        } else if (!colsIsDefault(kind)) {
+          up.push({ key: ck, value: JSON.stringify({ list: columns[kind] }), updatedAt: now });
+        }
+      });
+      var centralTotalNames = {};
+      Object.keys(central).forEach(function (k) {
+        if (k.indexOf('t_') !== 0) return;
+        var v = central[k].v;
+        if (v && v.n) { centralTotalNames[v.n] = 1; if (v.v > 0) totals[v.n] = v.v; else delete totals[v.n]; }
+      });
+      Object.keys(totals).forEach(function (b) {
+        if (centralTotalNames[b]) return;
+        hashJobs.push(sha40('total|' + b).then(function (h) {
+          up.push({ key: 't_' + h, value: JSON.stringify({ n: b, v: totals[b] }), updatedAt: now });
+        }));
+      });
+      return Promise.all(hashJobs).then(function () {
+        saveAssign(saved); saveColumns(columns); saveTotals(totals);
+        return centralPut(up);
+      }).then(function (ok) { syncOk = true; setSyncNote(); return ok; });
+    }).catch(function (e) {
+      console.warn('[稼働粗利表] 中央共有に接続できません(このPCの保存で続行):', e && e.message);
+      syncOk = false; setSyncNote();
+    });
+  }
+  // 保存後の送信: 変更のあった機種だけを中央へ
+  function pushAssigns(kind, names) {
+    if (!names.length) return Promise.resolve(true);
+    var tag = kind === 'slot' ? 'sl' : 'pc';
+    var now = new Date().toISOString();
+    return Promise.all(names.map(function (n) {
+      return sha40(kind + '|' + n).then(function (h) {
+        var sv = saved[kind][n] || { seg: '', ind: '' };
+        return { key: 'a_' + tag + '_' + h, value: JSON.stringify({ n: n, s: sv.seg || '', i: sv.ind || '' }), updatedAt: now };
+      });
+    })).then(centralPut).then(function (ok) {
+      if (ok) names.forEach(function (n) { delete dirty[kind][n]; });
+      syncOk = !!ok; setSyncNote();
+      return ok;
+    }).catch(function () { syncOk = false; setSyncNote(); return false; });
+  }
+  function pushCols(kind) {
+    return centralPut([{ key: 'cols_' + kind, value: JSON.stringify({ list: columns[kind] }), updatedAt: new Date().toISOString() }])
+      .then(function (ok) { syncOk = !!ok; setSyncNote(); return ok; })
+      .catch(function () { syncOk = false; setSyncNote(); return false; });
+  }
+  function pushTotal(base) {
+    return sha40('total|' + base).then(function (h) {
+      return centralPut([{ key: 't_' + h, value: JSON.stringify({ n: base, v: totals[base] != null ? totals[base] : null }), updatedAt: new Date().toISOString() }]);
+    }).then(function (ok) { syncOk = !!ok; setSyncNote(); return ok; })
+      .catch(function () { syncOk = false; setSyncNote(); return false; });
+  }
   var $ = function (id) { return document.getElementById(id); };
   function setStatus(el, msg, cls) { el.textContent = msg; el.style.color = cls === 'err' ? '#e05656' : (cls === 'ok' ? 'var(--accent)' : 'var(--text2)'); }
 
@@ -19425,6 +19564,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '<label>期間（開始）<br><input type="date" id="bjkaFrom"></label>'
         + '<label>期間（終了）<br><input type="date" id="bjkaTo"></label>'
         + '<label>総台数（店全体）<br><input type="number" id="bjkaTotal" min="1" style="width:100px" placeholder="例: 1242"></label>'
+        + '<span class="bjka-status" id="bjkaSync" style="margin-top:0;align-self:center"></span>'
         + '<span style="flex:1"></span>'
         + '<button class="bjka-ghost" id="bjkaClose">閉じる</button>'
         + '</div>'
@@ -19463,6 +19603,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         if (v > 0) totals[hall.base] = v;
         else delete totals[hall.base];
         saveTotals(totals);
+        pushTotal(hall.base);
       };
     }
     m.style.display = 'flex';
@@ -19470,7 +19611,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     columns = loadColumns();
     totals = loadTotals();
     ensureExcelJS().catch(function () { /* 生成時に再試行してエラー表示する */ });
-    buildStoreIndex();
+    // 中央共有から最新を取り込んでから店舗一覧を組む(接続できなければこのPCの保存で続行)
+    syncOk = null; setSyncNote();
+    syncFromCentral().then(function () { buildStoreIndex(); });
   }
 
   function buildStoreIndex() {
@@ -19642,9 +19785,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
             columns[curKind].push({ name: nm, type: isSeg ? 'seg' : 'ind' });
             saveColumns(columns);
             colDraft = null; colDraftKind = null;
+            pushCols(curKind);
           }
           v[isSeg ? 'seg' : 'ind'] = nm;
           delete v._pending;
+          dirty[curKind][name] = 1;
           renderAssign();
           renderColEditor();
           setStatus($('bjkaGenSt'), label + '「' + nm + '」を追加しました。完成Excelの右端に列が増えます（並び順は「列の設定」で変えられます）。', 'ok');
@@ -19652,6 +19797,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         }
         v[sel.getAttribute('data-f')] = sel.value;
         delete v._pending;
+        dirty[curKind][name] = 1;
         tr.className = '';
         var tag = tr.querySelector('.bjka-tag'); if (tag) tag.remove();
         renderCount();
@@ -19671,10 +19817,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     models[curKind].forEach(function (m) {
       var v = uiValues[curKind][m.name];
       if (!v) return;
+      if (v._pending) dirty[curKind][m.name] = 1;   // 候補の確定も「変更」として中央へ送る
       delete v._pending;
       saved[curKind][m.name] = { seg: v.seg || '', ind: v.ind || '' };
     });
     saveAssign(saved);
+    pushAssigns(curKind, Object.keys(dirty[curKind]));
     renderAssign();
     var other = curKind === 'slot' ? 'pachi' : 'slot';
     var otherPend = 0;
@@ -19752,16 +19900,21 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var now = nfc(c.name);
       if (c.orig !== now) (c.type === 'seg' ? segRen : indRen)[c.orig] = now;
     });
-    var migrate = function (sv) {
+    var migChanged = [];   // リネーム/削除の追随で振り分けが変わった機種(中央にも送る)
+    var migrate = function (sv, name) {
+      var b = sv.seg + '|' + sv.ind;
       if (sv.seg && deletedSeg[sv.seg]) sv.seg = '';
       if (sv.ind && deletedInd[sv.ind]) sv.ind = '';
       if (sv.seg && segRen[sv.seg] != null) sv.seg = segRen[sv.seg];
       if (sv.ind && indRen[sv.ind] != null) sv.ind = indRen[sv.ind];
+      if (name && sv.seg + '|' + sv.ind !== b) migChanged.push(name);
     };
-    Object.keys(saved[kind]).forEach(function (m) { migrate(saved[kind][m]); });
+    Object.keys(saved[kind]).forEach(function (m) { migrate(saved[kind][m], m); });
     saveAssign(saved);
     columns[kind] = clean;
     saveColumns(columns);
+    pushCols(kind);
+    pushAssigns(kind, migChanged);
     var segSet = {}, indSet = {};
     KACore.colNames(clean, 'seg').forEach(function (n) { segSet[n] = 1; });
     KACore.colNames(clean, 'ind').forEach(function (n) { indSet[n] = 1; });
