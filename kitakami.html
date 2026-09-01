@@ -1890,7 +1890,7 @@ const USER_LABEL = '北上文化さん専用';               // 例: '田中さ�
 const USER_ID = 'kitakami';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260831-165934';
+const BJ_VERSION = '20260901-113041';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2529,6 +2529,9 @@ async function exportUserData() {
   // ＝毎日の書き出し・アップは実質当月分だけになり、過去月はブラウザキャッシュが効き続ける。
   // 最新月は変化がなくても毎回書き出す（generated＝配信時刻と目次を新鮮に保つため）。
   // データを消して入れ直した月も、指紋（金額込み）が変わるので自動で書き出しに含まれる。
+  // ⚠️指紋にはパスワードの目印も入れる（2026-09-01）。パスワード＝暗号の鍵なので、月替わりの
+  //   切替時は全月を新しい鍵で書き出し直す必要がある。目印が変われば全月が自動で対象になる。
+  const _bjPwTag = s => { let h = 0; for (let i = 0; i < String(s).length; i++) { h = (h * 31 + String(s).charCodeAt(i)) >>> 0; } return h.toString(36); };
   let _fpAll = {};
   try { _fpAll = JSON.parse(localStorage.getItem('admin_bj_export_fp') || '{}') || {}; } catch(e) { _fpAll = {}; }
   let skippedMonths = 0;
@@ -2577,7 +2580,7 @@ async function exportUserData() {
     const corpFp = _fpAll[userConf.file] || {};
     const nextFp = {};
     for (const m of months) {
-      const fp = stat[m].cnt + '|' + Math.round(stat[m].sum) + '|' + Object.keys(byMonth[m]).length;
+      const fp = stat[m].cnt + '|' + Math.round(stat[m].sum) + '|' + Object.keys(byMonth[m]).length + '|' + _bjPwTag(userConf.pw || '');
       nextFp[m] = fp;
       const write = (m === latest) || (corpFp[m] !== fp);
       if (!write) { skippedMonths++; continue; }
@@ -13067,7 +13070,7 @@ function renderDayCharts() {
 
 
 // ─── 認証 ───
-const PW_HASH = '0e0f45c5868e1e6ed2c6e78a4e64f54930fffdca1df67a442374d14dc97c4970';
+const PW_HASH = 'a8c55faeacfc24f77ebf48c254899c44fd5edcd03a7c1bb89b7ad5576494da4d';
 const AUTH_KEY = 'bi_auth_bearjon';  // サイト共通（ユーザー別にしない）
 
 async function sha256(str) {
@@ -19436,7 +19439,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function colsIsDefault(kind) {
     return JSON.stringify(columns[kind]) === JSON.stringify(KACore.DEFAULT_COLUMNS[kind]);
   }
-  // 起動時の取り込み: 中央を正として上書きし、中央に無いこのPCの登録だけ自動で合流させる
+  // 起動時の取り込み: 中央を正として取り込み、中央に無いこのPCの登録だけ自動で合流させる。
+  // 鉄則(2026-09-01事故の教訓): 「空の振り分け」は情報を持たないので、本物に勝てないし中央にも送らない。
+  function isEmptyAssign(sv) { return !(sv && (sv.seg || sv.ind)); }
   function syncFromCentral() {
     return centralGet().then(function (js) {
       var central = {};   // key → {v(パース済み), at}
@@ -19444,7 +19449,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         try { central[j.key] = { v: JSON.parse(j.value), at: j.updatedAt || '' }; } catch (e) {}
       });
       var now = new Date().toISOString();
-      var up = [];        // 中央に無いローカル分(初回合流)
+      var up = [];        // 中央へ送る分(合流・修復)
       var hashJobs = [];  // [key生成のPromise]
       ['slot', 'pachi'].forEach(function (kind) {
         var tag = kind === 'slot' ? 'sl' : 'pc';
@@ -19454,9 +19459,21 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           var v = central[k].v;
           if (v && v.n) centralNames[v.n] = { seg: v.s || '', ind: v.i || '' };
         });
-        Object.keys(centralNames).forEach(function (n) { saved[kind][n] = centralNames[n]; });
+        Object.keys(centralNames).forEach(function (n) {
+          var cv = centralNames[n];
+          if (isEmptyAssign(cv) && !isEmptyAssign(saved[kind][n])) {
+            // 中央が空・手元が本物 → 手元を残して中央を修復する
+            hashJobs.push(sha40(kind + '|' + n).then(function (h) {
+              var sv = saved[kind][n];
+              up.push({ key: 'a_' + tag + '_' + h, value: JSON.stringify({ n: n, s: sv.seg || '', i: sv.ind || '' }), updatedAt: now });
+            }));
+            return;
+          }
+          saved[kind][n] = cv;
+        });
         Object.keys(saved[kind]).forEach(function (n) {
           if (centralNames[n]) return;
+          if (isEmptyAssign(saved[kind][n])) return;   // 空は送らない
           hashJobs.push(sha40(kind + '|' + n).then(function (h) {
             var sv = saved[kind][n];
             up.push({ key: 'a_' + tag + '_' + h, value: JSON.stringify({ n: n, s: sv.seg || '', i: sv.ind || '' }), updatedAt: now });
@@ -19464,7 +19481,19 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         });
         var ck = 'cols_' + kind;
         if (central[ck] && central[ck].v && Array.isArray(central[ck].v.list) && central[ck].v.list.length) {
-          columns[kind] = central[ck].v.list;
+          // 列の設定は「中央+このPCにしかない列を後ろに足す」和集合(勝手に列が消えないように)
+          var merged = central[ck].v.list.slice();
+          var haveName = {};
+          merged.forEach(function (c) { if (c.name) haveName[c.name] = 1; });
+          var added = false;
+          (columns[kind] || []).forEach(function (c) {
+            if (c.type === 'spacer' || !c.name || haveName[c.name]) return;
+            merged.push({ name: c.name, type: c.type });
+            haveName[c.name] = 1;
+            added = true;
+          });
+          columns[kind] = merged;
+          if (added) up.push({ key: ck, value: JSON.stringify({ list: merged }), updatedAt: now });
         } else if (!colsIsDefault(kind)) {
           up.push({ key: ck, value: JSON.stringify({ list: columns[kind] }), updatedAt: now });
         }
@@ -19817,7 +19846,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     models[curKind].forEach(function (m) {
       var v = uiValues[curKind][m.name];
       if (!v) return;
-      if (v._pending) dirty[curKind][m.name] = 1;   // 候補の確定も「変更」として中央へ送る
+      // 候補の確定は「中身のあるもの」だけ中央へ送る(空を送ると他のPCの本物を消しかねない)
+      if (v._pending && (v.seg || v.ind)) dirty[curKind][m.name] = 1;
       delete v._pending;
       saved[curKind][m.name] = { seg: v.seg || '', ind: v.ind || '' };
     });
