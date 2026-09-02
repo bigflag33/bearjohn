@@ -1890,7 +1890,7 @@ const USER_LABEL = '東海UNUさん専用';               // 例: '田中さん�
 const USER_ID = 'tokai_unu';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260901-144510';
+const BJ_VERSION = '20260902-090842';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -19340,6 +19340,36 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return c;
   }
   function saveColumns(c) { localStorage.setItem(COLUMNS_KEY, JSON.stringify(c)); }
+  /* ── 店舗別の列構成(2026-09-02): 「どの列をどの順で出すか」だけ店別。無い店は共通(columns)を使う。
+     列の名前変更・新設は共通側のみ＝振り分け(機種→列)は全店共通のまま。中央共有あり(c_sl_/c_pc_) ── */
+  var STORECOLS_KEY = _NS + 'kadouArari_storecols_v1';
+  var SCDIRTY_KEY = _NS + 'kadouArari_storecols_dirty_v1';   // 未送信の店別編集 {base|kind: 編集時刻ISO}
+  function loadStoreCols() { var v = loadJSON(STORECOLS_KEY, null); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; }
+  function saveStoreCols() { localStorage.setItem(STORECOLS_KEY, JSON.stringify(storeCols)); }
+  function loadScDirty() { var v = loadJSON(SCDIRTY_KEY, null); return (v && typeof v === 'object') ? v : {}; }
+  function saveScDirty() { localStorage.setItem(SCDIRTY_KEY, JSON.stringify(scDirty)); }
+  function effCols(kind, base) {
+    var o = base && storeCols && storeCols[base];
+    var l = o && o[kind];
+    // 実列(空白以外)が1つも無いリストは「専用なし」扱い(共通へフォールバック)
+    return (Array.isArray(l) && l.some(function (c) { return c.type !== 'spacer'; })) ? l : columns[kind];
+  }
+  // 店別リストを共通カタログに合わせて整える: 同名で型違いは型を直し、カタログに無い列は落とす。
+  // 実列が無くなったら null(=専用なし)。戻り {list, changed}
+  function fitToCatalog(list, kind) {
+    var byName = {};
+    (columns[kind] || []).forEach(function (c) { if (c.type !== 'spacer' && c.name) byName[c.name] = c.type; });
+    var out = [], changed = false;
+    (list || []).forEach(function (c) {
+      if (c.type === 'spacer') { out.push({ name: '', type: 'spacer' }); return; }
+      var t = byName[c.name];
+      if (!t) { changed = true; return; }              // カタログに無い(リネーム/削除の置き去り)→落とす
+      if (t !== c.type) { changed = true; out.push({ name: c.name, type: t }); return; }   // 型変更に追随
+      out.push({ name: c.name, type: c.type });
+    });
+    if (!out.some(function (c) { return c.type !== 'spacer'; })) return { list: null, changed: true };
+    return { list: out, changed: changed };
+  }
   var TOTALS_KEY = _NS + 'kadouArari_totals_v1';
   function loadTotals() {
     var t = loadJSON(TOTALS_KEY, USER_ID === 'admin' ? 'kadouArari_totals_v1' : null);
@@ -19383,10 +19413,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 
   /* ── 画面の状態 ── */
   var storeIndex = [], hall = null, curKind = 'slot';
+  var allMode = false;                    // true=「全店舗まとめて」(振り分け専用モード・Excel作成は不可)
   var recCache = {}, models = { slot: [], pachi: [] };
-  var saved = null, columns = null;
+  var saved = null, columns = null, storeCols = null;
   var uiValues = { slot: {}, pachi: {} };
   var colDraft = null, colDraftKind = null;
+  var scDraft = null, scDraftKey = null;  // 店別列構成の編集ドラフト(base|kind)
+  var scDirty = {};                       // 店別列構成の未送信フラグ(オフライン編集が古い中央に消されないように)
   var loadGen = 0;
   var dirty = { slot: {}, pachi: {} };   // このPCで変更した機種(保存時に中央へ送る対象)
   var syncOk = null;                      // null=未接続 / true=同期済み / false=オフライン
@@ -19510,10 +19543,58 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           up.push({ key: 't_' + h, value: JSON.stringify({ n: b, v: totals[b] }), updatedAt: now });
         }));
       });
+      // 店別の列構成: 基本は中央が正(値={n:店基底名, list:[...]} / {n, use:'common'}=専用をやめた印)。
+      // 空のlistは書かない設計(消すときは use:'common' を明示)。例外=このPCに「送信できていない新しい編集」
+      // (scDirty)がある場合は、それより古い中央には負けない(9/1事故の教訓の店別版)。
+      var centralSC = {};
+      Object.keys(central).forEach(function (k) {
+        var kind = k.indexOf('c_sl_') === 0 ? 'slot' : (k.indexOf('c_pc_') === 0 ? 'pachi' : null);
+        if (!kind) return;
+        var v = central[k].v;
+        if (!v || !v.n) return;
+        var dk = v.n + '|' + kind;
+        centralSC[dk] = 1;
+        if (scDirty[dk] && scDirty[dk] > (central[k].at || '')) {
+          // このPCの未送信編集の方が新しい → 中央を取り込まず、ローカルを送って修復
+          var lv = (storeCols[v.n] || {})[kind];
+          hashJobs.push(sha40('cols|' + kind + '|' + v.n).then(function (h) {
+            up.push({ key: (kind === 'slot' ? 'c_sl_' : 'c_pc_') + h, value: JSON.stringify(Array.isArray(lv) && lv.length ? { n: v.n, list: lv } : { n: v.n, use: 'common' }), updatedAt: now });
+          }));
+          return;
+        }
+        if (v.use === 'common' || !Array.isArray(v.list) || !v.list.length) {
+          if (storeCols[v.n]) { delete storeCols[v.n][kind]; if (!storeCols[v.n].slot && !storeCols[v.n].pachi) delete storeCols[v.n]; }
+        } else {
+          (storeCols[v.n] = storeCols[v.n] || {})[kind] = v.list;
+        }
+      });
+      Object.keys(storeCols).forEach(function (b) {
+        ['slot', 'pachi'].forEach(function (kind) {
+          var l = storeCols[b][kind];
+          if (!Array.isArray(l) || !l.length) return;
+          // 共通カタログに合わせて整える(旧版PCのリネーム/削除の置き去り列を掃除)
+          var fit = fitToCatalog(l, kind);
+          if (fit.changed) {
+            if (fit.list) storeCols[b][kind] = fit.list;
+            else { delete storeCols[b][kind]; if (!storeCols[b].slot && !storeCols[b].pachi) delete storeCols[b]; }
+            hashJobs.push(sha40('cols|' + kind + '|' + b).then(function (h) {
+              up.push({ key: (kind === 'slot' ? 'c_sl_' : 'c_pc_') + h, value: JSON.stringify(fit.list ? { n: b, list: fit.list } : { n: b, use: 'common' }), updatedAt: now });
+            }));
+            return;
+          }
+          if (centralSC[b + '|' + kind]) return;   // 中央にある方が正
+          hashJobs.push(sha40('cols|' + kind + '|' + b).then(function (h) {
+            up.push({ key: (kind === 'slot' ? 'c_sl_' : 'c_pc_') + h, value: JSON.stringify({ n: b, list: l }), updatedAt: now });
+          }));
+        });
+      });
       return Promise.all(hashJobs).then(function () {
-        saveAssign(saved); saveColumns(columns); saveTotals(totals);
+        saveAssign(saved); saveColumns(columns); saveTotals(totals); saveStoreCols();
         return centralPut(up);
-      }).then(function (ok) { syncOk = true; setSyncNote(); return ok; });
+      }).then(function (ok) {
+        if (ok) { scDirty = {}; saveScDirty(); }   // 同期一式が通ったので未送信フラグを解除
+        syncOk = true; setSyncNote(); return ok;
+      });
     }).catch(function (e) {
       console.warn('[稼働粗利表] 中央共有に接続できません(このPCの保存で続行):', e && e.message);
       syncOk = false; setSyncNote();
@@ -19521,17 +19602,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
   // 保存後の送信: 変更のあった機種だけを中央へ
   function pushAssigns(kind, names) {
-    if (!names.length) return Promise.resolve(true);
+    // 鉄則: 空の振り分けは中央へ送らない(未保存の編集がdirtyに残っていた場合など。空が他PCの本物を消すのを防ぐ)
+    var sendable = names.filter(function (n) { return !isEmptyAssign(saved[kind][n]); });
+    var skipped = names.filter(function (n) { return isEmptyAssign(saved[kind][n]); });
+    skipped.forEach(function (n) { delete dirty[kind][n]; });   // 送るものが無いdirtyは掃除
+    if (!sendable.length) return Promise.resolve(true);
     var tag = kind === 'slot' ? 'sl' : 'pc';
     var now = new Date().toISOString();
-    return Promise.all(names.map(function (n) {
+    return Promise.all(sendable.map(function (n) {
       return sha40(kind + '|' + n).then(function (h) {
-        var sv = saved[kind][n] || { seg: '', ind: '' };
+        var sv = saved[kind][n];
         return { key: 'a_' + tag + '_' + h, value: JSON.stringify({ n: n, s: sv.seg || '', i: sv.ind || '' }), updatedAt: now };
       });
     })).then(centralPut).then(function (ok) {
-      if (ok) names.forEach(function (n) { delete dirty[kind][n]; });
+      if (ok) sendable.forEach(function (n) { delete dirty[kind][n]; });
       syncOk = !!ok; setSyncNote();
+      if (kind === curKind) renderCount();   // 「未保存の変更」表示を送信結果に合わせて更新
       return ok;
     }).catch(function () { syncOk = false; setSyncNote(); return false; });
   }
@@ -19545,6 +19631,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       return centralPut([{ key: 't_' + h, value: JSON.stringify({ n: base, v: totals[base] != null ? totals[base] : null }), updatedAt: new Date().toISOString() }]);
     }).then(function (ok) { syncOk = !!ok; setSyncNote(); return ok; })
       .catch(function () { syncOk = false; setSyncNote(); return false; });
+  }
+  function pushStoreCols(base, kind) {
+    var dk = base + '|' + kind;
+    scDirty[dk] = new Date().toISOString();   // 送信が失敗しても「このPCの編集が最新」の印が残る
+    saveScDirty();
+    var l = (storeCols[base] || {})[kind];
+    return sha40('cols|' + kind + '|' + base).then(function (h) {
+      return centralPut([{
+        key: (kind === 'slot' ? 'c_sl_' : 'c_pc_') + h,
+        value: JSON.stringify(Array.isArray(l) && l.length ? { n: base, list: l } : { n: base, use: 'common' }),
+        updatedAt: new Date().toISOString(),
+      }]);
+    }).then(function (ok) {
+      if (ok) { delete scDirty[dk]; saveScDirty(); }
+      syncOk = !!ok; setSyncNote(); return ok;
+    }).catch(function () { syncOk = false; setSyncNote(); return false; });
   }
   var $ = function (id) { return document.getElementById(id); };
   function setStatus(el, msg, cls) { el.textContent = msg; el.style.color = cls === 'err' ? '#e05656' : (cls === 'ok' ? 'var(--accent)' : 'var(--text2)'); }
@@ -19611,6 +19713,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '</div>'
         + '<div class="bjka-status" id="bjkaGenSt"></div>'
         + '<div class="bjka-note">機種ごとに「セグメント」と「個別機種列」を選びます（両方選んだ機種は両方の列に計上・どちらも選ばない機種は合計列のみ）。プルダウン最下部の「＋ 新しい〇〇を追加...」でその場で列を増やせます。黄色の行は自動候補です。保存すれば次回は新しい機種だけ確認すれば済みます。<br>'
+        + '店舗プルダウンの「全店舗まとめて」を選ぶと、全店の機種が1画面に出ます（未確定が上に並ぶので、新台の振り分けは店を回らずここだけで済みます）。振り分けは全店共通です。<br>'
+        + '店舗を選んでいるとき「列の設定」から<b>その店専用の列構成</b>（どの列を・どの順で出すか）を作れます。例: A店は鳳凰の列・B店はキングハナハナの列、のような店別カスタムができます。<br>'
         + '完成Excel下部・黄色い構成比行の左端は「店の総台数(1パチ等も含む)」で割る式です。総台数はデータに無いため、必要ならExcelのA52セルへ手入力してください（他への影響はありません）。</div>'
         + '</div>';
       document.body.appendChild(m);
@@ -19623,6 +19727,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       $('bjkaGenPachi').onclick = function () { generate('pachi'); };
       $('bjkaStore').addEventListener('change', function () {
         var v = $('bjkaStore').value;
+        if (v === '__all__') { selectAllStores(); return; }
         var x = v === '' ? null : storeIndex[Number(v)];
         selectHall(x ? x.hall : null, x ? x.kind : 'slot');
       });
@@ -19639,6 +19744,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     saved = loadAssign();
     columns = loadColumns();
     totals = loadTotals();
+    storeCols = loadStoreCols();
+    scDirty = loadScDirty();
+    // 前回開いたときの編集ドラフトを持ち越さない(古いドラフトで他PCの新しい設定を上書きしないため)
+    colDraft = null; colDraftKind = null;
+    scDraft = null; scDraftKey = null;
     ensureExcelJS().catch(function () { /* 生成時に再試行してエラー表示する */ });
     // 中央共有から最新を取り込んでから店舗一覧を組む(接続できなければこのPCの保存で続行)
     syncOk = null; setSyncNote();
@@ -19666,6 +19776,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var act = (typeof getActiveStoreId === 'function') ? getActiveStoreId() : null;
     var actIdx = storeIndex.findIndex(function (x) { return x.store.id === act; });
     sel.innerHTML = '<option value="">選択してください</option>'
+      + '<option value="__all__">全店舗まとめて（新台の振り分け用）</option>'
       + storeIndex.map(function (x, i) { return '<option value="' + i + '"' + (i === actIdx ? ' selected' : '') + '>' + esc(x.label) + '</option>'; }).join('');
     if (actIdx >= 0) selectHall(storeIndex[actIdx].hall, storeIndex[actIdx].kind);
     else selectHall(null, 'slot');
@@ -19674,10 +19785,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function selectHall(h, focusKind) {
     var gen = ++loadGen;
     hall = h;
+    allMode = false;
     models = { slot: [], pachi: [] };
     $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">読み込み中...</div>';
     $('bjkaGenSlot').disabled = $('bjkaGenPachi').disabled = $('bjkaSave').disabled = true;
     $('bjkaFrom').value = ''; $('bjkaTo').value = ''; $('bjkaTotal').value = '';
+    $('bjkaFrom').disabled = $('bjkaTo').disabled = $('bjkaTotal').disabled = false;
     $('bjkaCount').textContent = '';
     if (!h) {
       $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">店舗を選ぶと機種一覧が表示されます</div>';
@@ -19744,6 +19857,73 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }
   }
 
+  /* ── 全店舗まとめて(2026-09-02): 全店の機種を1画面に出して振り分けだけ行う。新台の店巡りを不要にする ── */
+  function selectAllStores() {
+    var gen = ++loadGen;
+    allMode = true; hall = null;
+    models = { slot: [], pachi: [] };
+    $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">読み込み中...</div>';
+    $('bjkaGenSlot').disabled = $('bjkaGenPachi').disabled = $('bjkaSave').disabled = true;
+    $('bjkaFrom').value = ''; $('bjkaTo').value = ''; $('bjkaTotal').value = '';
+    $('bjkaFrom').disabled = $('bjkaTo').disabled = $('bjkaTotal').disabled = true;
+    $('bjkaCount').textContent = '';
+    var stores = listStores();
+    var agg = { slot: {}, pachi: {} };
+    (function next(i) {
+      if (gen !== loadGen) return;
+      if (i >= stores.length) { done(); return; }
+      var s = stores[i];
+      var kind = kindOf(s.name);
+      setStatus($('bjkaLoad'), '読み込み中... (' + (i + 1) + '/' + stores.length + '店)');
+      var p = recCache[s.key] ? Promise.resolve(recCache[s.key]) : getRecords(s.key).then(function (r) { recCache[s.key] = r; return r; });
+      p.then(function (recs) {
+        if (gen !== loadGen) return;
+        var latest = '';
+        recs.forEach(function (r) { if (r.date > latest) latest = r.date; });
+        var seen = {};
+        recs.forEach(function (r) {
+          var n = nfc(r['機種名']);
+          if (!n) return;
+          var a = agg[kind][n];
+          if (!a) a = agg[kind][n] = { name: n, count: 0, stores: 0 };   // 撤去済みでも一覧に出す(過去月の表に必要)
+          if (r.date === latest) {
+            a.count++;
+            if (!seen[n]) { seen[n] = 1; a.stores++; }
+          }
+        });
+        next(i + 1);
+      }).catch(function (e) {
+        if (gen !== loadGen) return;
+        console.error(e);
+        setStatus($('bjkaLoad'), 'データの読み込みに失敗しました', 'err');
+      });
+    })(0);
+    function done() {
+      ['slot', 'pachi'].forEach(function (kind) {
+        models[kind] = Object.keys(agg[kind]).map(function (k) { return agg[kind][k]; });
+      });
+      if (!models.slot.length && !models.pachi.length) {
+        setStatus($('bjkaLoad'), 'データがまだ読み込まれていません。', 'err');
+        $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">データがありません</div>';
+        return;
+      }
+      initUiValues();
+      // 新台の発見が目的なので未確定(黄色)を上に・あとは設置台数の多い順
+      ['slot', 'pachi'].forEach(function (kind) {
+        models[kind].sort(function (a, b) {
+          var pa = (uiValues[kind][a.name] || {})._pending ? 0 : 1;
+          var pb = (uiValues[kind][b.name] || {})._pending ? 0 : 1;
+          return pa - pb || b.count - a.count || a.name.localeCompare(b.name, 'ja');
+        });
+      });
+      setStatus($('bjkaLoad'), '全店舗まとめて: ' + stores.length + '店 ・ スロット' + models.slot.length + '機種 / パチンコ' + models.pachi.length + '機種（Excelの作成は店舗を選んだときだけできます）', 'ok');
+      curKind = models.slot.length ? 'slot' : 'pachi';
+      renderAssign();
+      renderColEditor();
+      $('bjkaSave').disabled = false;
+    }
+  }
+
   function initUiValues() {
     ['slot', 'pachi'].forEach(function (kind) {
       var segSet = {}, indSet = {};
@@ -19772,8 +19952,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     $('bjkaTabSlot').className = curKind === 'slot' ? 'on' : '';
     $('bjkaTabPachi').className = curKind === 'pachi' ? 'on' : '';
     var list = models[curKind];
-    if (!hall || !list.length) {
-      $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">' + (!hall ? '店舗を選ぶと機種一覧が表示されます' : 'この部門のデータがありません') + '</div>';
+    if ((!hall && !allMode) || !list.length) {
+      $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">' + ((!hall && !allMode) ? '店舗を選ぶと機種一覧が表示されます' : 'この部門のデータがありません') + '</div>';
       $('bjkaCount').textContent = '';
       return;
     }
@@ -19790,11 +19970,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       return '<tr class="' + (v._pending ? 'bjka-pend' : '') + '" data-i="' + i + '">'
         + '<td>' + esc(m.name) + (v._pending ? '<span class="bjka-tag">候補</span>' : '') + '</td>'
         + '<td class="num">' + (m.count || '') + '</td>'
+        + (allMode ? '<td class="num">' + (m.stores || '') + '</td>' : '')
         + '<td><select data-f="seg">' + opt(segs, v.seg, 'セグメント') + '</select></td>'
         + '<td><select data-f="ind">' + opt(inds, v.ind, '個別機種列') + '</select></td>'
         + '</tr>';
     }).join('');
-    $('bjkaAssign').innerHTML = '<table class="bjka-t"><tr><th>機種名</th><th style="text-align:right">直近台数</th><th>セグメント</th><th>個別機種列</th></tr>' + rows + '</table>';
+    var head = allMode
+      ? '<tr><th>機種名</th><th style="text-align:right">設置台数（全店）</th><th style="text-align:right">設置店舗数</th><th>セグメント</th><th>個別機種列</th></tr>'
+      : '<tr><th>機種名</th><th style="text-align:right">直近台数</th><th>セグメント</th><th>個別機種列</th></tr>';
+    $('bjkaAssign').innerHTML = '<table class="bjka-t">' + head + rows + '</table>';
     renderCount(pend);
     Array.prototype.forEach.call($('bjkaAssign').querySelectorAll('select'), function (sel) {
       sel.onchange = function () {
@@ -19816,12 +20000,24 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
             colDraft = null; colDraftKind = null;
             pushCols(curKind);
           }
+          // この店が専用列構成なら、そこにも足す(共通にだけ足れてもこの店のExcelに出ないため)
+          var scNote = '';
+          if (hall && storeCols[hall.base] && Array.isArray(storeCols[hall.base][curKind]) && storeCols[hall.base][curKind].length) {
+            var scl = storeCols[hall.base][curKind];
+            if (!scl.some(function (c) { return c.name === nm && c.type === (isSeg ? 'seg' : 'ind'); })) {
+              scl.push({ name: nm, type: isSeg ? 'seg' : 'ind' });
+              saveStoreCols();
+              pushStoreCols(hall.base, curKind);
+              scDraft = null; scDraftKey = null;
+              scNote = 'この店の専用列構成にも追加しました。';
+            }
+          }
           v[isSeg ? 'seg' : 'ind'] = nm;
           delete v._pending;
           dirty[curKind][name] = 1;
           renderAssign();
           renderColEditor();
-          setStatus($('bjkaGenSt'), label + '「' + nm + '」を追加しました。完成Excelの右端に列が増えます（並び順は「列の設定」で変えられます）。', 'ok');
+          setStatus($('bjkaGenSt'), label + '「' + nm + '」を追加しました。' + scNote + '完成Excelの右端に列が増えます（並び順は「列の設定」で変えられます）。', 'ok');
           return;
         }
         v[sel.getAttribute('data-f')] = sel.value;
@@ -19839,7 +20035,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       pend = 0;
       models[curKind].forEach(function (m) { if ((uiValues[curKind][m.name] || {})._pending) pend++; });
     }
-    $('bjkaCount').textContent = pend ? '未保存の候補 ' + pend + '件' : '全機種 保存済み';
+    var un = Object.keys(dirty[curKind]).length;
+    $('bjkaCount').textContent = pend ? '未確認の候補 ' + pend + '件'
+      : (un ? '未保存の変更 ' + un + '件（「振り分けを保存」を押してください）' : '全機種 保存済み');
   }
 
   function onSave() {
@@ -19865,6 +20063,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function renderColEditor() {
     var body = $('bjkaColBody');
     if (!body) return;
+    // 店舗を選んでいて、その店に専用の列構成がある場合は店別エディタを出す
+    var scBase = (!allMode && hall) ? hall.base : null;
+    var scList = scBase ? (storeCols[scBase] || {})[curKind] : null;
+    if (scBase && Array.isArray(scList) && scList.length) { renderStoreColEditor(scBase); return; }
     if (colDraftKind !== curKind || !colDraft) {
       colDraft = deepCopy(columns[curKind]).map(function (c) { return { name: c.name, type: c.type, orig: c.name, origType: c.type }; });
       colDraftKind = curKind;
@@ -19888,7 +20090,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       + '<button class="bjka-mini" id="bjkaColAdd">列を追加</button>'
       + '<button class="bjka-mini" id="bjkaColReset">標準構成に戻す</button>'
       + '<button class="bjka-ghost" id="bjkaColSave" style="color:var(--accent);border-color:var(--accent)">列設定を保存</button>'
-      + '<span class="bjka-status" id="bjkaColMsg" style="margin-top:0"></span></div>';
+      + '<span class="bjka-status" id="bjkaColMsg" style="margin-top:0"></span></div>'
+      + (scBase ? '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:10.5px;color:var(--text2)">この列構成は<b>全店共通</b>です。'
+        + '<button class="bjka-mini" id="bjkaColStoreMake" style="margin-left:8px">' + esc(scBase) + ' 専用の列構成を作る（共通をコピーして開始）</button></div>' : '');
     Array.prototype.forEach.call(body.querySelectorAll('[data-a]'), function (el) {
       var i = Number(el.getAttribute('data-i'));
       var a = el.getAttribute('data-a');
@@ -19901,6 +20105,74 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     $('bjkaColAdd').onclick = function () { colDraft.push({ name: '', type: 'seg', orig: null, origType: null }); renderColEditor(); };
     $('bjkaColReset').onclick = function () { colDraft = deepCopy(KACore.DEFAULT_COLUMNS[curKind]).map(function (c) { return { name: c.name, type: c.type, orig: c.name, origType: c.type }; }); renderColEditor(); };
     $('bjkaColSave').onclick = saveColDraft;
+    var mk = $('bjkaColStoreMake');
+    if (mk) mk.onclick = function () {
+      (storeCols[scBase] = storeCols[scBase] || {})[curKind] = deepCopy(columns[curKind]);
+      saveStoreCols();
+      pushStoreCols(scBase, curKind);
+      scDraft = null; scDraftKey = null;
+      renderColEditor();
+    };
+  }
+
+  /* ── 店別の列エディタ: 共通の列カタログから「どの列を・どの順で出すか」だけ選ぶ(名前変更・新設は共通側) ── */
+  function renderStoreColEditor(base) {
+    var body = $('bjkaColBody');
+    var key = base + '|' + curKind;
+    if (scDraftKey !== key || !scDraft) { scDraft = deepCopy((storeCols[base] || {})[curKind] || []); scDraftKey = key; }
+    var catalog = (columns[curKind] || []).filter(function (c) { return c.type !== 'spacer'; });
+    var chosen = {};
+    scDraft.forEach(function (c) { if (c.name) chosen[c.type + ':' + c.name] = 1; });
+    var addOpts = catalog.filter(function (c) { return !chosen[c.type + ':' + c.name]; });
+    var rows = scDraft.map(function (c, i) {
+      return '<tr>'
+        + '<td><button class="bjka-mini" data-a="up" data-i="' + i + '"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="bjka-mini" data-a="dn" data-i="' + i + '"' + (i === scDraft.length - 1 ? ' disabled' : '') + '>↓</button></td>'
+        + '<td style="font-size:11px;color:var(--text2)">' + (c.type === 'seg' ? 'セグメント' : (c.type === 'ind' ? '個別機種' : '空白')) + '</td>'
+        + '<td>' + (c.type === 'spacer' ? '<span style="color:var(--text2)">（空白列）</span>' : esc(c.name)) + '</td>'
+        + '<td><button class="bjka-mini" data-a="del" data-i="' + i + '">外す</button></td>'
+        + '</tr>';
+    }).join('');
+    body.innerHTML = '<div style="font-size:10.5px;color:var(--text2);margin:8px 0;">'
+      + '<b>' + esc(base) + ' 専用</b>の' + (curKind === 'slot' ? 'スロット' : 'パチンコ') + '列構成です（この店のExcelだけに効きます）。'
+      + '「外す」はこの店のExcelから列を消すだけで、振り分けや他の店には影響しません。列の名前変更・新しい列づくりは共通側（振り分けプルダウンの「＋追加」など）で行ってください。</div>'
+      + '<table style="border-collapse:collapse">' + rows + '</table>'
+      + '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">'
+      + '<select id="bjkaScAdd"><option value="">共通の列から追加...</option>'
+      + addOpts.map(function (c, i) { return '<option value="' + i + '">' + esc(c.name) + '（' + (c.type === 'seg' ? 'セグメント' : '個別機種') + '）</option>'; }).join('')
+      + '<option value="__sp__">空白（仕切り）列</option></select>'
+      + '<button class="bjka-ghost" id="bjkaScSave" style="color:var(--accent);border-color:var(--accent)">この店の列設定を保存</button>'
+      + '<button class="bjka-mini" id="bjkaScRevert">共通の列構成に戻す（専用をやめる）</button>'
+      + '<span class="bjka-status" id="bjkaColMsg" style="margin-top:0"></span></div>';
+    Array.prototype.forEach.call(body.querySelectorAll('[data-a]'), function (el) {
+      var i = Number(el.getAttribute('data-i'));
+      var a = el.getAttribute('data-a');
+      if (a === 'up') el.onclick = function () { var t = scDraft[i - 1]; scDraft[i - 1] = scDraft[i]; scDraft[i] = t; renderColEditor(); };
+      if (a === 'dn') el.onclick = function () { var t = scDraft[i + 1]; scDraft[i + 1] = scDraft[i]; scDraft[i] = t; renderColEditor(); };
+      if (a === 'del') el.onclick = function () { scDraft.splice(i, 1); renderColEditor(); };
+    });
+    $('bjkaScAdd').onchange = function () {
+      var v = $('bjkaScAdd').value;
+      if (v === '__sp__') scDraft.push({ name: '', type: 'spacer' });
+      else if (v !== '') { var c = addOpts[Number(v)]; scDraft.push({ name: c.name, type: c.type }); }
+      renderColEditor();
+    };
+    $('bjkaScSave').onclick = function () {
+      if (!scDraft.some(function (c) { return c.type !== 'spacer'; })) { setColMsg('列が1つもありません。1列以上選ぶか「共通に戻す」を使ってください。'); return; }
+      (storeCols[base] = storeCols[base] || {})[curKind] = deepCopy(scDraft).map(function (c) { return { name: c.name || '', type: c.type }; });
+      saveStoreCols();
+      pushStoreCols(base, curKind);
+      setColMsg('保存しました。' + base + 'の完成Excelはこの列並びで作られます。');
+    };
+    $('bjkaScRevert').onclick = function () {
+      if (!window.confirm(base + ' の専用列構成をやめて、共通の列構成に戻します。よろしいですか？（振り分けは消えません）')) return;
+      if (storeCols[base]) { delete storeCols[base][curKind]; if (!storeCols[base].slot && !storeCols[base].pachi) delete storeCols[base]; }
+      saveStoreCols();
+      pushStoreCols(base, curKind);
+      scDraft = null; scDraftKey = null;
+      colDraft = null; colDraftKind = null;
+      renderColEditor();
+      setColMsg('共通の列構成に戻しました。');
+    };
   }
   function setColMsg(msg) { var el = $('bjkaColMsg'); if (el) el.textContent = msg; }
   function saveColDraft() {
@@ -19945,6 +20217,29 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     saveColumns(columns);
     pushCols(kind);
     pushAssigns(kind, migChanged);
+    // 店別の列構成にもリネームを反映してから、共通カタログに合わせて整える
+    // (型変更は型ごと追随・削除された列は落とす・実列が無くなったら専用をやめる)
+    var scChanged = [];
+    Object.keys(storeCols).forEach(function (b) {
+      var l = storeCols[b][kind];
+      if (!Array.isArray(l) || !l.length) return;
+      var renamed = l.map(function (c) {
+        if (c.type === 'spacer') return { name: '', type: 'spacer' };
+        var ren = (c.type === 'seg' ? segRen : indRen)[c.name];
+        return { name: ren != null ? ren : c.name, type: c.type };
+      });
+      var fit = fitToCatalog(renamed, kind);
+      var before = JSON.stringify(l);
+      if (fit.list && JSON.stringify(fit.list) === before) return;   // 変化なし
+      if (fit.list) storeCols[b][kind] = fit.list;
+      else { delete storeCols[b][kind]; if (!storeCols[b].slot && !storeCols[b].pachi) delete storeCols[b]; }
+      scChanged.push(b);
+    });
+    if (scChanged.length) {
+      saveStoreCols();
+      scChanged.forEach(function (b) { pushStoreCols(b, kind); });
+      scDraft = null; scDraftKey = null;
+    }
     var segSet = {}, indSet = {};
     KACore.colNames(clean, 'seg').forEach(function (n) { segSet[n] = 1; });
     KACore.colNames(clean, 'ind').forEach(function (n) { indSet[n] = 1; });
@@ -19984,7 +20279,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     setStatus($('bjkaGenSt'), '作成中...');
     ensureExcelJS().then(function (EJ) {
       var records = recCache[st.key] || [];
-      var layout = KACore.computeLayout(kind, columns[kind]);
+      var scCustom = Array.isArray((storeCols[h.base] || {})[kind]) && (storeCols[h.base] || {})[kind].length > 0;
+      var layout = KACore.computeLayout(kind, effCols(kind, h.base));
       var byDate = KACore.aggregateByDate(records, kind, assign);
       var daysInRange = Object.keys(byDate).filter(function (d) { return d >= from && d <= to; }).length;
       var sheets = ymList.map(function (ym) {
@@ -20008,7 +20304,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         var warns = [];
         if (!daysInRange) warns.push('選択期間にこの部門のデータが無いため日別表は空です');
         if (pend) warns.push('未確定の振り分けが' + pend + '機種あります（画面の表示どおり反映済み）。確認して保存してください');
+        if (scCustom) {
+          // 店別の列構成に、共通の列一覧から消えた/改名された列が残っていないかの最終チェック
+          var known = {};
+          (columns[kind] || []).forEach(function (c) { if (c.type !== 'spacer' && c.name) known[c.name] = 1; });
+          var ghosts = effCols(kind, h.base).filter(function (c) { return c.type !== 'spacer' && c.name && !known[c.name]; }).map(function (c) { return c.name; });
+          if (ghosts.length) warns.push('⚠ この店の列設定に現存しない列があります: ' + ghosts.join('・') + '（その列は空で出ています。「列の設定」を開いて整えてください）');
+        }
         setStatus($('bjkaGenSt'), 'ダウンロードしました: ' + a.download
+          + (scCustom ? '（この店専用の列構成で作成）' : '')
           + (ymList.length > 1 ? '（' + ymList.length + 'か月分を月ごとのシートで収録）' : '')
           + (warns.length ? '（' + warns.join('。') + '）' : ''), 'ok');
       });
