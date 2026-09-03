@@ -1890,7 +1890,7 @@ const USER_LABEL = '北上文化さん専用';               // 例: '田中さ�
 const USER_ID = 'kitakami';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260903-151614';
+const BJ_VERSION = '20260903-163532';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -19884,7 +19884,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   /* ── 店舗別の列構成(2026-09-02): 「どの列をどの順で出すか」だけ店別。無い店は共通(columns)を使う。
      列の名前変更・新設は共通側のみ＝振り分け(機種→列)は全店共通のまま。中央共有あり(c_sl_/c_pc_) ── */
   var STORECOLS_KEY = _NS + 'kadouArari_storecols_v1';
-  var SCDIRTY_KEY = _NS + 'kadouArari_storecols_dirty_v1';   // 未送信の店別編集 {base|kind: 編集時刻ISO}
+  var SCDIRTY_KEY = _NS + 'kadouArari_storecols_dirty_v2';   // 未送信の店別編集 {base|kind: 編集時刻ISO}。v2=旧版(顔認証API共有)の残りフラグを引き継がない
+  var COLSDIRTY_KEY = _NS + 'kadouArari_cols_dirty_v1';      // 箱へ送れていない共通列設定 {kind: 編集時刻ISO}
   function loadStoreCols() { var v = loadJSON(STORECOLS_KEY, null); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; }
   function saveStoreCols() { localStorage.setItem(STORECOLS_KEY, JSON.stringify(storeCols)); }
   function loadScDirty() { var v = loadJSON(SCDIRTY_KEY, null); return (v && typeof v === 'object') ? v : {}; }
@@ -19959,9 +19960,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var saved = null, columns = null, storeCols = null;
   var uiValues = { slot: {}, pachi: {} };
   var colDraft = null, colDraftKind = null;
-  var scDraft = null, scDraftKey = null;  // 店別列構成の編集ドラフト(base|kind)
+  var scDraft = null, scDraftKey = null, scDraftSig = null;  // 店別列構成の編集ドラフト(base|kind)。Sig=共通の写しで始めた時の共通の中身
   var scDirty = {};                       // 店別列構成の未送信フラグ(オフライン編集が古い中央に消されないように)
   var asgDirty = {};                      // 振り分けの未送信フラグ(永続化。PC時計に頼らず「送れていない編集」だけを守る)
+  var colsDirty = {};                     // 共通列設定の未送信フラグ {kind: 時刻}
+  function loadColsDirty() { var v = loadJSON(COLSDIRTY_KEY, null); return (v && typeof v === 'object') ? v : {}; }
+  function saveColsDirty() { try { localStorage.setItem(COLSDIRTY_KEY, JSON.stringify(colsDirty)); } catch (e) {} }
   function loadAsgDirty() { var v = loadJSON(ASGDIRTY_KEY, null); return (v && typeof v === 'object') ? v : {}; }
   function saveAsgDirty() { try { localStorage.setItem(ASGDIRTY_KEY, JSON.stringify(asgDirty)); } catch (e) {} }
   var loadGen = 0;
@@ -19992,7 +19996,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
   // 「最新を読む→変更を重ねる→書く」を1本ずつ順番に実行(同時実行で互いに消さないため)
   var _boxQueue = Promise.resolve();
-  var BOX_WARN_BYTES = 300000;   // DynamoDBの1項目上限(400KB)に近づいたら知らせる
+  var BOX_WARN_BYTES = 100000;   // 設定サーバの1件上限(120KB)に近づいたら知らせる(コンコルドは2026-09-03時点で約50KB)
   function boxPutChecked(b) {
     var s = JSON.stringify(b);
     if (s.length > BOX_WARN_BYTES) console.warn('[稼働粗利表] 共有データが大きくなっています: ' + s.length + ' bytes');
@@ -20081,19 +20085,14 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         });
         var bc = box.cols && box.cols[kind];
         if (Array.isArray(bc) && bc.length) {
-          // 列の設定は「箱+このPCにしかない列を後ろに足す」和集合(勝手に列が消えないように)
-          var merged = bc.slice();
-          var haveName = {};
-          merged.forEach(function (c) { if (c.name) haveName[c.name] = 1; });
-          var added = false;
-          (columns[kind] || []).forEach(function (c) {
-            if (c.type === 'spacer' || !c.name || haveName[c.name]) return;
-            merged.push({ name: c.name, type: c.type });
-            haveName[c.name] = 1;
-            added = true;
-          });
-          columns[kind] = merged;
-          if (added) pending.push(function (b) { (b.cols = b.cols || {})[kind] = merged; });
+          if (colsDirty[kind]) {
+            // このPCに箱へ送れていない列の編集がある → 手元を送る(送れたらフラグが下りる)
+            var mineD = columns[kind];
+            pending.push(function (b) { (b.cols = b.cols || {})[kind] = mineD; });
+          } else {
+            // 列の設定は箱が正。和集合にすると「消した列」が他PCの手元や初期構成から復活してしまう(2026-09-03監査)
+            columns[kind] = bc.map(function (c) { return c.type === 'spacer' ? { name: '', type: 'spacer' } : { name: c.name || '', type: c.type }; });
+          }
         } else if (!colsIsDefault(kind)) {
           var mine = columns[kind];
           pending.push(function (b) { (b.cols = b.cols || {})[kind] = mine; });
@@ -20152,7 +20151,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       saveAssign(saved); saveColumns(columns); saveTotals(totals); saveStoreCols();
       if (!pending.length) { syncOk = true; setSyncNote(); return true; }
       return boxUpdate(function (b) { pending.forEach(function (f) { f(b); }); }).then(function () {
-        scDirty = {}; saveScDirty(); asgDirty = {}; saveAsgDirty();   // 同期一式が通ったので未送信フラグを解除
+        scDirty = {}; saveScDirty(); asgDirty = {}; saveAsgDirty(); colsDirty = {}; saveColsDirty();   // 同期一式が通ったので未送信フラグを解除
         syncOk = true; setSyncNote(); return true;
       });
     }).catch(function (e) {
@@ -20172,8 +20171,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     saveAssign(saved);
     if (!sendable.length) return Promise.resolve(true);
     if (!boxEnabled()) {
-      // 送り先が無い(admin/対象外法人)＝手元保存で完了。未保存表示を残さない
-      sendable.forEach(function (n) { delete dirty[kind][n]; });
+      if (USER_ID === 'admin') sendable.forEach(function (n) { delete dirty[kind][n]; });   // admin(file://)は手元保存で完了。未保存表示を残さない
+      else { sendable.forEach(function (n) { asgDirty[kind + '|' + n] = now; }); saveAsgDirty(); }   // 法人PCで箱に繋がらない → 次に繋がった時に送る
       syncOk = false; setSyncNote();
       if (kind === curKind) renderCount();
       return Promise.resolve(false);
@@ -20190,10 +20189,14 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }).catch(function () { syncOk = false; setSyncNote(); return false; });
   }
   function pushCols(kind) {
-    if (!boxEnabled()) { syncOk = false; setSyncNote(); return Promise.resolve(false); }
     var mine = columns[kind];
+    if (!boxEnabled()) {
+      if (USER_ID !== 'admin') { colsDirty[kind] = new Date().toISOString(); saveColsDirty(); }   // 法人PCで箱に繋がらない → 次に繋がった時に送る
+      syncOk = false; setSyncNote(); return Promise.resolve(false);
+    }
+    colsDirty[kind] = new Date().toISOString(); saveColsDirty();
     return boxUpdate(function (b) { (b.cols = b.cols || {})[kind] = mine; })
-      .then(function () { syncOk = true; setSyncNote(); return true; })
+      .then(function () { delete colsDirty[kind]; saveColsDirty(); syncOk = true; setSyncNote(); return true; })
       .catch(function () { syncOk = false; setSyncNote(); return false; });
   }
   function pushTotal(base) {
@@ -20317,6 +20320,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     storeCols = loadStoreCols();
     scDirty = loadScDirty();
     asgDirty = loadAsgDirty();
+    colsDirty = loadColsDirty();
     // 前回開いたときの編集ドラフトを持ち越さない(古いドラフトで他PCの新しい設定を上書きしないため)
     colDraft = null; colDraftKind = null;
     scDraft = null; scDraftKey = null;
@@ -20366,6 +20370,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if (!h) {
       $('bjkaAssign').innerHTML = '<div style="padding:20px;text-align:center;color:var(--text2)">店舗を選ぶと機種一覧が表示されます</div>';
       setStatus($('bjkaLoad'), '');
+      scDraft = null; scDraftKey = null;
+      renderColEditor();
       return;
     }
     setStatus($('bjkaLoad'), '読み込み中...');
@@ -20606,10 +20612,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
               scl.push({ name: nm, type: isSeg ? 'seg' : 'ind' });
               saveStoreCols();
               pushStoreCols(hall.base, curKind);
-              scDraft = null; scDraftKey = null;
-              scNote = 'この店の専用列構成にも追加しました。';
+              scNote = 'この店の並びにも追加しました。';
             }
           }
+          scDraft = null; scDraftKey = null;   // 店の並びの下書きは作り直す(共通の写しで始めた店も新しい名前を拾う)
           v[isSeg ? 'seg' : 'ind'] = nm;
           delete v._pending;
           dirty[curKind][name] = 1;
@@ -20671,10 +20677,16 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function renderColEditor() {
     var body = $('bjkaColBody');
     if (!body) return;
-    // 店舗を選んでいて、その店に専用の列構成がある場合は店別エディタを出す
-    var scBase = (!allMode && hall) ? hall.base : null;
-    var scList = scBase ? (storeCols[scBase] || {})[curKind] : null;
-    if (scBase && Array.isArray(scList) && scList.length) { renderStoreColEditor(scBase); return; }
+    // 店を選んでいる間は「その店の並び」を編集する(無ければ共通の並びを写して始める)。
+    // 名前の台帳(自由入力・名前変更・削除)は「全店舗まとめて」の画面でだけ(2026-09-03 ユーザー指示: 店の画面から共通が変わらないように)
+    var sumEl = $('bjkaColEd') && $('bjkaColEd').querySelector('summary');
+    if (!allMode && hall) { if (sumEl) sumEl.textContent = '列の設定（' + hall.base + ' のExcelに出す列と並び順）'; renderStoreColEditor(hall.base); return; }
+    if (!allMode) {   // 店未選択: 何も編集させない(台帳は「全店舗まとめて」でだけ)
+      if (sumEl) sumEl.textContent = '列の設定';
+      body.innerHTML = '<div style="font-size:10.5px;color:var(--text2);margin:8px 0;">店舗を選ぶとその店の列並びを、「全店舗まとめて」を選ぶと名前の台帳（全店共通）を編集できます。</div>';
+      return;
+    }
+    if (sumEl) sumEl.textContent = '列の設定（名前の台帳：セグメント名・個別機種名の追加 / 削除 / 名前変更 / 基本の並び）';
     if (colDraftKind !== curKind || !colDraft) {
       colDraft = deepCopy(columns[curKind]).map(function (c) { return { name: c.name, type: c.type, orig: c.name, origType: c.type }; });
       colDraftKind = curKind;
@@ -20692,15 +20704,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '</tr>';
     }).join('');
     body.innerHTML = '<div style="font-size:10.5px;color:var(--text2);margin:8px 0;">'
-      + (curKind === 'slot' ? 'スロット' : 'パチンコ') + 'の完成Excelの列並びです（先頭の合計列「' + (curKind === 'slot' ? '20S' : '4P') + '」は固定）。名前を変えると振り分け済みの機種も自動で付いてきます。列を削除すると、その列に振り分けていた機種はその列については「（なし）」になります。保存せずにタブや店舗を切り替えると編集中の内容は破棄されます。</div>'
+      + '<b>名前の台帳（全店共通）</b>です。' + (curKind === 'slot' ? 'スロット' : 'パチンコ') + 'のセグメント名・個別機種名をここで作る・変える・消すことができます（先頭の合計列「' + (curKind === 'slot' ? '20S' : '4P') + '」は固定）。'
+      + '名前を変えると振り分け済みの機種と各店の並びも自動で付いてきます。名前を消すと、その名前に振り分けていた機種は「（なし）」になり、各店の並びからも消えます。'
+      + 'ここの並び順は、まだ自分の並びを作っていない店のExcelの並びになります。店ごとの並びは店を選んだ画面で決めてください。保存せずにタブを切り替えると編集中の内容は破棄されます。</div>'
       + '<table style="border-collapse:collapse">' + rows + '</table>'
       + '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;">'
       + '<button class="bjka-mini" id="bjkaColAdd">列を追加</button>'
       + '<button class="bjka-mini" id="bjkaColReset">標準構成に戻す</button>'
       + '<button class="bjka-ghost" id="bjkaColSave" style="color:var(--accent);border-color:var(--accent)">列設定を保存</button>'
-      + '<span class="bjka-status" id="bjkaColMsg" style="margin-top:0"></span></div>'
-      + (scBase ? '<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border);font-size:10.5px;color:var(--text2)">この列構成は<b>全店共通</b>です。'
-        + '<button class="bjka-mini" id="bjkaColStoreMake" style="margin-left:8px">' + esc(scBase) + ' 専用の列構成を作る（共通をコピーして開始）</button></div>' : '');
+      + '<span class="bjka-status" id="bjkaColMsg" style="margin-top:0"></span></div>';
     Array.prototype.forEach.call(body.querySelectorAll('[data-a]'), function (el) {
       var i = Number(el.getAttribute('data-i'));
       var a = el.getAttribute('data-a');
@@ -20713,25 +20725,26 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     $('bjkaColAdd').onclick = function () { colDraft.push({ name: '', type: 'seg', orig: null, origType: null }); renderColEditor(); };
     $('bjkaColReset').onclick = function () { colDraft = deepCopy(KACore.DEFAULT_COLUMNS[curKind]).map(function (c) { return { name: c.name, type: c.type, orig: c.name, origType: c.type }; }); renderColEditor(); };
     $('bjkaColSave').onclick = saveColDraft;
-    var mk = $('bjkaColStoreMake');
-    if (mk) mk.onclick = function () {
-      (storeCols[scBase] = storeCols[scBase] || {})[curKind] = deepCopy(columns[curKind]);
-      saveStoreCols();
-      pushStoreCols(scBase, curKind);
-      scDraft = null; scDraftKey = null;
-      renderColEditor();
-    };
   }
-
-  /* ── 店別の列エディタ: 共通の列カタログから「どの列を・どの順で出すか」だけ選ぶ(名前変更・新設は共通側) ── */
+  /* ── 店の列エディタ: 名前の台帳(共通)から「どの列を・どの順で出すか」を選ぶだけ。名前の新設・変更・削除は共通側 ──
+     その店の並びがまだ無ければ共通の並びを写して始め、保存した時点でその店の並びになる(2026-09-03) */
   function renderStoreColEditor(base) {
     var body = $('bjkaColBody');
     var key = base + '|' + curKind;
-    if (scDraftKey !== key || !scDraft) { scDraft = deepCopy((storeCols[base] || {})[curKind] || []); scDraftKey = key; }
-    var catalog = (columns[curKind] || []).filter(function (c) { return c.type !== 'spacer'; });
+    var own = (storeCols[base] || {})[curKind];
+    var hasOwn = Array.isArray(own) && own.length > 0;
+    var commonSig = JSON.stringify(columns[curKind] || []);
+    if (scDraftKey !== key || !scDraft || (!hasOwn && scDraftSig !== commonSig)) {
+      scDraft = deepCopy(hasOwn ? own : (columns[curKind] || [])).map(function (c) { return c.type === 'spacer' ? { name: '', type: 'spacer' } : { name: c.name, type: c.type }; });
+      scDraftKey = key;
+      scDraftSig = hasOwn ? null : commonSig;   // 共通の写しで始めた下書きは、共通が変わったら作り直す
+    }
+    var catalog = (columns[curKind] || []).filter(function (c) { return c.type !== 'spacer' && c.name; });
     var chosen = {};
     scDraft.forEach(function (c) { if (c.name) chosen[c.type + ':' + c.name] = 1; });
-    var addOpts = catalog.filter(function (c) { return !chosen[c.type + ':' + c.name]; });
+    var segOpts = catalog.filter(function (c) { return c.type === 'seg' && !chosen['seg:' + c.name]; });
+    var indOpts = catalog.filter(function (c) { return c.type === 'ind' && !chosen['ind:' + c.name]; });
+    var optHtml = function (list) { return list.map(function (c, i) { return '<option value="' + i + '">' + esc(c.name) + '</option>'; }).join(''); };
     var rows = scDraft.map(function (c, i) {
       return '<tr>'
         + '<td><button class="bjka-mini" data-a="up" data-i="' + i + '"' + (i === 0 ? ' disabled' : '') + '>↑</button><button class="bjka-mini" data-a="dn" data-i="' + i + '"' + (i === scDraft.length - 1 ? ' disabled' : '') + '>↓</button></td>'
@@ -20741,15 +20754,17 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '</tr>';
     }).join('');
     body.innerHTML = '<div style="font-size:10.5px;color:var(--text2);margin:8px 0;">'
-      + '<b>' + esc(base) + ' 専用</b>の' + (curKind === 'slot' ? 'スロット' : 'パチンコ') + '列構成です（この店のExcelだけに効きます）。'
-      + '「外す」はこの店のExcelから列を消すだけで、振り分けや他の店には影響しません。列の名前変更・新しい列づくりは共通側（振り分けプルダウンの「＋追加」など）で行ってください。</div>'
+      + '<b>' + esc(base) + '</b>の' + (curKind === 'slot' ? 'スロット' : 'パチンコ') + 'のExcelの列並びです（この店だけに効きます）。'
+      + (hasOwn ? '' : 'この店の並びはまだ無いので、共通の並びを写して始めています。保存するとこの店の並びになります。')
+      + '「外す」はこの店のExcelから列を消すだけで、振り分けや他の店には影響しません。'
+      + '名前を作る・変える・消すのは「全店舗まとめて」の画面か、振り分け表の「＋追加」で行ってください。</div>'
       + '<table style="border-collapse:collapse">' + rows + '</table>'
       + '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">'
-      + '<select id="bjkaScAdd"><option value="">共通の列から追加...</option>'
-      + addOpts.map(function (c, i) { return '<option value="' + i + '">' + esc(c.name) + '（' + (c.type === 'seg' ? 'セグメント' : '個別機種') + '）</option>'; }).join('')
-      + '<option value="__sp__">空白（仕切り）列</option></select>'
+      + '<select id="bjkaScAddSeg"><option value="">セグメントを追加...</option>' + optHtml(segOpts) + '</select>'
+      + '<select id="bjkaScAddInd"><option value="">個別機種を追加...</option>' + optHtml(indOpts) + '</select>'
+      + '<button class="bjka-mini" id="bjkaScAddSp">空白（仕切り）列を追加</button>'
       + '<button class="bjka-ghost" id="bjkaScSave" style="color:var(--accent);border-color:var(--accent)">この店の列設定を保存</button>'
-      + '<button class="bjka-mini" id="bjkaScRevert">共通の列構成に戻す（専用をやめる）</button>'
+      + (hasOwn ? '<button class="bjka-mini" id="bjkaScRevert">共通の並びに戻す</button>' : '')
       + '<span class="bjka-status" id="bjkaColMsg" style="margin-top:0"></span></div>';
     Array.prototype.forEach.call(body.querySelectorAll('[data-a]'), function (el) {
       var i = Number(el.getAttribute('data-i'));
@@ -20758,28 +20773,27 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if (a === 'dn') el.onclick = function () { var t = scDraft[i + 1]; scDraft[i + 1] = scDraft[i]; scDraft[i] = t; renderColEditor(); };
       if (a === 'del') el.onclick = function () { scDraft.splice(i, 1); renderColEditor(); };
     });
-    $('bjkaScAdd').onchange = function () {
-      var v = $('bjkaScAdd').value;
-      if (v === '__sp__') scDraft.push({ name: '', type: 'spacer' });
-      else if (v !== '') { var c = addOpts[Number(v)]; scDraft.push({ name: c.name, type: c.type }); }
-      renderColEditor();
-    };
+    $('bjkaScAddSeg').onchange = function () { var v = $('bjkaScAddSeg').value; if (v === '') return; var c = segOpts[Number(v)]; scDraft.push({ name: c.name, type: 'seg' }); renderColEditor(); };
+    $('bjkaScAddInd').onchange = function () { var v = $('bjkaScAddInd').value; if (v === '') return; var c = indOpts[Number(v)]; scDraft.push({ name: c.name, type: 'ind' }); renderColEditor(); };
+    $('bjkaScAddSp').onclick = function () { scDraft.push({ name: '', type: 'spacer' }); renderColEditor(); };
     $('bjkaScSave').onclick = function () {
-      if (!scDraft.some(function (c) { return c.type !== 'spacer'; })) { setColMsg('列が1つもありません。1列以上選ぶか「共通に戻す」を使ってください。'); return; }
+      if (!scDraft.some(function (c) { return c.type !== 'spacer'; })) { setColMsg('列が1つもありません。1列以上選んでください。'); return; }
       (storeCols[base] = storeCols[base] || {})[curKind] = deepCopy(scDraft).map(function (c) { return { name: c.name || '', type: c.type }; });
       saveStoreCols();
       pushStoreCols(base, curKind);
-      setColMsg('保存しました。' + base + 'の完成Excelはこの列並びで作られます。');
+      renderColEditor();   // 保存後は「共通の並びに戻す」が出る
+      setColMsg('保存しました。' + base + 'のExcelはこの列並びで作られます。');
     };
-    $('bjkaScRevert').onclick = function () {
-      if (!window.confirm(base + ' の専用列構成をやめて、共通の列構成に戻します。よろしいですか？（振り分けは消えません）')) return;
+    var rv = $('bjkaScRevert');
+    if (rv) rv.onclick = function () {
+      if (!window.confirm(base + ' の並びをやめて、共通の並びに戻します。よろしいですか？（振り分けは消えません）')) return;
       if (storeCols[base]) { delete storeCols[base][curKind]; if (!storeCols[base].slot && !storeCols[base].pachi) delete storeCols[base]; }
       saveStoreCols();
       pushStoreCols(base, curKind);
       scDraft = null; scDraftKey = null;
       colDraft = null; colDraftKind = null;
       renderColEditor();
-      setColMsg('共通の列構成に戻しました。');
+      setColMsg('共通の並びに戻しました。');
     };
   }
   function setColMsg(msg) { var el = $('bjkaColMsg'); if (el) el.textContent = msg; }
@@ -20846,8 +20860,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if (scChanged.length) {
       saveStoreCols();
       scChanged.forEach(function (b) { pushStoreCols(b, kind); });
-      scDraft = null; scDraftKey = null;
     }
+    scDraft = null; scDraftKey = null;   // 台帳が変わったので店の並びの下書きは作り直す(自分の並びが無い店の写しも含む)
     var segSet = {}, indSet = {};
     KACore.colNames(clean, 'seg').forEach(function (n) { segSet[n] = 1; });
     KACore.colNames(clean, 'ind').forEach(function (n) { indSet[n] = 1; });
@@ -20968,6 +20982,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       storeCols = loadStoreCols();
       scDirty = loadScDirty();
       asgDirty = loadAsgDirty();
+      colsDirty = loadColsDirty();
       _tuneReadyP = syncFromCentral().then(function () { return true; }).catch(function () { return false; });
       return _tuneReadyP;
     },
