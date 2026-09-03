@@ -1890,7 +1890,7 @@ const USER_LABEL = 'セントラルさん専用';               // 例: '田中�
 const USER_ID = 'central';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260903-150503';
+const BJ_VERSION = '20260903-151614';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -17452,7 +17452,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         .then(function(r){ if(!r.ok) throw new Error('get '+r.status); return r.json(); })
         .then(function(j){
           var hit=null;
-          (j.items||[]).forEach(function(it){ if(it.kind===kind){ try{ hit={value:JSON.parse(it.value), updatedAt:it.updatedAt||'', updatedBy:it.updatedBy||''}; }catch(e){} } });
+          (j.items||[]).forEach(function(it){ if(it.kind===kind){ try{ hit={value:JSON.parse(it.value), updatedAt:it.updatedAt||'', updatedBy:it.updatedBy||''}; }catch(e){ hit={corrupt:true}; } } });
           return hit;
         });
     },
@@ -18136,8 +18136,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     Object.keys(priceSet).forEach(function(n){
       _bjtDraft[n]=Object.assign(_bjtDraft[n]||{}, priceSet[n]);
     });
-    var pAsg=Promise.resolve(true);
-    asgSet.forEach(function(a){ pAsg=pAsg.then(function(ok){ return window._bjkaForTune.set(kind,a.name,a.seg,a.ind).then(function(ok2){ return ok&&ok2; }); }); });
+    var pAsg=asgSet.length ? window._bjkaForTune.setMany(kind, asgSet) : Promise.resolve(true);   // 1回の書き込みにまとめる
     _bjtRender();
     if(msg){ msg.className='bjt-msg ok';
       msg.textContent=(nPrice?('CSVから'+Object.keys(priceSet).length+'機種・'+nPrice+'か所を下書きに入れました。内容を確かめて「保存して反映」を押してください。'):'')
@@ -19834,6 +19833,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var EXCELJS_SRI = 'sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw==';
   var ASSIGN_KEY = _NS + 'kadouArari_assign_v1';
   var EMPTYRESET_KEY = _NS + 'kadouArari_emptyreset_v1';   // 旧版が黙って保存した空エントリの一回きりの掃除フラグ
+  var ASGDIRTY_KEY = _NS + 'kadouArari_assign_dirty_v1';    // 箱へ送れていない振り分け {kind|機種名: 編集時刻}。これが立つ機種だけ手元を優先
   // 旧版(〜2026-09-03)の自動候補の規則。新版では候補には使わず、「この登録は自動候補のまま確定された疑い」を見つけるためだけに使う
   var LEGACY_SUGGEST = {
     slot: { seg: [[/ジャグラー/, 'ジャグラー'], [/ハナハナ/, 'ハナハナ'], [/沖ドキ/, '沖ドキ！'], [/^(スマスロ|L\s|Lパチスロ|L[^T])/, 'スマスロ']],
@@ -19961,6 +19961,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var colDraft = null, colDraftKind = null;
   var scDraft = null, scDraftKey = null;  // 店別列構成の編集ドラフト(base|kind)
   var scDirty = {};                       // 店別列構成の未送信フラグ(オフライン編集が古い中央に消されないように)
+  var asgDirty = {};                      // 振り分けの未送信フラグ(永続化。PC時計に頼らず「送れていない編集」だけを守る)
+  function loadAsgDirty() { var v = loadJSON(ASGDIRTY_KEY, null); return (v && typeof v === 'object') ? v : {}; }
+  function saveAsgDirty() { try { localStorage.setItem(ASGDIRTY_KEY, JSON.stringify(asgDirty)); } catch (e) {} }
   var loadGen = 0;
   var dirty = { slot: {}, pachi: {} };   // このPCで変更した機種(保存時に中央へ送る対象)
   var syncOk = null;                      // null=未接続 / true=同期済み / false=オフライン
@@ -19982,16 +19985,37 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function boxGet() {
     var a = boxApi();
     if (!a || !a.enabled()) return Promise.reject(new Error('local'));
-    return a.get(BOX_KIND).then(function (hit) { return hit ? normBox(hit.value) : null; });
+    return a.get(BOX_KIND).then(function (hit) {
+      if (hit && hit.corrupt) throw new Error('box corrupt');   // 壊れた箱に自分の変更だけ乗せて上書きしない
+      return hit ? normBox(hit.value) : null;
+    });
   }
   // 「最新を読む→変更を重ねる→書く」を1本ずつ順番に実行(同時実行で互いに消さないため)
   var _boxQueue = Promise.resolve();
+  var BOX_WARN_BYTES = 300000;   // DynamoDBの1項目上限(400KB)に近づいたら知らせる
+  function boxPutChecked(b) {
+    var s = JSON.stringify(b);
+    if (s.length > BOX_WARN_BYTES) console.warn('[稼働粗利表] 共有データが大きくなっています: ' + s.length + ' bytes');
+    return boxApi().put(BOX_KIND, b);
+  }
   function boxUpdate(mutator) {
+    // mutator は同じ入力に対して同じ結果になる作りにする(書いた時刻は呼び出し時に決めておく)
     var run = function () {
       return boxGet().then(function (b) {
         b = b || emptyBox();
         mutator(b);
-        return boxApi().put(BOX_KIND, b);
+        return boxPutChecked(b);
+      }).then(function verify(prev, attempt) {
+        // 書いた直後に読み直し、自分の変更が消えていたら(別PCが同時に書いた)重ね直す。最大3回
+        var n = (typeof attempt === 'number') ? attempt : 0;
+        return boxGet().then(function (b2) {
+          b2 = b2 || emptyBox();
+          var before = JSON.stringify(b2);
+          mutator(b2);
+          if (JSON.stringify(b2) === before) return true;   // 載っている
+          if (n >= 2) throw new Error('box conflict');
+          return boxPutChecked(b2).then(function () { return verify(null, n + 1); });
+        });
       });
     };
     var p = _boxQueue.then(run, run);
@@ -20041,9 +20065,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
             pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: now, c: sv.c ? 1 : 0 }; });
             return;
           }
-          if (!isEmptyAssign(sv) && sv.at && cv.at && sv.at > cv.at && (sv.seg !== cv.seg || sv.ind !== cv.ind)) {
-            // 手元の方が新しい(送れていなかった編集) → 手元を残して箱へ
-            pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: sv.at, c: sv.c ? 1 : 0 }; });
+          if (!isEmptyAssign(sv) && asgDirty[kind + '|' + n]) {
+            // このPCで送れていない編集 → 手元を残して箱へ(PC時計には頼らない)
+            var svAt = sv.at || now;
+            pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: svAt, c: 1 }; });
             return;
           }
           saved[kind][n] = { seg: cv.seg, ind: cv.ind, c: cv.c, at: cv.at };
@@ -20074,7 +20099,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           pending.push(function (b) { (b.cols = b.cols || {})[kind] = mine; });
         }
       });
-      // 総台数: 箱にあれば箱が正、このPCにしか無ければ箱へ
+      // 総台数: 箱にあれば箱が正(v:0=消した印)、このPCにしか無ければ箱へ
       var bt = box.totals || {};
       Object.keys(bt).forEach(function (b2) { var v = bt[b2] && bt[b2].v; if (v > 0) totals[b2] = v; else delete totals[b2]; });
       Object.keys(totals).forEach(function (b2) {
@@ -20091,12 +20116,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           if (!e) return;
           var dk = base + '|' + kind;
           seenSC[dk] = 1;
-          if (scDirty[dk] && scDirty[dk] > (e.at || '')) {
+          if (scDirty[dk]) {
+            // このPCで送れていない店別編集 → 手元を残して箱へ(消した場合は list:[] の印を書く)
             var lv = (storeCols[base] || {})[kind];
             pending.push(function (b) {
               b.storeCols = b.storeCols || {};
-              if (Array.isArray(lv) && lv.length) (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: lv, at: now };
-              else if (b.storeCols[base]) { delete b.storeCols[base][kind]; if (!Object.keys(b.storeCols[base]).length) delete b.storeCols[base]; }
+              (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: (Array.isArray(lv) && lv.length) ? lv : [], at: now };
             });
             return;
           }
@@ -20115,8 +20140,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
             var fl = fit.list;
             pending.push(function (b) {
               b.storeCols = b.storeCols || {};
-              if (fl) (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: fl, at: now };
-              else if (b.storeCols[base]) { delete b.storeCols[base][kind]; if (!Object.keys(b.storeCols[base]).length) delete b.storeCols[base]; }
+              (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: fl || [], at: now };   // 実列が無くなったら list:[] (消した印)
             });
             return;
           }
@@ -20128,7 +20152,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       saveAssign(saved); saveColumns(columns); saveTotals(totals); saveStoreCols();
       if (!pending.length) { syncOk = true; setSyncNote(); return true; }
       return boxUpdate(function (b) { pending.forEach(function (f) { f(b); }); }).then(function () {
-        scDirty = {}; saveScDirty();   // 同期一式が通ったので未送信フラグを解除
+        scDirty = {}; saveScDirty(); asgDirty = {}; saveAsgDirty();   // 同期一式が通ったので未送信フラグを解除
         syncOk = true; setSyncNote(); return true;
       });
     }).catch(function (e) {
@@ -20144,17 +20168,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var skipped = names.filter(function (n) { return isEmptyAssign(saved[kind][n]); });
     skipped.forEach(function (n) { delete dirty[kind][n]; });
     var now = new Date().toISOString();
-    sendable.forEach(function (n) { if (saved[kind][n]) saved[kind][n].at = now; });
+    var items = sendable.map(function (n) { var sv = saved[kind][n]; sv.at = now; sv.c = 1; return { n: n, s: sv.seg || '', i: sv.ind || '' }; });   // 呼び出し時点の値を写し取る
     saveAssign(saved);
     if (!sendable.length) return Promise.resolve(true);
-    if (!boxEnabled()) { syncOk = false; setSyncNote(); return Promise.resolve(false); }
-    return boxUpdate(function (b) {
-      sendable.forEach(function (n) {
-        var sv = saved[kind][n];
-        (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: now, c: 1 };
-      });
-    }).then(function () {
+    if (!boxEnabled()) {
+      // 送り先が無い(admin/対象外法人)＝手元保存で完了。未保存表示を残さない
       sendable.forEach(function (n) { delete dirty[kind][n]; });
+      syncOk = false; setSyncNote();
+      if (kind === curKind) renderCount();
+      return Promise.resolve(false);
+    }
+    sendable.forEach(function (n) { asgDirty[kind + '|' + n] = now; }); saveAsgDirty();
+    return boxUpdate(function (b) {
+      items.forEach(function (it) { (b[kind] = b[kind] || {})[it.n] = { s: it.s, i: it.i, at: now, c: 1 }; });
+    }).then(function () {
+      sendable.forEach(function (n) { delete dirty[kind][n]; delete asgDirty[kind + '|' + n]; });
+      saveAsgDirty();
       syncOk = true; setSyncNote();
       if (kind === curKind) renderCount();
       return true;
@@ -20170,7 +20199,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function pushTotal(base) {
     if (!boxEnabled()) { syncOk = false; setSyncNote(); return Promise.resolve(false); }
     var v = totals[base] != null ? totals[base] : null, now = new Date().toISOString();
-    return boxUpdate(function (b) { b.totals = b.totals || {}; if (v > 0) b.totals[base] = { v: v, at: now }; else delete b.totals[base]; })
+    return boxUpdate(function (b) { b.totals = b.totals || {}; b.totals[base] = { v: (v > 0) ? v : 0, at: now }; })   // v:0=消した印(他PCの古い手元で復活しないように)
       .then(function () { syncOk = true; setSyncNote(); return true; })
       .catch(function () { syncOk = false; setSyncNote(); return false; });
   }
@@ -20180,10 +20209,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     saveScDirty();
     if (!boxEnabled()) { syncOk = false; setSyncNote(); return Promise.resolve(false); }
     var l = (storeCols[base] || {})[kind];
+    var snap = (Array.isArray(l) && l.length) ? JSON.parse(JSON.stringify(l)) : [];   // []=専用をやめた印(墓標)
     return boxUpdate(function (b) {
       b.storeCols = b.storeCols || {};
-      if (Array.isArray(l) && l.length) (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: l, at: now };
-      else if (b.storeCols[base]) { delete b.storeCols[base][kind]; if (!Object.keys(b.storeCols[base]).length) delete b.storeCols[base]; }
+      (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: snap, at: now };
     }).then(function () {
       delete scDirty[dk]; saveScDirty();
       syncOk = true; setSyncNote(); return true;
@@ -20287,6 +20316,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     totals = loadTotals();
     storeCols = loadStoreCols();
     scDirty = loadScDirty();
+    asgDirty = loadAsgDirty();
     // 前回開いたときの編集ドラフトを持ち越さない(古いドラフトで他PCの新しい設定を上書きしないため)
     colDraft = null; colDraftKind = null;
     scDraft = null; scDraftKey = null;
@@ -20480,7 +20510,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           var v = { seg: segOk ? (sv.seg || '') : '', ind: indOk ? (sv.ind || '') : '' };
           if (!segOk || !indOk) {
             v._pending = true;
-            saved[kind][m.name] = { seg: v.seg, ind: v.ind };   // 消えた列名を保存側にも残さない
+            saved[kind][m.name] = { seg: v.seg, ind: v.ind, at: sv.at, c: sv.c };   // 消えた列名を保存側にも残さない(at/cは保つ)
           }
           // 旧版の自動候補と同じ値のまま、新版で人が確定した印(c)が無い → 疑いとして黄色で見せる(値は残す＝Excelは変わらない)
           if (!v._pending && !sv.c && (v.seg || v.ind)) {
@@ -20621,6 +20651,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if (!v) return;
       // 自動候補なし(2026-09-03): 黄色(触っていない)の行は保存しない。_pendingが消えるのは人の操作経路だけ
       if (v._pending) { left++; return; }
+      if (!dirty[curKind][m.name] && saved[curKind][m.name]) return;   // 触っていない機種は既存(at/c付き)をそのまま
       var ent = { seg: v.seg || '', ind: v.ind || '', c: 1 };
       if (!ent.seg && !ent.ind) ent.none = 1;   // 人が選んだ（なし）(旧版が黙って書いた空と区別する)
       saved[curKind][m.name] = ent;
@@ -20936,6 +20967,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       totals = loadTotals();
       storeCols = loadStoreCols();
       scDirty = loadScDirty();
+      asgDirty = loadAsgDirty();
       _tuneReadyP = syncFromCentral().then(function () { return true; }).catch(function () { return false; });
       return _tuneReadyP;
     },
@@ -20954,6 +20986,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       saveAssign(saved);
       dirty[kind][name] = 1;
       return pushAssigns(kind, [name]);
+    },
+    setMany: function (kind, list) {   // [{name,seg,ind}] をまとめて1回の書き込みで
+      if (!saved) return Promise.resolve(false);
+      var names = [];
+      list.forEach(function (x) { saved[kind][x.name] = { seg: x.seg || '', ind: x.ind || '' }; dirty[kind][x.name] = 1; names.push(x.name); });
+      saveAssign(saved);
+      return pushAssigns(kind, names);
     },
   };
 
