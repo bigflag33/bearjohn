@@ -1890,7 +1890,7 @@ const USER_LABEL = '丸三さん専用';               // 例: '田中さん専�
 const USER_ID = 'marusan';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260902-143724';
+const BJ_VERSION = '20260903-091935';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -15187,6 +15187,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   table.bjt-t select.bjt-asg{ font:inherit; font-size:11.5px; max-width:150px; padding:3px 4px;
     border:1px solid var(--border); border-radius:6px; background:var(--card2); color:var(--text); }
   table.bjt-t td.bjt-asgna{ color:var(--text2); font-size:11px; }
+  .bjts-sec{ margin:14px 0 6px; font-size:12.5px; font-weight:700; color:var(--text); }
+  .bjtp select.bjts-sel{ font:inherit; font-size:12px; max-width:320px; padding:3px 4px; border:1px solid var(--border); border-radius:6px; background:var(--card2); color:var(--text); }
+  .bjtp input.bjts-other{ font:inherit; font-size:12px; padding:3px 6px; border:1px solid var(--border); border-radius:6px; background:var(--card2); color:var(--text); }
   .bjtp-ov{ position:fixed; inset:0; background:rgba(20,40,50,.35); z-index:9999;
             display:flex; align-items:flex-start; justify-content:center; padding:40px 16px; overflow-y:auto; }
   .bjtp{ background:var(--card); border-radius:8px; max-width:700px; width:100%;
@@ -17249,6 +17252,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     try{ localStorage.removeItem(_bjtLsKey()+'_ref'); localStorage.removeItem(_bjtLsKey()+'_targets'); }catch(e){}   // 旧方式の残骸を掃除
     try{ if(typeof bjTuneBump==='function') bjTuneBump(); }catch(e){}
     _bjtLoadPrice();
+    _bjtLoadSisMap();
   }
   function _bjtPersist(){
     try{ localStorage.setItem(_bjtLsKey(), JSON.stringify(window.BJ_TUNE||{})); return true; }catch(e){ return false; }
@@ -17277,6 +17281,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var _bjtTk=null, _bjtTkExp=0, _bjtSyncState='', _bjtMeta=null, _bjtPullTried=false;
   var _bjtRev=0;   // このPCで保存するたびに増やす。読み込みの返事が遅れて届いても、保存済みの内容を消さないための番号
   var _bjtRevP=0, _bjtDfltHeld=false;   // 新台価格用の世代番号(単価と別に持つ) / 仮の価格をサーバへ送れず保留中の印
+  var _bjtRevS=0, _bjtSisHeld=false;     // SIS対応表用の世代番号 / 送れなかった対応表を保留中の印
 
   function _bjtCorp(){ return window.BJ_TUNE_CORP || (typeof USER_ID!=='undefined'?USER_ID:'admin'); }
   // file:// で開いているとき（弊社のローカル版）はサーバに繋がない＝このPCの中だけ
@@ -17333,16 +17338,17 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       return Promise.resolve();
     }
     _bjtPullTried=true;
-    var rev=_bjtRev, revP=_bjtRevP;   // 読み込みを始めた時点の番号を控える(単価/新台価格それぞれ)
+    var rev=_bjtRev, revP=_bjtRevP, revS=_bjtRevS;   // 読み込みを始めた時点の番号を控える(単価/新台価格/SIS対応表それぞれ)
     return _bjtCall('settings',{method:'GET'})
       .then(function(r){ if(!r.ok) throw new Error('get '+r.status); return r.json(); })
       .then(function(j){
         // 読み込んでいる間にこのPCで保存されたら、その種別の返事は捨てる（保存を消さないため）。単価と新台価格は別々に判定
-        var useT=(rev===_bjtRev), useP=(revP===_bjtRevP);
-        if(!useT && !useP){ _bjtSyncState='ok'; _bjtNotice();
+        var useT=(rev===_bjtRev), useP=(revP===_bjtRevP), useS=(revS===_bjtRevS);
+        if(!useT && !useP && !useS){ _bjtSyncState='ok'; _bjtNotice();
           if(window._bjRoom==='tune'){ try{ _bjtSyncLine(); }catch(e){} } return; }
-        var models=null, pachi=null, meta=null, pm=null, pp=null, pd=null;
+        var models=null, pachi=null, meta=null, pm=null, pp=null, pd=null, sm=null;
         (j.items||[]).forEach(function(it){
+          if(it.kind==='sismap'){ try{ var sv=JSON.parse(it.value); if(sv&&typeof sv==='object') sm=sv; }catch(e){} return; }
           // pricev1=新台価格スロット({dflt, models})／pricev1p=パチンコ({models})
           if(it.kind==='pricev1' || it.kind==='pricev1p'){
             try{
@@ -17380,6 +17386,14 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           window.BJ_PRICE=nextP; _bjtPersistPrice();
           changedP=(JSON.stringify(nextP)!==beforeP);
           if(_bjtDfltHeld){ _bjtDfltHeld=false; _bjtPushPrice().catch(function(){ _bjtDfltHeld=true; }); }
+        }
+        if(useS && sm){
+          // 対応表は追記型なので「サーバ版を土台に、このPCにしか無い対応を残す」合成にする(他PCの追加も自分の未送信も消えない)
+          var merged={v:1, slot:(sm.slot&&typeof sm.slot==='object')?sm.slot:{}, pachi:(sm.pachi&&typeof sm.pachi==='object')?sm.pachi:{}};
+          var loc=window.BJ_SISMAP||{slot:{},pachi:{}}, addedS=0;
+          ['slot','pachi'].forEach(function(k){ Object.keys(loc[k]||{}).forEach(function(key){ if(!(key in merged[k])){ merged[k][key]=loc[k][key]; addedS++; } }); });
+          window.BJ_SISMAP=merged; _bjtPersistSisMap();
+          if(addedS || _bjtSisHeld){ _bjtSisHeld=false; _bjtPushSisMap().catch(function(){ _bjtSisHeld=true; }); }
         }
         _bjtSyncState='ok';
         if(changedT){
@@ -17749,7 +17763,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function _bjtVisibleRows(){
     var st=_bjtStats();
     return st.rows.filter(function(r){
-      if(!_bjtShowAll && !r.recent) return false;
+      if(!_bjtShowAll && !r.recent && _bjtDraft[r.name]===undefined) return false;   // 下書きのある行は隠さない
       // 「未入力のみ」でも、いま入力中（下書きあり）の行は消さない＝打っている最中に行が消えると困る
       if(_bjtOnlyEmpty && _bjtSavedEntry(r.name) && _bjtDraft[r.name]===undefined) return false;
       return true;
@@ -18139,6 +18153,271 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     });
   }
 
+  // ── SIS取り込み(2026-09-02 GO): SIS.xlsx(機種名+単価の2列)を「対応表」で名寄せし、選んだ月の下書きへ入れる ──
+  // 対応表 BJ_SISMAP={v:1, slot:{key:{sis,bj}}, pachi:{...}}。key=正規化したSIS名(全角半角・記号・空白の差だけ吸収。型式コードは残す=スペックの区別を守る)
+  // bj=''は「対応なし(この機種は取り込まない)」の記憶。対応は必ず1:1。曖昧なものは自動で当てず人が選ぶ(ユーザー指示: スペック違いに同じ単価は絶対NG)
+  function _bjtSisKey(){ return _bjtLsKey()+'_sismap'; }
+  function _bjtLoadSisMap(){
+    var o={};
+    try{ var raw=localStorage.getItem(_bjtSisKey()); if(raw) o=JSON.parse(raw)||{}; }catch(e){ o={}; }
+    if(!(o && o.v===1)) o={v:1, slot:{}, pachi:{}};
+    if(!o.slot||typeof o.slot!=='object') o.slot={};
+    if(!o.pachi||typeof o.pachi!=='object') o.pachi={};
+    window.BJ_SISMAP=o;
+  }
+  function _bjtPersistSisMap(){ try{ localStorage.setItem(_bjtSisKey(), JSON.stringify(window.BJ_SISMAP||{})); return true; }catch(e){ return false; } }
+  function _bjtPushSisMap(){
+    if(!_bjtApiEnabled()) return Promise.reject(new Error('local'));
+    var S=window.BJ_SISMAP||{v:1,slot:{},pachi:{}};
+    return _bjtCall('settings',{method:'PUT',headers:{'content-type':'application/json'},
+      body:JSON.stringify({kind:'sismap', scope:'*', value:JSON.stringify({slot:S.slot||{}, pachi:S.pachi||{}}), updatedBy:_bjtWho()})})
+      .then(function(r){ if(!r.ok) throw new Error('put sismap '+r.status); _bjtSisHeld=false; });
+  }
+  function _bjtSisMapOf(){ var S=window.BJ_SISMAP||{v:1,slot:{},pachi:{}}; var k=(_bjtDept==='4P')?'pachi':'slot'; if(!S[k]) S[k]={}; return S[k]; }
+
+  // 名寄せの段階: ②全角半角・記号・空白 ③＋末尾の型式コード ④＋接頭辞(L/S/e/P等)
+  function _bjtNz2(s){
+    s=String(s==null?'':s).normalize('NFKC');
+    s=s.replace(/／/g,'/').replace(/！/g,'!').replace(/[〜～]/g,'~').replace(/－/g,'-');
+    s=s.replace(/[\s・･、。「」『』（）()\[\]【】]/g,'');
+    return s.toUpperCase();
+  }
+  function _bjtNz3(s){
+    var t=_bjtNz2(s), m=/[A-Z0-9.]+$/.exec(t);
+    if(!m) return t;
+    var tok=m[0];
+    var isCode = tok.length<=4 || (/[0-9]/.test(tok) && tok.length<=5);   // 例: MA/AB/GFEA/YKJ11/A03 は型式コード。SPECIAL/BLACK/7500VER は機種名の一部
+    return isCode ? t.slice(0, t.length-tok.length) : t;
+  }
+  function _bjtNz4(s){ return _bjtNz3(s).replace(/^(スマスロ|スマート沖スロ|パチスロ|LB|SB|EF|E|L|S|P)/,''); }
+  function _bjtDice(a,b){
+    if(!a||!b) return 0;
+    if(a===b) return 1;
+    var ga={}, n=0, hit=0;
+    for(var i=0;i<a.length-1;i++){ var g=a.substr(i,2); ga[g]=(ga[g]||0)+1; n++; }
+    for(var j=0;j<b.length-1;j++){ var h=b.substr(j,2); if(ga[h]){ ga[h]--; hit++; } }
+    var m=b.length-1;
+    return (n+m)? (2*hit)/(n+m) : 0;
+  }
+  var _bjtSis=null;   // 取り込み中の状態
+  function _bjtSisIndex(){
+    var st=_bjtStats();
+    var idx={k2:{}, k3:{}, k4:{}, all:[], set:{}};
+    st.rows.forEach(function(r){
+      var n=r.name; idx.set[n]=1;
+      var k2=_bjtNz2(n), k3=_bjtNz3(n), k4=_bjtNz4(n);
+      (idx.k2[k2]=idx.k2[k2]||[]).push(n); (idx.k3[k3]=idx.k3[k3]||[]).push(n); (idx.k4[k4]=idx.k4[k4]||[]).push(n);
+      idx.all.push({n:n, k4:k4});
+    });
+    return idx;
+  }
+  function _bjtSisCands(name, idx){
+    var k2=_bjtNz2(name), k3=_bjtNz3(name), k4=_bjtNz4(name);
+    if(idx.k2[k2]) return {tier:2, list:idx.k2[k2].slice()};
+    if(idx.k3[k3]) return {tier:3, list:idx.k3[k3].slice()};
+    if(idx.k4[k4]) return {tier:4, list:idx.k4[k4].slice()};
+    var sc=[];
+    idx.all.forEach(function(m){ var d=_bjtDice(k4, m.k4); if(d>=0.55) sc.push([d,m.n]); });
+    sc.sort(function(a,b){ return b[0]-a[0]; });
+    return {tier:5, list:sc.slice(0,5).map(function(x){ return x[1]; })};
+  }
+  function _bjtSisOpen(file){
+    var msg=document.getElementById('bjtMsg');
+    var fail=function(t){ if(msg){ msg.className='bjt-msg ng'; msg.textContent=t; } };
+    if(typeof XLSX==='undefined') return fail('Excelを読む部品が読み込まれていません。画面を開き直してください。');
+    if(_bjtIsPrice()) return fail('SISの取り込みは単価（コイン単価／玉単価）の画面で行ってください。');
+    file.arrayBuffer().then(function(buf){
+      var wb=XLSX.read(new Uint8Array(buf),{type:'array'});
+      var want=(_bjtDept==='4P')?'P加工後':'S加工後';
+      var sh=wb.SheetNames.indexOf(want)>=0 ? want : wb.SheetNames.filter(function(n){ return n.indexOf('加工後')>=0 && n.indexOf(_bjtDept==='4P'?'P':'S')===0; })[0];
+      if(!sh) return fail('シート「'+want+'」が見つかりません（このファイルのシート: '+wb.SheetNames.join(' / ')+'）。いまの部門は'+_bjtDeptName()+'です。');
+      var aoa=XLSX.utils.sheet_to_json(wb.Sheets[sh],{header:1, raw:true});
+      var rows=[], seen={}, dupes=0, badRows=[];
+      aoa.forEach(function(r){
+        if(!r) return;
+        var n=String(r[0]==null?'':r[0]).normalize('NFC').trim(), p=Number(r[1]);
+        if(!n) return;
+        if(!isFinite(p) || p<=0){ badRows.push(n); return; }   // 単価が数値でない行(見出し行など)。件数を画面に出す
+        var key=_bjtNz2(n);
+        if(seen[key]){ dupes++; return; }
+        seen[key]=1;
+        rows.push({sis:n, price:Math.round(p*10000)/10000, key:key});
+      });
+      if(!rows.length) return fail('シート「'+sh+'」に「機種名, 単価」の行が見つかりません（A列=機種名・B列=単価の想定）。');
+      var idx=_bjtSisIndex(), map=_bjtSisMapOf();
+      rows.forEach(function(row){
+        var m=map[row.key];
+        var c=_bjtSisCands(row.sis, idx);
+        row.cands=c.list; row.tier=c.tier;
+        if(m && m.bj==='' ){ row.state='skip'; row.bj=''; return; }
+        if(m && m.bj && idx.set[m.bj]){ row.state='fixed'; row.bj=m.bj; return; }
+        if(m && m.bj && !idx.set[m.bj]){ row.state='ask'; row.sel=''; row.note='以前の対応先「'+m.bj+'」がいまの一覧にありません'; return; }
+        if(!c.list.length){ row.state='none'; return; }
+        row.state='ask';
+        // 自動候補にするのは「全角半角・記号・空白の差だけ」の完全一致(②)で候補が1つのときだけ。
+        // 型式コードを削った一致(③)は続編番号や版(2/II/GOLD/SP等)まで削れて兄弟機種に当たりうるので、候補として出すが人が選ぶ(④⑤も同様)
+        row.sel=(c.tier===2 && c.list.length===1) ? c.list[0] : '';
+        row.auto=!!row.sel;
+      });
+      // 同じベアジョン機種に自動候補が2つ以上当たる(SIS側にスペック違いが複数)ときは、どれも自動にしない=人が選ぶ
+      var autoBy={};
+      rows.forEach(function(r){ if(r.state==='ask' && r.auto) (autoBy[r.sel]=autoBy[r.sel]||[]).push(r); });
+      Object.keys(autoBy).forEach(function(bj){
+        if(autoBy[bj].length<2) return;
+        autoBy[bj].forEach(function(r){ r.sel=''; r.auto=false; r.note='「'+bj+'」にはSIS側のスペック違いが'+autoBy[bj].length+'件当たります。どれか1つを選ぶか、対応なしにしてください'; });
+      });
+      var ml=_bjtMonthList();
+      _bjtSis={file:file.name, sheet:sh, rows:rows, dupes:dupes, badRows:badRows, month:ml.curM, months:ml.all.concat([ml.future]), idx:idx,
+               dept:_bjtDept, mode:_bjtMode};   // 開いたときの部門/種別を控える(途中で切り替わったら取り込まない)
+      _bjtSisRender();
+    }).catch(function(e){ console.error('sis', e); fail('Excelの読み取りで問題が起きました: '+(e&&e.message||e)); });
+  }
+  function _bjtSisRender(){
+    var S=_bjtSis; if(!S) return;
+    var ov=document.getElementById('bjtSisOv');
+    if(!ov){ ov=document.createElement('div'); ov.id='bjtSisOv'; ov.className='bjtp-ov'; document.getElementById('bjPanels').appendChild(ov); }
+    var bd0=ov.querySelector('.bjtp-bd'); var keepTop=bd0?bd0.scrollTop:0;   // 描き直してもスクロール位置を保つ
+    var fixed=S.rows.filter(function(r){ return r.state==='fixed'; });
+    var ask=S.rows.filter(function(r){ return r.state==='ask'; });
+    var none=S.rows.filter(function(r){ return r.state==='none'; });
+    var skip=S.rows.filter(function(r){ return r.state==='skip'; });
+    var M=_bjtM();
+    var curOf=function(bj){
+      var d=_bjtDraft[bj]; if(d && d[S.month]!==undefined) return '<span style="color:#b08c00">未保存の手入力: '+_bjtEsc(d[S.month]||'（空）')+'</span>';
+      var e=M[bj]; var v=e?_bjtEffAt(e.vers||[], S.month):null; return v==null?'—':_bjtFmtPrice(v)+'円';
+    };
+    var tierLabel=function(t){ return t===2?'完全一致':(t===3?'型式コード以外は一致':(t===4?'名前だけ一致(接頭辞違い)':'似ている')); };
+    var monOpts=S.months.map(function(mk){ return '<option value="'+mk+'"'+(mk===S.month?' selected':'')+'>'+_bjtMonLabel(mk)+'</option>'; }).join('')
+      +'<option value=""'+(S.month===''?' selected':'')+'>最初から（全期間の基準）</option>';
+    var h='<div class="bjtp" style="max-width:980px"><div class="bjtp-hd">'
+      +'<div class="bjtp-name">SISのExcelを取り込む — '+_bjtEsc(S.file)+'（シート「'+_bjtEsc(S.sheet)+'」・'+S.rows.length+'機種'+(S.dupes?('・重複'+S.dupes+'件は先頭のみ採用'):'')
+      +(S.badRows&&S.badRows.length?('・単価が数値でない行'+S.badRows.length+'件は無視: '+_bjtEsc(S.badRows.slice(0,3).join(' / '))+(S.badRows.length>3?' …':'')):'')+'）</div>'
+      +'<div class="bjtp-meta">対象の月: <select id="bjtSisMon">'+monOpts+'</select>　選んだ月の1日から効きます（その月の欄に入ります）。いまの部門: '+_bjtDeptName()+'</div></div>'
+      +'<div class="bjtp-bd" style="max-height:62vh;overflow-y:auto">';
+    // A 確定済み
+    h+='<div class="bjts-sec">① 対応表で確定済み（'+fixed.length+'機種）— このまま下書きに入ります。違っていれば「変更」</div>';
+    if(fixed.length){
+      h+='<table class="bjtp-h"><thead><tr><th>SISの機種名</th><th>→ ベアジョンの機種名</th><th class="n">今回の単価</th><th class="n">その月のいまの値</th><th></th></tr></thead><tbody>';
+      fixed.forEach(function(r){ var i=S.rows.indexOf(r);
+        h+='<tr><td>'+_bjtEsc(r.sis)+'</td><td>'+_bjtEsc(r.bj)+'</td><td class="n">'+r.price+'円</td><td class="n">'+curOf(r.bj)+'</td><td class="n"><a href="javascript:void(0)" class="bjts-chg" data-i="'+i+'">変更</a></td></tr>'; });
+      h+='</tbody></table>';
+    } else h+='<div class="bjt-note" style="margin:0 0 10px">（まだ対応表がありません。初回は下の②で選ぶと、次回から自動になります）</div>';
+    // B 要確認
+    h+='<div class="bjts-sec">② 要確認（'+ask.length+'機種）— 候補から選んでください。自動候補（名前が完全に一致・候補1つ）は選択済みで出しています。選ばない行は今回は取り込みません</div>';
+    if(ask.length){
+      h+='<table class="bjtp-h"><thead><tr><th>SISの機種名</th><th class="n">単価</th><th>ベアジョンの機種名（候補）</th><th></th></tr></thead><tbody>';
+      ask.forEach(function(r){ var i=S.rows.indexOf(r);
+        var opts='<option value="">（選んでください）</option>';
+        r.cands.forEach(function(c){ opts+='<option value="'+_bjtEsc(c)+'"'+(c===r.sel?' selected':'')+'>'+_bjtEsc(c)+'</option>'; });
+        opts+='<option value="__none__"'+(r.sel==='__none__'?' selected':'')+'>（対応なし＝この機種は取り込まない）</option>'
+             +'<option value="__other__"'+(r.sel==='__other__'?' selected':'')+'>その他…（一覧から探す）</option>';
+        h+='<tr'+(r.auto?' class="bjtp-now"':'')+'><td>'+_bjtEsc(r.sis)+(r.note?'<div class="bjt-cw">'+_bjtEsc(r.note)+'</div>':'')+'</td><td class="n">'+r.price+'円</td>'
+          +'<td><select class="bjts-sel" data-i="'+i+'">'+opts+'</select>'
+          +(r.sel==='__other__'?('<input type="text" list="bjtSisList" class="bjts-other" data-i="'+i+'" value="'+_bjtEsc(r.other||'')+'" placeholder="機種名の一部を打つと候補が出ます" style="width:260px;margin-left:6px">'):'')
+          +'</td><td class="bjt-cw">'+(r.cands.length?tierLabel(r.tier):'')+(r.auto?'・自動候補':'')+'</td></tr>'; });
+      h+='</tbody></table>';
+    }
+    // C 候補なし
+    h+='<div class="bjts-sec">③ 候補なし（'+none.length+'機種）— ベアジョンの'+_bjtDeptName()+'の一覧に見当たらないので取り込みません（「探す」で②に移して一覧から選べます）</div>';
+    if(none.length) h+='<div class="bjt-note" style="margin:0 0 10px">'+none.map(function(r){ var i=S.rows.indexOf(r); return _bjtEsc(r.sis)+'（'+r.price+'） <a href="javascript:void(0)" class="bjts-find" data-i="'+i+'">探す</a>'; }).join('、 ')+'</div>';
+    // D 対応なし(記憶)
+    if(skip.length){
+      h+='<div class="bjts-sec">④ 「対応なし」と記憶済み（'+skip.length+'機種）— 取り込みません。戻すには「変更」</div>';
+      h+='<div class="bjt-note" style="margin:0 0 10px">'+skip.map(function(r){ var i=S.rows.indexOf(r); return _bjtEsc(r.sis)+' <a href="javascript:void(0)" class="bjts-chg" data-i="'+i+'">変更</a>'; }).join('、 ')+'</div>';
+    }
+    h+='<datalist id="bjtSisList">'+S.idx.all.map(function(m){ return '<option value="'+_bjtEsc(m.n)+'">'; }).join('')+'</datalist>';
+    h+='</div><div class="bjtp-ft">'
+      +'<span class="bjt-note" style="margin:0;flex:1">「下書きに入れる」のあと、いつもの「保存して反映」で確定します（二段構え）。選んだ対応はこの法人の対応表に記憶され、次回から自動になります。</span>'
+      +'<button type="button" class="bjt-btn" id="bjtSisCancel">キャンセル</button>'
+      +'<button type="button" class="bjt-btn on" id="bjtSisApply">下書きに入れる</button></div></div>';
+    ov.innerHTML=h; ov.style.display='flex';
+    var bd1=ov.querySelector('.bjtp-bd'); if(bd1) bd1.scrollTop=keepTop;
+    document.getElementById('bjtSisMon').addEventListener('change', function(ev){ _bjtSis.month=ev.target.value; _bjtSisRender(); });
+    document.getElementById('bjtSisCancel').addEventListener('click', function(){ _bjtSisClose(false); });
+    document.getElementById('bjtSisApply').addEventListener('click', _bjtSisApply);
+    ov.querySelectorAll('select.bjts-sel').forEach(function(sel){ sel.addEventListener('change', function(){
+      var r=_bjtSis.rows[+sel.getAttribute('data-i')]; r.sel=sel.value; r.auto=false;
+      var tr=sel.closest('tr'); if(tr){ tr.classList.remove('bjtp-now'); var last=tr.querySelector('td:last-child'); if(last) last.textContent=last.textContent.replace('・自動候補',''); }
+      if(sel.value==='__other__'){ _bjtSisRender(); var inp=ov.querySelector('input.bjts-other[data-i="'+sel.getAttribute('data-i')+'"]'); if(inp) inp.focus(); }
+    }); });
+    ov.querySelectorAll('input.bjts-other').forEach(function(inp){ inp.addEventListener('input', function(){ _bjtSis.rows[+inp.getAttribute('data-i')].other=inp.value; }); });
+    ov.querySelectorAll('a.bjts-chg').forEach(function(a){ a.addEventListener('click', function(){
+      var r=_bjtSis.rows[+a.getAttribute('data-i')]; r.state='ask'; r.auto=false;
+      if(r.bj && r.cands.indexOf(r.bj)>=0) r.sel=r.bj;
+      else if(r.bj){ r.sel='__other__'; r.other=r.bj; }   // 候補外(その他で決めた対応)は入力欄に戻す
+      else r.sel='';
+      _bjtSisRender();
+    }); });
+    ov.querySelectorAll('a.bjts-find').forEach(function(a){ a.addEventListener('click', function(){
+      var r=_bjtSis.rows[+a.getAttribute('data-i')]; r.state='ask'; r.sel='__other__'; r.other=''; r.auto=false; _bjtSisRender();
+      var inp=ov.querySelector('input.bjts-other[data-i="'+a.getAttribute('data-i')+'"]'); if(inp) inp.focus();
+    }); });
+  }
+  // 閉じる。選択途中なら確認する(誤クリックで全部やり直しにならないように)。背景クリックでは閉じない
+  function _bjtSisClose(force){
+    var S=_bjtSis;
+    if(!force && S){
+      var touched=S.rows.some(function(r){ return r.state==='ask' && !r.auto && (r.sel||r.other); });
+      if(touched && !window.confirm('選んだ対応を捨てて閉じますか？（対応表には何も記憶されません）')) return;
+    }
+    _bjtSis=null; var ov=document.getElementById('bjtSisOv'); if(ov){ ov.style.display='none'; ov.innerHTML=''; }
+  }
+  function _bjtSisApply(){
+    var S=_bjtSis; if(!S) return;
+    var msg=document.getElementById('bjtMsg');
+    if(S.dept!==_bjtDept || S.mode!==_bjtMode){ window.alert('取り込みを開いたあとに部門または入力種別が切り替わったため、取り込みを中止しました。もう一度やり直してください。'); _bjtSisClose(true); return; }
+    var idx=S.idx, map=_bjtSisMapOf();
+    var used={}, errs=[], take=[], nones=[], noneCnt=0, unsel=0;
+    S.rows.forEach(function(r){
+      if(r.state==='fixed'){ take.push([r, r.bj]); return; }
+      if(r.state!=='ask') return;
+      var bj='';
+      if(r.sel==='__none__'){ noneCnt++; nones.push(r); return; }
+      if(r.sel==='__other__'){ bj=String(r.other||'').normalize('NFC').trim(); if(!bj){ unsel++; return; } if(!idx.set[bj]){ errs.push('「'+r.sis+'」の対応先「'+bj+'」が一覧にありません'); return; } }
+      else if(r.sel){ bj=r.sel; }
+      else { unsel++; return; }
+      take.push([r, bj]);
+    });
+    take.forEach(function(t){ var bj=t[1]; (used[bj]=used[bj]||[]).push(t[0].sis); });
+    Object.keys(used).forEach(function(bj){ if(used[bj].length>1) errs.push('「'+bj+'」に複数のSIS機種が当たっています（'+used[bj].join(' / ')+'）。対応は1つずつにしてください'); });
+    // 対応表に既に記憶されている別のSIS名が同じ機種を指していないか(1:1は保存データ上も守る)
+    take.forEach(function(t){
+      var r=t[0], bj=t[1];
+      Object.keys(map).forEach(function(k){ if(k!==r.key && map[k] && map[k].bj===bj) errs.push('「'+bj+'」は既にSISの「'+map[k].sis+'」と対応済みです（「'+r.sis+'」と両方は当てられません。片方を対応なしにしてください）'); });
+    });
+    if(errs.length){ window.alert('取り込めません:\n'+errs.slice(0,6).join('\n')+(errs.length>6?('\nほか'+(errs.length-6)+'件'):'')); return; }
+    if(!take.length && !noneCnt){ window.alert('取り込むものがありません。②で候補を選んでください（自動候補が無い機種は選ばないと入りません）。'); return; }
+    var mkey=S.month;
+    var overwrote=0;
+    take.forEach(function(t){ var d=_bjtDraft[t[1]]; if(d && d[mkey]!==undefined && String(d[mkey])!==String(t[0].price)) overwrote++; });
+    if(overwrote && !window.confirm('手入力中の下書き'+overwrote+'件を、SISの値で置き換えます。よろしいですか？')) return;
+    nones.forEach(function(r){ map[r.key]={sis:r.sis, bj:''}; });   // 検証に通ってから記憶する
+    var hiddenRecent=0;
+    take.forEach(function(t){
+      var r=t[0], bj=t[1];
+      map[r.key]={sis:r.sis, bj:bj};
+      (_bjtDraft[bj]=_bjtDraft[bj]||{})[mkey]=String(r.price);
+    });
+    _bjtRevS++; _bjtPersistSisMap();
+    var n=take.length;
+    _bjtSisClose(true);
+    // 下書きに入れた機種・月が表で見えるように表示条件を広げる(黙って保存されないため)
+    var st=_bjtStats(), recentSet={};
+    st.rows.forEach(function(r){ if(r.recent) recentSet[r.name]=1; });
+    take.forEach(function(t){ if(!recentSet[t[1]]) hiddenRecent++; });
+    if(hiddenRecent && !_bjtShowAll){ _bjtShowAll=true; var sa=document.getElementById('bjtShowAll'); if(sa) sa.checked=true; }
+    var ml=_bjtMonthList();
+    if(mkey!=='' && mkey!==ml.future && ml.shown.indexOf(mkey)<0 && _bjtMonWin!==0){ _bjtMonWin=0; var mw=document.getElementById('bjtMonWinSel'); if(mw) mw.value='0'; }
+    if(_bjtFind){ _bjtFind=''; var fi=document.getElementById('bjtFind'); if(fi) fi.value=''; }
+    _bjtRender();
+    var head='SISから'+n+'機種を'+_bjtMonLabel(mkey)+'の下書きに入れました（対応なし'+noneCnt+'・未選択'+unsel+(overwrote?('・手入力の下書きを置き換え'+overwrote):'')+(hiddenRecent?('・直近1ヶ月稼働なしの機種'+hiddenRecent+'件は表示を広げて出しています'):'')+'）。内容を確かめて「保存して反映」を押してください。';
+    if(!_bjtApiEnabled()){ if(msg){ msg.className='bjt-msg ok'; msg.textContent=head+'対応表はこのPCの中だけに記憶しました。'; } return; }
+    if(_bjtSyncState==='fail'){ _bjtSisHeld=true; if(msg){ msg.className='bjt-msg ok'; msg.textContent=head+'対応表はこのPCに記憶（サーバ未読のため送信は保留。次につながったとき自動で送ります）。'; } return; }
+    if(msg){ msg.className='bjt-msg ok'; msg.textContent=head+'対応表をサーバへ送っています…'; }
+    _bjtPushSisMap().then(function(){ if(msg){ msg.className='bjt-msg ok'; msg.textContent=head+'対応表は全PCで共有されました。'; } })
+      .catch(function(){ _bjtSisHeld=true; if(msg){ msg.className='bjt-msg ng'; msg.textContent=head+'対応表をサーバに送れませんでした（このPCには記憶済み。次につながったとき自動で送ります）。'; } });
+  }
+
   function buildTuneTab(panel){
     if(!panel||document.getElementById('bjtBody')) return;
     panel.innerHTML=''
@@ -18147,7 +18426,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'機種ごとに<b>正解の単価</b>（スロット＝コイン単価／パチンコ＝玉単価）を<b>月ごと</b>に入力すると、その比率で売上と粗利を補正します。各月の値は<b>その月の1日から</b>効き、空欄の月は前の月の値を引き継ぎます。粗利は<b>週トータルで黒字の機種は係数を掛け、赤字の機種は係数で割ります</b>（赤字は膨らむ向き。判定は店×機種×週のトータル）。<br>'
       +'部門は上の<b>スロット／パチンコ</b>で切り替えます（タブを開くと表示中の店の部門になります）。設定は部門ごとに別々で、互いに影響しません。<br>'
       +'一覧は選んだ部門の<b>全店</b>から自動で作られ、新しい機種はデータを取り込むと「未入力」として現れます。<b>セグメント・個別機種列</b>（稼働粗利表の振り分け）もこの表で設定できます（選ぶと即保存・全店共通）。<br>'
-      +'まとめて直すときは<b>CSVダウンロード→Excelで修正→CSVアップロード</b>が早いです（CSVの空欄＝変更なし）。<br>'
+      +'まとめて直すときは<b>CSVダウンロード→Excelで修正→CSVアップロード</b>が早いです（CSVの空欄＝変更なし）。'
+      +'<b>SISのExcel</b>（P加工後／S加工後）はそのまま取り込めます: 対応表で名寄せ→画面で確認→下書き→保存。曖昧な機種は自動で当てず、選んだ対応は次回から自動です。<br>'
       +'上の<b>新台価格</b>に切り替えると、機種ごとの新台価格（円・1台あたり）を同じ表で入力できます。未入力の機種は「仮の価格」（既定500,000円・画面で変更可）で扱います。この数値を使う機能（回収率など）は今後追加します。<br>'
       +'アウトと差枚は触らないので<b>出玉率と勝率は変わりません</b>。入力済みの欄をすべて空にして保存すると、その機種の補正を（履歴ごと）外します。</div>'
       +'<div class="bjt-bar">'
@@ -18169,6 +18449,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<button type="button" class="bjt-btn" id="bjtCsvDl">CSVダウンロード</button>'
       +'<button type="button" class="bjt-btn" id="bjtCsvUl">CSVアップロード</button>'
       +'<input type="file" id="bjtCsvFile" accept=".csv,text/csv" style="display:none">'
+      +'<button type="button" class="bjt-btn" id="bjtSisBtn" title="SISのExcel（P加工後/S加工後）を対応表で名寄せして取り込む">SISのExcelを取り込む</button>'
+      +'<input type="file" id="bjtSisFile" accept=".xlsx,.xls" style="display:none">'
       +'<button type="button" class="bjt-btn on" id="bjtSaveBtn">保存して反映</button>'
       +'<button type="button" class="bjt-btn" id="bjtUndoBtn">入力を取り消す</button>'
       +'<button type="button" class="bjt-btn" id="bjtClearBtn">入力済みの単価を全部消す</button>'
@@ -18187,6 +18469,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(d===_bjtDept) return;
       var hadDraft=Object.keys(_bjtDraft).length>0;
       _bjtDept=d; _bjtDraft={};
+      if(_bjtSis) _bjtSisClose(true);   // 取り込み中なら中止(別部門に入るのを防ぐ)
       dsw.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-d')===d); });
       _bjtRender();
       var m=document.getElementById('bjtMsg');
@@ -18201,8 +18484,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(mo===_bjtMode) return;
       var hadDraft=Object.keys(_bjtDraft).length>0;
       _bjtMode=mo; _bjtDraft={};
+      if(_bjtSis) _bjtSisClose(true);
       msw.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x.getAttribute('data-m')===mo); });
       var clb=document.getElementById('bjtClearBtn'); if(clb) clb.textContent=_bjtIsPrice()?'入力済みの新台価格を全部消す':'入力済みの単価を全部消す';
+      var sisb=document.getElementById('bjtSisBtn'); if(sisb) sisb.style.display=_bjtIsPrice()?'none':'';   // SISは単価のみ
       _bjtRender();
       var m=document.getElementById('bjtMsg');
       if(m){ m.className='bjt-msg'; m.textContent=(_bjtIsPrice()?'新台価格の入力に切り替えました（円・1台あたり。未入力の機種は仮の価格で扱います）。':'単価の入力に切り替えました。')+(hadDraft?'入力中の値は取り消しました（保存済みは残っています）。':''); }
@@ -18226,6 +18511,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         _bjtReadFile(f).then(function(txt){ try{ _bjtCsvApply(txt); }catch(e){ console.error('tune csv', e);
           var m=document.getElementById('bjtMsg'); if(m){ m.className='bjt-msg ng'; m.textContent='CSVの読み取りで問題が起きました: '+(e&&e.message||e); } } });
       });
+    }
+    var sb=document.getElementById('bjtSisBtn'), sf=document.getElementById('bjtSisFile');
+    if(sb&&sf){
+      sb.addEventListener('click', function(){ sf.value=''; sf.click(); });
+      sf.addEventListener('change', function(){ var f=sf.files&&sf.files[0]; if(f) _bjtSisOpen(f); });
     }
     var sv=document.getElementById('bjtSaveBtn');
     if(sv) sv.addEventListener('click', function(){ try{ _bjtApply(); }catch(e){ console.error('tune apply', e); } });
