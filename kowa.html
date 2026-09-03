@@ -1890,7 +1890,7 @@ const USER_LABEL = '興和商事さん専用';               // 例: '田中さ�
 const USER_ID = 'kowa';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260903-091935';
+const BJ_VERSION = '20260903-150503';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -15235,6 +15235,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   // 試験運用中はセントラル（コンコルドさん）と管理者のみ。問題なければここに法人を足して横展開する。
   // ここに載っていない法人では機能そのものを動かさない（設定の読み込みも行わない）＝数字は従来どおり。
   var BJ_TUNE_CORPS=['admin','central'];
+  window.BJ_FEATURE_CORPS=BJ_TUNE_CORPS;   // チューニング・稼働粗利表の提供先(広げるときはここに法人IDを足す)
   var _bjtOn=BJ_TUNE_CORPS.indexOf(typeof USER_ID!=='undefined'?USER_ID:'')>=0;
   if(_bjtOn){
     ROOMS.push(['tune','機種別チューニング']);
@@ -17441,6 +17442,27 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
 
   window._bjtSyncNow=function(){ try{ return _bjtPull(); }catch(e){ return Promise.resolve(); } };
+  // ── 他機能(稼働粗利表の振り分け等)への窓口: 同じ「法人ごとの箱」を kind 別に読み書きする(2026-09-03) ──
+  //    法人はサーバ側で入場券から決まる＝クライアントは法人IDを送らない。file://(admin)や配信対象外の法人では enabled=false
+  window._bjtSettingsApi={
+    enabled: function(){ return _bjtApiEnabled(); },
+    get: function(kind){
+      if(!_bjtApiEnabled()) return Promise.reject(new Error('local'));
+      return _bjtCall('settings',{method:'GET'})
+        .then(function(r){ if(!r.ok) throw new Error('get '+r.status); return r.json(); })
+        .then(function(j){
+          var hit=null;
+          (j.items||[]).forEach(function(it){ if(it.kind===kind){ try{ hit={value:JSON.parse(it.value), updatedAt:it.updatedAt||'', updatedBy:it.updatedBy||''}; }catch(e){} } });
+          return hit;
+        });
+    },
+    put: function(kind, obj){
+      if(!_bjtApiEnabled()) return Promise.reject(new Error('local'));
+      return _bjtCall('settings',{method:'PUT',headers:{'content-type':'application/json'},
+        body:JSON.stringify({kind:kind, scope:'*', value:JSON.stringify(obj), updatedBy:_bjtWho()})})
+        .then(function(r){ if(!r.ok) throw new Error('put '+r.status); return true; });
+    },
+  };
 
   function _bjtSyncLine(){
     var el=document.getElementById('bjtSync'); if(!el) return;
@@ -19399,46 +19421,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
   const colNames = (columns, type) => (columns || []).filter(c => c.type === type && c.name).map(c => c.name);
 
-  // ── 機種名からの振り分け候補（あくまで初期候補。決定はユーザー）──
-  const SUGGEST_SLOT_IND = [
-    [/ニューキングハナハナ/, 'SBニューキングハナハナ'],
-    [/キングハナハナ/, 'Sキングハナハナ'],
-    [/ドラゴンハナハナ/, 'Sドラゴンハナハナ'],
-    [/沖ドキ.{0,3}BLACK/i, 'S沖ドキBLACK'],
-    [/沖ドキ.{0,3}ゴージャス/, 'S沖ドキゴージャス'],
-    [/ミリオンゴッド|GOD/i, 'LGOD'],
-    [/ヴァルヴレイヴ/, 'Lヴァルヴレイヴ2'],
-    [/モンキーターン/, 'Lモンキーターン5'],
-    [/東京喰種/, 'Ｌ東京喰種'],
-    [/カバネリ/, 'Lカバネリ'],
-    [/戦国乙女/, 'L戦国乙女5'],
-    [/ソードアート|SAO/i, 'LSAO2'],
-    [/からくりサーカス/, 'Lからくり2'],
-  ];
-  const SUGGEST_SLOT_SEG = [
-    [/ジャグラー/, 'ジャグラー'],
-    [/ハナハナ/, 'ハナハナ'],
-    [/沖ドキ/, '沖ドキ！'],
-    [/^(スマスロ|L\s|Lパチスロ|L[^T])/, 'スマスロ'],
-  ];
-  const SUGGEST_PACHI_IND = [
-    [/牙狼/, 'e牙狼12'],
-    [/リコリス/, 'eリコリス・リコイル'],
-    [/東京喰種.*(デカ|一撃)/, 'eデカヘソ東京喰種'],
-    [/東京喰種/, 'e東京喰種'],
-    [/ガンダムSEED|ガンダムシード/i, 'eガンダムSEED'],
-  ];
-  const SUGGEST_PACHI_SEG = [
-    [/羽根|はねもの/, '羽根物'],
-  ];
-  // 候補は「現在の列構成に存在する名前」だけ返す（列を消したのに候補が出続けるのを防ぐ）
-  function suggest(kind, name, columns) {
-    const segSet = new Set(colNames(columns || DEFAULT_COLUMNS[kind], 'seg'));
-    const indSet = new Set(colNames(columns || DEFAULT_COLUMNS[kind], 'ind'));
-    const tryList = (list, ok) => { for (const [re, v] of list) if (re.test(name) && ok.has(v)) return v; return ''; };
-    if (kind === 'slot') return { seg: tryList(SUGGEST_SLOT_SEG, segSet), ind: tryList(SUGGEST_SLOT_IND, indSet) };
-    return { seg: tryList(SUGGEST_PACHI_SEG, segSet), ind: tryList(SUGGEST_PACHI_IND, indSet) };
-  }
+  // (自動候補の規則は2026-09-03に撤去。スペック違い(SAO/SAO2・e/P等)を同じ列に寄せる事故の元だった)
 
   // ── 集計 ──
   // records: [{date:'YYYY-MM-DD', 機種名, IN枚数, 台粗利, ...}]
@@ -19827,7 +19810,6 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     JAPAN_HOLIDAYS, isHoliday,
     TOTAL_NAME, TITLE_SUFFIX, DEFAULT_TOTALS,
     DEFAULT_COLUMNS, computeLayout, colNames,
-    suggest,
     aggregateByDate, dailyTable, monthlyTable, monthWindow, monthsInRange,
     buildWorkbook, buildWorkbookMulti, colLetter,
   };
@@ -19840,18 +19822,29 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
    書き込みは localStorage の自機能キー(_NS + kadouArari_*)のみ。KACore(集計+Excel生成)は直前のscriptで定義済み。 */
 (function () {
   'use strict';
-  if (typeof USER_ID === 'undefined' || (USER_ID !== 'central' && USER_ID !== 'admin')) return;   // セントラル限定(adminはローカル検証用)
+  if (typeof USER_ID === 'undefined' || (window.BJ_FEATURE_CORPS || ['admin', 'central']).indexOf(USER_ID) < 0) return;   // 提供先の法人だけ
 
-  /* ── 中央共有 (2026-08-28): 振り分け・列の設定・総台数を法人内の全PCで共有 ──
-     bearjohn-api の /judgments (type='kadou') に相乗り。サーバー側が updatedAt の新しい方を残す(機種ごとの後勝ち)。
-     このトークンは kadou 種別しか読み書きできない専用のもの(顔認証のデータには一切触れない)。
-     通信できない時はこのPCの保存(localStorage)だけで動き続ける。 */
-  var KADOU_API = 'https://f97y7gnlej.execute-api.ap-northeast-1.amazonaws.com';
-  var KADOU_TOKEN = 'st090.911a587265d259964cdf9b84c45c45bab586dfd64c7551b7194a45a60be1bd57';
+  /* ── 共有 (2026-09-03 引っ越し): 振り分け・列の設定・総台数・店別列を「法人ごとの箱」(チューニングと同じ設定サーバ・kind='kadou')で共有 ──
+     以前は顔認証側API(/judgments)にコンコルドさん用トークン1本で繋いでいたため、法人が増やせず、手元のadmin(file://)からも書けてしまった。
+     いまは window._bjtSettingsApi 経由＝法人は入場券から決まり、file://のadminはサーバに繋がらない(このPCの中だけ)。
+     箱の中身は1つのJSON: {v:1, slot:{機種名:{s,i,at,c,none}}, pachi:{同}, cols:{slot:[],pachi:[]}, storeCols:{店:{slot:{list,at},pachi:{..}}}, totals:{店:{v,at}}}
+     書き込みは「最新を読む→自分の変更だけ重ねる→書く」(機種ごとの後勝ち)。空の振り分けは送らない(2026-09-01事故の教訓)。 */
 
   var EXCELJS_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
   var EXCELJS_SRI = 'sha512-dlPw+ytv/6JyepmelABrgeYgHI0O+frEwgfnPdXDTOIZz+eDgfW07QXG02/O8COfivBdGNINy+Vex+lYmJ5rxw==';
   var ASSIGN_KEY = _NS + 'kadouArari_assign_v1';
+  var EMPTYRESET_KEY = _NS + 'kadouArari_emptyreset_v1';   // 旧版が黙って保存した空エントリの一回きりの掃除フラグ
+  // 旧版(〜2026-09-03)の自動候補の規則。新版では候補には使わず、「この登録は自動候補のまま確定された疑い」を見つけるためだけに使う
+  var LEGACY_SUGGEST = {
+    slot: { seg: [[/ジャグラー/, 'ジャグラー'], [/ハナハナ/, 'ハナハナ'], [/沖ドキ/, '沖ドキ！'], [/^(スマスロ|L\s|Lパチスロ|L[^T])/, 'スマスロ']],
+            ind: [[/ニューキングハナハナ/, 'SBニューキングハナハナ'], [/キングハナハナ/, 'Sキングハナハナ'], [/ドラゴンハナハナ/, 'Sドラゴンハナハナ'], [/沖ドキ.{0,3}BLACK/i, 'S沖ドキBLACK'], [/沖ドキ.{0,3}ゴージャス/, 'S沖ドキゴージャス'], [/ミリオンゴッド|GOD/i, 'LGOD'], [/ヴァルヴレイヴ/, 'Lヴァルヴレイヴ2'], [/モンキーターン/, 'Lモンキーターン5'], [/東京喰種/, 'Ｌ東京喰種'], [/カバネリ/, 'Lカバネリ'], [/戦国乙女/, 'L戦国乙女5'], [/ソードアート|SAO/i, 'LSAO2'], [/からくりサーカス/, 'Lからくり2']] },
+    pachi: { seg: [[/羽根|はねもの/, '羽根物']],
+             ind: [[/牙狼/, 'e牙狼12'], [/リコリス/, 'eリコリス・リコイル'], [/東京喰種.*(デカ|一撃)/, 'eデカヘソ東京喰種'], [/東京喰種/, 'e東京喰種'], [/ガンダムSEED|ガンダムシード/i, 'eガンダムSEED']] },
+  };
+  function legacySuggest(kind, name) {
+    var t = LEGACY_SUGGEST[kind], pick = function (list) { for (var i = 0; i < list.length; i++) if (list[i][0].test(name)) return list[i][1]; return ''; };
+    return { seg: pick(t.seg), ind: pick(t.ind) };
+  }
   var COLUMNS_KEY = _NS + 'kadouArari_columns_v1';
   var SKIP_NAMES = { 'デフォルト店舗': 1, '機種フォーマッタテスト店舗': 1, '業界ベンチマーク': 1 };
   var nfc = function (s) { return String(s == null ? '' : s).normalize('NFC').trim(); };
@@ -19972,98 +19965,99 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var dirty = { slot: {}, pachi: {} };   // このPCで変更した機種(保存時に中央へ送る対象)
   var syncOk = null;                      // null=未接続 / true=同期済み / false=オフライン
 
-  /* ── 中央共有の通信 ── */
-  function sha40(s) {
-    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)).then(function (buf) {
-      var u = new Uint8Array(buf), h = '';
-      for (var i = 0; i < u.length; i++) h += ('0' + u[i].toString(16)).slice(-2);
-      return h.slice(0, 40);
-    });
+  /* ── 共有(法人ごとの箱)の通信 ── */
+  var BOX_KIND = 'kadou';
+  function boxApi() { return window._bjtSettingsApi || null; }
+  function boxEnabled() { var a = boxApi(); return !!(a && a.enabled()); }
+  function emptyBox() { return { v: 1, slot: {}, pachi: {}, cols: {}, storeCols: {}, totals: {} }; }
+  function normBox(b) {
+    b = (b && typeof b === 'object') ? b : {};
+    var o = emptyBox();
+    ['slot', 'pachi'].forEach(function (k) { if (b[k] && typeof b[k] === 'object') o[k] = b[k]; });
+    if (b.cols && typeof b.cols === 'object') o.cols = b.cols;
+    if (b.storeCols && typeof b.storeCols === 'object') o.storeCols = b.storeCols;
+    if (b.totals && typeof b.totals === 'object') o.totals = b.totals;
+    return o;
   }
-  function kadouFetch(url, opt, timeoutMs) {
-    var ctl = new AbortController();
-    var t = setTimeout(function () { ctl.abort(); }, timeoutMs || 6000);
-    opt = opt || {}; opt.signal = ctl.signal;
-    return fetch(url, opt).then(function (r) { clearTimeout(t); return r; },
-                                function (e) { clearTimeout(t); throw e; });
+  function boxGet() {
+    var a = boxApi();
+    if (!a || !a.enabled()) return Promise.reject(new Error('local'));
+    return a.get(BOX_KIND).then(function (hit) { return hit ? normBox(hit.value) : null; });
   }
-  function centralGet() {
-    return kadouFetch(KADOU_API + '/judgments', { headers: { 'x-bearjohn-token': KADOU_TOKEN } })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (d) {
-        return (d.judgments || []).filter(function (j) { return j.type === 'kadou' && j.value != null; });
+  // 「最新を読む→変更を重ねる→書く」を1本ずつ順番に実行(同時実行で互いに消さないため)
+  var _boxQueue = Promise.resolve();
+  function boxUpdate(mutator) {
+    var run = function () {
+      return boxGet().then(function (b) {
+        b = b || emptyBox();
+        mutator(b);
+        return boxApi().put(BOX_KIND, b);
       });
-  }
-  function centralPut(items) {   // items: [{key, value, updatedAt}] → 200件ずつ送る
-    if (!items.length) return Promise.resolve(true);
-    var chunks = [];
-    for (var i = 0; i < items.length; i += 200) chunks.push(items.slice(i, i + 200));
-    var p = Promise.resolve(true);
-    chunks.forEach(function (ch) {
-      p = p.then(function (okSoFar) {
-        return kadouFetch(KADOU_API + '/judgments', {
-          method: 'PUT',
-          headers: { 'x-bearjohn-token': KADOU_TOKEN, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items: ch.map(function (i2) { return { type: 'kadou', key: i2.key, value: i2.value, updatedAt: i2.updatedAt }; }) }),
-        }).then(function (r) { return r.ok && okSoFar; });
-      });
-    });
+    };
+    var p = _boxQueue.then(run, run);
+    _boxQueue = p.catch(function () {});
     return p;
   }
   function setSyncNote() {
     var el = $('bjkaSync');
     if (!el) return;
-    if (syncOk === true) { el.textContent = '共有: 同期済み'; el.style.color = 'var(--accent)'; }
-    else if (syncOk === false) { el.textContent = '共有: 接続できないためこのPCの保存で動作中'; el.style.color = '#e0a020'; }
+    if (syncOk === true) { el.textContent = '共有: 同期済み（法人内の全PC）'; el.style.color = 'var(--accent)'; }
+    else if (syncOk === false) { el.textContent = boxEnabled() ? '共有: 接続できないためこのPCの保存で動作中' : '共有: なし（このPCの中だけ。閲覧・検証用）'; el.style.color = '#e0a020'; }
     else { el.textContent = '共有: 接続中...'; el.style.color = 'var(--text2)'; }
   }
   function colsIsDefault(kind) {
     return JSON.stringify(columns[kind]) === JSON.stringify(KACore.DEFAULT_COLUMNS[kind]);
   }
-  // 起動時の取り込み: 中央を正として取り込み、中央に無いこのPCの登録だけ自動で合流させる。
-  // 鉄則(2026-09-01事故の教訓): 「空の振り分け」は情報を持たないので、本物に勝てないし中央にも送らない。
+  // 起動時の取り込み: 箱を正として取り込み、箱に無い(または箱より新しい)このPCの登録だけ合流させる。
+  // 鉄則(2026-09-01事故の教訓): 「空の振り分け」は情報を持たないので、本物に勝てないし箱にも送らない。
   function isEmptyAssign(sv) { return !(sv && (sv.seg || sv.ind)); }
   function syncFromCentral() {
-    return centralGet().then(function (js) {
-      var central = {};   // key → {v(パース済み), at}
-      js.forEach(function (j) {
-        try { central[j.key] = { v: JSON.parse(j.value), at: j.updatedAt || '' }; } catch (e) {}
-      });
+    if (!boxEnabled()) {
+      syncOk = false; setSyncNote();
+      return Promise.resolve(false);
+    }
+    return boxGet().then(function (box) {
+      box = box || emptyBox();
       var now = new Date().toISOString();
-      var up = [];        // 中央へ送る分(合流・修復)
-      var hashJobs = [];  // [key生成のPromise]
+      var pending = [];   // 箱へ重ねる変更 [function(b){...}]
       ['slot', 'pachi'].forEach(function (kind) {
-        var tag = kind === 'slot' ? 'sl' : 'pc';
+        var bx = box[kind] || {};
         var centralNames = {};
-        Object.keys(central).forEach(function (k) {
-          if (k.indexOf('a_' + tag + '_') !== 0) return;
-          var v = central[k].v;
-          if (v && v.n) centralNames[v.n] = { seg: v.s || '', ind: v.i || '' };
+        Object.keys(bx).forEach(function (n) {
+          var v = bx[n] || {};
+          centralNames[n] = { seg: v.s || '', ind: v.i || '', c: v.c ? 1 : 0, at: v.at || '' };
         });
+        // 旧版が「保存」で黙って書いた空エントリ(箱にも無い)を一回だけ捨てて、未振り分け(黄色)に戻す
+        if (!localStorage.getItem(EMPTYRESET_KEY)) {
+          Object.keys(saved[kind]).forEach(function (n) {
+            var sv = saved[kind][n];
+            if (!centralNames[n] && isEmptyAssign(sv) && !(sv && sv.none)) delete saved[kind][n];
+          });
+        }
         Object.keys(centralNames).forEach(function (n) {
-          var cv = centralNames[n];
-          if (isEmptyAssign(cv) && !isEmptyAssign(saved[kind][n])) {
-            // 中央が空・手元が本物 → 手元を残して中央を修復する
-            hashJobs.push(sha40(kind + '|' + n).then(function (h) {
-              var sv = saved[kind][n];
-              up.push({ key: 'a_' + tag + '_' + h, value: JSON.stringify({ n: n, s: sv.seg || '', i: sv.ind || '' }), updatedAt: now });
-            }));
+          var cv = centralNames[n], sv = saved[kind][n];
+          if (isEmptyAssign(cv) && !isEmptyAssign(sv)) {
+            // 箱が空・手元が本物 → 手元を残して箱を修復する
+            pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: now, c: sv.c ? 1 : 0 }; });
             return;
           }
-          saved[kind][n] = cv;
+          if (!isEmptyAssign(sv) && sv.at && cv.at && sv.at > cv.at && (sv.seg !== cv.seg || sv.ind !== cv.ind)) {
+            // 手元の方が新しい(送れていなかった編集) → 手元を残して箱へ
+            pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: sv.at, c: sv.c ? 1 : 0 }; });
+            return;
+          }
+          saved[kind][n] = { seg: cv.seg, ind: cv.ind, c: cv.c, at: cv.at };
         });
         Object.keys(saved[kind]).forEach(function (n) {
           if (centralNames[n]) return;
-          if (isEmptyAssign(saved[kind][n])) return;   // 空は送らない
-          hashJobs.push(sha40(kind + '|' + n).then(function (h) {
-            var sv = saved[kind][n];
-            up.push({ key: 'a_' + tag + '_' + h, value: JSON.stringify({ n: n, s: sv.seg || '', i: sv.ind || '' }), updatedAt: now });
-          }));
+          var sv = saved[kind][n];
+          if (isEmptyAssign(sv)) return;   // 空は送らない
+          pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: sv.at || now, c: sv.c ? 1 : 0 }; });
         });
-        var ck = 'cols_' + kind;
-        if (central[ck] && central[ck].v && Array.isArray(central[ck].v.list) && central[ck].v.list.length) {
-          // 列の設定は「中央+このPCにしかない列を後ろに足す」和集合(勝手に列が消えないように)
-          var merged = central[ck].v.list.slice();
+        var bc = box.cols && box.cols[kind];
+        if (Array.isArray(bc) && bc.length) {
+          // 列の設定は「箱+このPCにしかない列を後ろに足す」和集合(勝手に列が消えないように)
+          var merged = bc.slice();
           var haveName = {};
           merged.forEach(function (c) { if (c.name) haveName[c.name] = 1; });
           var added = false;
@@ -20074,126 +20068,125 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
             added = true;
           });
           columns[kind] = merged;
-          if (added) up.push({ key: ck, value: JSON.stringify({ list: merged }), updatedAt: now });
+          if (added) pending.push(function (b) { (b.cols = b.cols || {})[kind] = merged; });
         } else if (!colsIsDefault(kind)) {
-          up.push({ key: ck, value: JSON.stringify({ list: columns[kind] }), updatedAt: now });
+          var mine = columns[kind];
+          pending.push(function (b) { (b.cols = b.cols || {})[kind] = mine; });
         }
       });
-      var centralTotalNames = {};
-      Object.keys(central).forEach(function (k) {
-        if (k.indexOf('t_') !== 0) return;
-        var v = central[k].v;
-        if (v && v.n) { centralTotalNames[v.n] = 1; if (v.v > 0) totals[v.n] = v.v; else delete totals[v.n]; }
+      // 総台数: 箱にあれば箱が正、このPCにしか無ければ箱へ
+      var bt = box.totals || {};
+      Object.keys(bt).forEach(function (b2) { var v = bt[b2] && bt[b2].v; if (v > 0) totals[b2] = v; else delete totals[b2]; });
+      Object.keys(totals).forEach(function (b2) {
+        if (bt[b2]) return;
+        var tv = totals[b2];
+        pending.push(function (b) { (b.totals = b.totals || {})[b2] = { v: tv, at: now }; });
       });
-      Object.keys(totals).forEach(function (b) {
-        if (centralTotalNames[b]) return;
-        hashJobs.push(sha40('total|' + b).then(function (h) {
-          up.push({ key: 't_' + h, value: JSON.stringify({ n: b, v: totals[b] }), updatedAt: now });
-        }));
-      });
-      // 店別の列構成: 基本は中央が正(値={n:店基底名, list:[...]} / {n, use:'common'}=専用をやめた印)。
-      // 空のlistは書かない設計(消すときは use:'common' を明示)。例外=このPCに「送信できていない新しい編集」
-      // (scDirty)がある場合は、それより古い中央には負けない(9/1事故の教訓の店別版)。
-      var centralSC = {};
-      Object.keys(central).forEach(function (k) {
-        var kind = k.indexOf('c_sl_') === 0 ? 'slot' : (k.indexOf('c_pc_') === 0 ? 'pachi' : null);
-        if (!kind) return;
-        var v = central[k].v;
-        if (!v || !v.n) return;
-        var dk = v.n + '|' + kind;
-        centralSC[dk] = 1;
-        if (scDirty[dk] && scDirty[dk] > (central[k].at || '')) {
-          // このPCの未送信編集の方が新しい → 中央を取り込まず、ローカルを送って修復
-          var lv = (storeCols[v.n] || {})[kind];
-          hashJobs.push(sha40('cols|' + kind + '|' + v.n).then(function (h) {
-            up.push({ key: (kind === 'slot' ? 'c_sl_' : 'c_pc_') + h, value: JSON.stringify(Array.isArray(lv) && lv.length ? { n: v.n, list: lv } : { n: v.n, use: 'common' }), updatedAt: now });
-          }));
-          return;
-        }
-        if (v.use === 'common' || !Array.isArray(v.list) || !v.list.length) {
-          if (storeCols[v.n]) { delete storeCols[v.n][kind]; if (!storeCols[v.n].slot && !storeCols[v.n].pachi) delete storeCols[v.n]; }
-        } else {
-          (storeCols[v.n] = storeCols[v.n] || {})[kind] = v.list;
-        }
-      });
-      Object.keys(storeCols).forEach(function (b) {
+      // 店別の列構成: 基本は箱が正。例外=このPCに「送信できていない新しい編集」(scDirty)がある場合は、それより古い箱には負けない
+      var bs = box.storeCols || {};
+      var seenSC = {};
+      Object.keys(bs).forEach(function (base) {
         ['slot', 'pachi'].forEach(function (kind) {
-          var l = storeCols[b][kind];
-          if (!Array.isArray(l) || !l.length) return;
-          // 共通カタログに合わせて整える(旧版PCのリネーム/削除の置き去り列を掃除)
-          var fit = fitToCatalog(l, kind);
-          if (fit.changed) {
-            if (fit.list) storeCols[b][kind] = fit.list;
-            else { delete storeCols[b][kind]; if (!storeCols[b].slot && !storeCols[b].pachi) delete storeCols[b]; }
-            hashJobs.push(sha40('cols|' + kind + '|' + b).then(function (h) {
-              up.push({ key: (kind === 'slot' ? 'c_sl_' : 'c_pc_') + h, value: JSON.stringify(fit.list ? { n: b, list: fit.list } : { n: b, use: 'common' }), updatedAt: now });
-            }));
+          var e = bs[base] && bs[base][kind];
+          if (!e) return;
+          var dk = base + '|' + kind;
+          seenSC[dk] = 1;
+          if (scDirty[dk] && scDirty[dk] > (e.at || '')) {
+            var lv = (storeCols[base] || {})[kind];
+            pending.push(function (b) {
+              b.storeCols = b.storeCols || {};
+              if (Array.isArray(lv) && lv.length) (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: lv, at: now };
+              else if (b.storeCols[base]) { delete b.storeCols[base][kind]; if (!Object.keys(b.storeCols[base]).length) delete b.storeCols[base]; }
+            });
             return;
           }
-          if (centralSC[b + '|' + kind]) return;   // 中央にある方が正
-          hashJobs.push(sha40('cols|' + kind + '|' + b).then(function (h) {
-            up.push({ key: (kind === 'slot' ? 'c_sl_' : 'c_pc_') + h, value: JSON.stringify({ n: b, list: l }), updatedAt: now });
-          }));
+          if (Array.isArray(e.list) && e.list.length) (storeCols[base] = storeCols[base] || {})[kind] = e.list;
+          else if (storeCols[base]) { delete storeCols[base][kind]; if (!storeCols[base].slot && !storeCols[base].pachi) delete storeCols[base]; }
         });
       });
-      return Promise.all(hashJobs).then(function () {
-        saveAssign(saved); saveColumns(columns); saveTotals(totals); saveStoreCols();
-        return centralPut(up);
-      }).then(function (ok) {
-        if (ok) { scDirty = {}; saveScDirty(); }   // 同期一式が通ったので未送信フラグを解除
-        syncOk = true; setSyncNote(); return ok;
+      Object.keys(storeCols).forEach(function (base) {
+        ['slot', 'pachi'].forEach(function (kind) {
+          var l = storeCols[base][kind];
+          if (!Array.isArray(l) || !l.length) return;
+          var fit = fitToCatalog(l, kind);   // 共通カタログに合わせて整える(置き去り列の掃除)
+          if (fit.changed) {
+            if (fit.list) storeCols[base][kind] = fit.list;
+            else { delete storeCols[base][kind]; if (!storeCols[base].slot && !storeCols[base].pachi) delete storeCols[base]; }
+            var fl = fit.list;
+            pending.push(function (b) {
+              b.storeCols = b.storeCols || {};
+              if (fl) (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: fl, at: now };
+              else if (b.storeCols[base]) { delete b.storeCols[base][kind]; if (!Object.keys(b.storeCols[base]).length) delete b.storeCols[base]; }
+            });
+            return;
+          }
+          if (seenSC[base + '|' + kind]) return;   // 箱にある方が正
+          pending.push(function (b) { b.storeCols = b.storeCols || {}; (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: l, at: now }; });
+        });
+      });
+      try { localStorage.setItem(EMPTYRESET_KEY, '1'); } catch (e) {}
+      saveAssign(saved); saveColumns(columns); saveTotals(totals); saveStoreCols();
+      if (!pending.length) { syncOk = true; setSyncNote(); return true; }
+      return boxUpdate(function (b) { pending.forEach(function (f) { f(b); }); }).then(function () {
+        scDirty = {}; saveScDirty();   // 同期一式が通ったので未送信フラグを解除
+        syncOk = true; setSyncNote(); return true;
       });
     }).catch(function (e) {
-      console.warn('[稼働粗利表] 中央共有に接続できません(このPCの保存で続行):', e && e.message);
+      console.warn('[稼働粗利表] 共有に接続できません(このPCの保存で続行):', e && e.message);
       syncOk = false; setSyncNote();
+      return false;
     });
   }
-  // 保存後の送信: 変更のあった機種だけを中央へ
+  // 保存後の送信: 変更のあった機種だけを箱へ(最新を読んでから重ねる=機種ごとの後勝ち)
   function pushAssigns(kind, names) {
-    // 鉄則: 空の振り分けは中央へ送らない(未保存の編集がdirtyに残っていた場合など。空が他PCの本物を消すのを防ぐ)
+    // 鉄則: 空の振り分けは箱へ送らない(空が他PCの本物を消すのを防ぐ)
     var sendable = names.filter(function (n) { return !isEmptyAssign(saved[kind][n]); });
     var skipped = names.filter(function (n) { return isEmptyAssign(saved[kind][n]); });
-    skipped.forEach(function (n) { delete dirty[kind][n]; });   // 送るものが無いdirtyは掃除
-    if (!sendable.length) return Promise.resolve(true);
-    var tag = kind === 'slot' ? 'sl' : 'pc';
+    skipped.forEach(function (n) { delete dirty[kind][n]; });
     var now = new Date().toISOString();
-    return Promise.all(sendable.map(function (n) {
-      return sha40(kind + '|' + n).then(function (h) {
+    sendable.forEach(function (n) { if (saved[kind][n]) saved[kind][n].at = now; });
+    saveAssign(saved);
+    if (!sendable.length) return Promise.resolve(true);
+    if (!boxEnabled()) { syncOk = false; setSyncNote(); return Promise.resolve(false); }
+    return boxUpdate(function (b) {
+      sendable.forEach(function (n) {
         var sv = saved[kind][n];
-        return { key: 'a_' + tag + '_' + h, value: JSON.stringify({ n: n, s: sv.seg || '', i: sv.ind || '' }), updatedAt: now };
+        (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: now, c: 1 };
       });
-    })).then(centralPut).then(function (ok) {
-      if (ok) sendable.forEach(function (n) { delete dirty[kind][n]; });
-      syncOk = !!ok; setSyncNote();
-      if (kind === curKind) renderCount();   // 「未保存の変更」表示を送信結果に合わせて更新
-      return ok;
+    }).then(function () {
+      sendable.forEach(function (n) { delete dirty[kind][n]; });
+      syncOk = true; setSyncNote();
+      if (kind === curKind) renderCount();
+      return true;
     }).catch(function () { syncOk = false; setSyncNote(); return false; });
   }
   function pushCols(kind) {
-    return centralPut([{ key: 'cols_' + kind, value: JSON.stringify({ list: columns[kind] }), updatedAt: new Date().toISOString() }])
-      .then(function (ok) { syncOk = !!ok; setSyncNote(); return ok; })
+    if (!boxEnabled()) { syncOk = false; setSyncNote(); return Promise.resolve(false); }
+    var mine = columns[kind];
+    return boxUpdate(function (b) { (b.cols = b.cols || {})[kind] = mine; })
+      .then(function () { syncOk = true; setSyncNote(); return true; })
       .catch(function () { syncOk = false; setSyncNote(); return false; });
   }
   function pushTotal(base) {
-    return sha40('total|' + base).then(function (h) {
-      return centralPut([{ key: 't_' + h, value: JSON.stringify({ n: base, v: totals[base] != null ? totals[base] : null }), updatedAt: new Date().toISOString() }]);
-    }).then(function (ok) { syncOk = !!ok; setSyncNote(); return ok; })
+    if (!boxEnabled()) { syncOk = false; setSyncNote(); return Promise.resolve(false); }
+    var v = totals[base] != null ? totals[base] : null, now = new Date().toISOString();
+    return boxUpdate(function (b) { b.totals = b.totals || {}; if (v > 0) b.totals[base] = { v: v, at: now }; else delete b.totals[base]; })
+      .then(function () { syncOk = true; setSyncNote(); return true; })
       .catch(function () { syncOk = false; setSyncNote(); return false; });
   }
   function pushStoreCols(base, kind) {
-    var dk = base + '|' + kind;
-    scDirty[dk] = new Date().toISOString();   // 送信が失敗しても「このPCの編集が最新」の印が残る
+    var dk = base + '|' + kind, now = new Date().toISOString();
+    scDirty[dk] = now;   // 送信が失敗しても「このPCの編集が最新」の印が残る
     saveScDirty();
+    if (!boxEnabled()) { syncOk = false; setSyncNote(); return Promise.resolve(false); }
     var l = (storeCols[base] || {})[kind];
-    return sha40('cols|' + kind + '|' + base).then(function (h) {
-      return centralPut([{
-        key: (kind === 'slot' ? 'c_sl_' : 'c_pc_') + h,
-        value: JSON.stringify(Array.isArray(l) && l.length ? { n: base, list: l } : { n: base, use: 'common' }),
-        updatedAt: new Date().toISOString(),
-      }]);
-    }).then(function (ok) {
-      if (ok) { delete scDirty[dk]; saveScDirty(); }
-      syncOk = !!ok; setSyncNote(); return ok;
+    return boxUpdate(function (b) {
+      b.storeCols = b.storeCols || {};
+      if (Array.isArray(l) && l.length) (b.storeCols[base] = b.storeCols[base] || {})[kind] = { list: l, at: now };
+      else if (b.storeCols[base]) { delete b.storeCols[base][kind]; if (!Object.keys(b.storeCols[base]).length) delete b.storeCols[base]; }
+    }).then(function () {
+      delete scDirty[dk]; saveScDirty();
+      syncOk = true; setSyncNote(); return true;
     }).catch(function () { syncOk = false; setSyncNote(); return false; });
   }
   var $ = function (id) { return document.getElementById(id); };
@@ -20260,7 +20253,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '<button class="bjka-btn" id="bjkaGenPachi" disabled>パチンコ版をダウンロード</button>'
         + '</div>'
         + '<div class="bjka-status" id="bjkaGenSt"></div>'
-        + '<div class="bjka-note">機種ごとに「セグメント」と「個別機種列」を選びます（両方選んだ機種は両方の列に計上・どちらも選ばない機種は合計列のみ）。プルダウン最下部の「＋ 新しい〇〇を追加...」でその場で列を増やせます。黄色の行は自動候補です。保存すれば次回は新しい機種だけ確認すれば済みます。<br>'
+        + '<div class="bjka-note">機種ごとに「セグメント」と「個別機種列」を選びます（両方選んだ機種は両方の列に計上・どちらも選ばない機種は合計列のみ）。プルダウン最下部の「＋ 新しい〇〇を追加...」でその場で列を増やせます。黄色の行は<b>まだ振り分けていない機種</b>で、自動では何も入りません（人が選んだ行だけ保存されます）。「（なし）」を選ぶとこのPCでは振り分け済みになりますが、安全設計のため他のPCには送られません（他のPCでは黄色のまま。そこで列が選ばれるとそちらが優先されます）。「自動候補の疑い」の行は、以前の自動候補と同じ値のまま確定された可能性がある登録です。値を確かめて「この値でOK」か、正しい列を選び直してください。<br>'
         + '店舗プルダウンの「全店舗まとめて」を選ぶと、全店の機種が1画面に出ます（未確定が上に並ぶので、新台の振り分けは店を回らずここだけで済みます）。振り分けは全店共通です。<br>'
         + '店舗を選んでいるとき「列の設定」から<b>その店専用の列構成</b>（どの列を・どの順で出すか）を作れます。例: A店は鳳凰の列・B店はキングハナハナの列、のような店別カスタムができます。<br>'
         + '完成Excel下部・黄色い構成比行の左端は「店の総台数(1パチ等も含む)」で割る式です。総台数はデータに無いため、必要ならExcelのA52セルへ手入力してください（他への影響はありません）。</div>'
@@ -20478,17 +20471,27 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       KACore.colNames(columns[kind], 'seg').forEach(function (n) { segSet[n] = 1; });
       KACore.colNames(columns[kind], 'ind').forEach(function (n) { indSet[n] = 1; });
       uiValues[kind] = {};
+      dirty[kind] = {};   // 画面を作り直す＝未保存の編集は捨てる(別の店で触った編集を持ち越して黙って保存しない)
       models[kind].forEach(function (m) {
         var sv = saved[kind][m.name];
         if (sv) {
           var segOk = !sv.seg || segSet[sv.seg];
           var indOk = !sv.ind || indSet[sv.ind];
           var v = { seg: segOk ? (sv.seg || '') : '', ind: indOk ? (sv.ind || '') : '' };
-          if (!segOk || !indOk) v._pending = true;
+          if (!segOk || !indOk) {
+            v._pending = true;
+            saved[kind][m.name] = { seg: v.seg, ind: v.ind };   // 消えた列名を保存側にも残さない
+          }
+          // 旧版の自動候補と同じ値のまま、新版で人が確定した印(c)が無い → 疑いとして黄色で見せる(値は残す＝Excelは変わらない)
+          if (!v._pending && !sv.c && (v.seg || v.ind)) {
+            var lg = legacySuggest(kind, m.name);
+            // どちらか一方でも旧候補と同じなら疑い(例: SAO初代=個別だけが候補由来・セグメントは人が選んだ)
+            if ((lg.seg && lg.seg === v.seg) || (lg.ind && lg.ind === v.ind)) { v._pending = true; v._suspect = true; }
+          }
           uiValues[kind][m.name] = v;
         } else {
-          var s = KACore.suggest(kind, m.name, columns[kind]);
-          uiValues[kind][m.name] = { seg: s.seg, ind: s.ind, _pending: true };
+          // 自動候補なし(2026-09-03)。黄色=まだ振り分けていない機種。人が選ぶまで保存もしない
+          uiValues[kind][m.name] = { seg: '', ind: '', _pending: true };
         }
       });
     });
@@ -20506,8 +20509,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       return;
     }
     var segs = KACore.colNames(columns[curKind], 'seg'), inds = KACore.colNames(columns[curKind], 'ind');
-    var opt = function (opts, cur, addLabel) {
-      return '<option value="">（なし）</option>'
+    var opt = function (opts, cur, addLabel, pending) {
+      // 未振り分けの行は「（未選択）」から始める＝「（なし）」を選ぶ操作も人の判断として残す
+      return (pending ? '<option value="__unset__" selected>（未選択）</option>' : '')
+        + '<option value="">（なし）</option>'
         + opts.map(function (o) { return '<option value="' + esc(o) + '"' + (o === cur ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('')
         + '<option value="__add__">＋ 新しい' + addLabel + 'を追加...</option>';
     };
@@ -20515,12 +20520,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var rows = list.map(function (m, i) {
       var v = uiValues[curKind][m.name] || { seg: '', ind: '' };
       if (v._pending) pend++;
+      var unset = !!v._pending && !v._suspect;   // 疑い行は現在の値を見せる(（未選択）にしない)
       return '<tr class="' + (v._pending ? 'bjka-pend' : '') + '" data-i="' + i + '">'
-        + '<td>' + esc(m.name) + (v._pending ? '<span class="bjka-tag">候補</span>' : '') + '</td>'
+        + '<td>' + esc(m.name)
+        + (v._suspect ? '<span class="bjka-tag">自動候補の疑い・要確認</span> <button type="button" class="bjka-mini bjka-okbtn" data-i="' + i + '">この値でOK</button>'
+                      : (v._pending ? '<span class="bjka-tag">未振り分け</span>' : '')) + '</td>'
         + '<td class="num">' + (m.count || '') + '</td>'
         + (allMode ? '<td class="num">' + (m.stores || '') + '</td>' : '')
-        + '<td><select data-f="seg">' + opt(segs, v.seg, 'セグメント') + '</select></td>'
-        + '<td><select data-f="ind">' + opt(inds, v.ind, '個別機種列') + '</select></td>'
+        + '<td><select data-f="seg">' + opt(segs, v.seg, 'セグメント', unset) + '</select></td>'
+        + '<td><select data-f="ind">' + opt(inds, v.ind, '個別機種列', unset) + '</select></td>'
         + '</tr>';
     }).join('');
     var head = allMode
@@ -20528,6 +20536,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       : '<tr><th>機種名</th><th style="text-align:right">直近台数</th><th>セグメント</th><th>個別機種列</th></tr>';
     $('bjkaAssign').innerHTML = '<table class="bjka-t">' + head + rows + '</table>';
     renderCount(pend);
+    // 「この値でOK」= 自動候補由来の疑いがある登録を、人がそのまま確定する
+    Array.prototype.forEach.call($('bjkaAssign').querySelectorAll('button.bjka-okbtn'), function (b) {
+      b.onclick = function () {
+        var i2 = Number(b.getAttribute('data-i')), name2 = list[i2].name, v2 = uiValues[curKind][name2];
+        if (!v2) return;
+        delete v2._pending; delete v2._suspect;
+        dirty[curKind][name2] = 1;
+        var tr2 = b.closest('tr'); if (tr2) { tr2.className = ''; var t2 = tr2.querySelector('.bjka-tag'); if (t2) t2.remove(); }
+        b.remove();
+        renderCount();
+      };
+    });
     Array.prototype.forEach.call($('bjkaAssign').querySelectorAll('select'), function (sel) {
       sel.onchange = function () {
         var tr = sel.closest('tr');
@@ -20568,11 +20588,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           setStatus($('bjkaGenSt'), label + '「' + nm + '」を追加しました。' + scNote + '完成Excelの右端に列が増えます（並び順は「列の設定」で変えられます）。', 'ok');
           return;
         }
+        if (sel.value === '__unset__') return;   // 未選択に戻しただけ(触っていない行でしか起きない)
         v[sel.getAttribute('data-f')] = sel.value;
-        delete v._pending;
+        delete v._pending; delete v._suspect;
         dirty[curKind][name] = 1;
         tr.className = '';
         var tag = tr.querySelector('.bjka-tag'); if (tag) tag.remove();
+        var okb = tr.querySelector('.bjka-okbtn'); if (okb) okb.remove();
+        // 一度でも選んだ行からは（未選択）を消す＝画面に見えている値がそのまま保存される(もう片方は（なし）に落ちる)
+        Array.prototype.forEach.call(tr.querySelectorAll('option[value="__unset__"]'), function (o) { o.remove(); });
         renderCount();
       };
     });
@@ -20586,18 +20610,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       models[curKind].forEach(function (m) { if ((uiValues[curKind][m.name] || {})._pending) pend++; });
     }
     var un = Object.keys(dirty[curKind]).length;
-    el.textContent = pend ? '未確認の候補 ' + pend + '件'
-      : (un ? '未保存の変更 ' + un + '件（「振り分けを保存」を押してください）' : '全機種 保存済み');
+    el.textContent = (un ? '未保存の変更 ' + un + '件（「振り分けを保存」を押してください）' : '')
+      + (pend ? (un ? '　／　' : '') + '未振り分け ' + pend + '件（黄色の行。触るまで保存されません）' : (un ? '' : '全機種 振り分け済み'));
   }
 
   function onSave() {
+    var left = 0;
     models[curKind].forEach(function (m) {
       var v = uiValues[curKind][m.name];
       if (!v) return;
-      // 候補の確定は「中身のあるもの」だけ中央へ送る(空を送ると他のPCの本物を消しかねない)
-      if (v._pending && (v.seg || v.ind)) dirty[curKind][m.name] = 1;
-      delete v._pending;
-      saved[curKind][m.name] = { seg: v.seg || '', ind: v.ind || '' };
+      // 自動候補なし(2026-09-03): 黄色(触っていない)の行は保存しない。_pendingが消えるのは人の操作経路だけ
+      if (v._pending) { left++; return; }
+      var ent = { seg: v.seg || '', ind: v.ind || '', c: 1 };
+      if (!ent.seg && !ent.ind) ent.none = 1;   // 人が選んだ（なし）(旧版が黙って書いた空と区別する)
+      saved[curKind][m.name] = ent;
     });
     saveAssign(saved);
     pushAssigns(curKind, Object.keys(dirty[curKind]));
@@ -20606,7 +20632,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var otherPend = 0;
     models[other].forEach(function (m) { if ((uiValues[other][m.name] || {})._pending) otherPend++; });
     setStatus($('bjkaGenSt'), (curKind === 'slot' ? 'スロット' : 'パチンコ') + 'の振り分けを保存しました。'
-      + (otherPend ? (other === 'slot' ? 'スロット' : 'パチンコ') + 'タブに未確認の候補が' + otherPend + '件あります。' : ''), 'ok');
+      + (left ? '未振り分けの' + left + '機種は触っていないのでそのまま残しています。' : '')
+      + (otherPend ? (other === 'slot' ? 'スロット' : 'パチンコ') + 'タブに未振り分けが' + otherPend + '件あります。' : ''), 'ok');
   }
 
   /* ── 列の設定エディタ ── */
@@ -20634,7 +20661,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '</tr>';
     }).join('');
     body.innerHTML = '<div style="font-size:10.5px;color:var(--text2);margin:8px 0;">'
-      + (curKind === 'slot' ? 'スロット' : 'パチンコ') + 'の完成Excelの列並びです（先頭の合計列「' + (curKind === 'slot' ? '20S' : '4P') + '」は固定）。名前を変えると振り分け済みの機種も自動で付いてきます。列を削除すると、その列に振り分けていた機種は「未確定」に戻ります。保存せずにタブや店舗を切り替えると編集中の内容は破棄されます。</div>'
+      + (curKind === 'slot' ? 'スロット' : 'パチンコ') + 'の完成Excelの列並びです（先頭の合計列「' + (curKind === 'slot' ? '20S' : '4P') + '」は固定）。名前を変えると振り分け済みの機種も自動で付いてきます。列を削除すると、その列に振り分けていた機種はその列については「（なし）」になります。保存せずにタブや店舗を切り替えると編集中の内容は破棄されます。</div>'
       + '<table style="border-collapse:collapse">' + rows + '</table>'
       + '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;">'
       + '<button class="bjka-mini" id="bjkaColAdd">列を追加</button>'
@@ -20853,7 +20880,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 30000);
         var warns = [];
         if (!daysInRange) warns.push('選択期間にこの部門のデータが無いため日別表は空です');
-        if (pend) warns.push('未確定の振り分けが' + pend + '機種あります（画面の表示どおり反映済み）。確認して保存してください');
+        if (pend) warns.push('未振り分けの機種が' + pend + '機種あります（選んでいない列には計上していません）');
         if (scCustom) {
           // 店別の列構成に、共通の列一覧から消えた/改名された列が残っていないかの最終チェック
           var known = {};
