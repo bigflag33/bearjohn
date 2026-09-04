@@ -1890,7 +1890,7 @@ const USER_LABEL = '北上文化さん専用';               // 例: '田中さ�
 const USER_ID = 'kitakami';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260903-163532';
+const BJ_VERSION = '20260904-090452';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -9722,6 +9722,7 @@ function _renderCalendarMonth(ym, filteredDates) {
         <div class="cal-metric">粗利 <span class="${profitColor}">${Math.round(metric.profit).toLocaleString()}円</span></div>
         <div class="cal-metric">売上 <span>${Math.round(metric.sales).toLocaleString()}円</span></div>
         <div class="cal-metric">${'1台平均'+_inLabel(true)} <span class="yellow">${_fmtInVal(metric.inmai/(metric.count||1))}</span></div>
+        <div class="cal-metric">平均台粗利 <span class="${profitColor}">${Math.round(metric.profit/(metric.count||1)).toLocaleString()}円</span></div>
         <div class="cal-metric">利益率 <span class="${rateColor}">${profitRate}%</span></div>
       `;
     } else {
@@ -20760,8 +20761,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       + '名前を作る・変える・消すのは「全店舗まとめて」の画面か、振り分け表の「＋追加」で行ってください。</div>'
       + '<table style="border-collapse:collapse">' + rows + '</table>'
       + '<div style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">'
-      + '<select id="bjkaScAddSeg"><option value="">セグメントを追加...</option>' + optHtml(segOpts) + '</select>'
-      + '<select id="bjkaScAddInd"><option value="">個別機種を追加...</option>' + optHtml(indOpts) + '</select>'
+      + '<select id="bjkaScAddSeg"' + (segOpts.length ? '' : ' disabled') + '><option value="">' + (segOpts.length ? 'セグメントを追加...' : 'セグメント: いま全部表に出ています') + '</option>' + optHtml(segOpts) + '</select>'
+      + '<select id="bjkaScAddInd"' + (indOpts.length ? '' : ' disabled') + '><option value="">' + (indOpts.length ? '個別機種を追加...' : '個別機種: いま全部表に出ています') + '</option>' + optHtml(indOpts) + '</select>'
       + '<button class="bjka-mini" id="bjkaScAddSp">空白（仕切り）列を追加</button>'
       + '<button class="bjka-ghost" id="bjkaScSave" style="color:var(--accent);border-color:var(--accent)">この店の列設定を保存</button>'
       + (hasOwn ? '<button class="bjka-mini" id="bjkaScRevert">共通の並びに戻す</button>' : '')
