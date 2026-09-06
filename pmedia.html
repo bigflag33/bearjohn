@@ -1890,7 +1890,7 @@ const USER_LABEL = 'ピーメディアさん専用';               // 例: '田�
 const USER_ID = 'pmedia';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260904-090452';
+const BJ_VERSION = '20260906-072840';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2368,15 +2368,21 @@ async function loadRemoteData() {
   if (USER_ID === 'admin') return;
   try {
     // ── まず月別配信を探す。入口ファイルだけは毎回取り直す（?t=）＝目次と当月データを新鮮に保つ
+    // 2026-09-06 API切替: データはサーバが毎朝APIから作りS3+CloudFrontで配信（キャッシュ無効＝過去月の古残り問題も解消）。
+    // CloudFrontに繋がらないときだけ、従来のGitHub配信（手動アップ）へ自動で切り替える（表示は止めない）
+    const BJ_DATA_BASES = ['https://d17k53m2wpr7dx.cloudfront.net/', './'];
     const ym = d => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0');
     const now = new Date();
     const prevM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    let head = null, headMonth = '';
-    for (const m of [ym(now), ym(prevM)]) {
-      try {
-        const r = await fetch(`./${USER_ID}_data_${m}.json?t=${Date.now()}`);
-        if (r.ok) { head = await r.json(); headMonth = m; break; }
-      } catch (e) {}
+    let head = null, headMonth = '', dataBase = './';
+    outer:
+    for (const base of BJ_DATA_BASES) {
+      for (const m of [ym(now), ym(prevM)]) {
+        try {
+          const r = await fetch(`${base}${USER_ID}_data_${m}.json?t=${Date.now()}`);
+          if (r.ok) { head = await r.json(); headMonth = m; dataBase = base; break outer; }
+        } catch (e) {}
+      }
     }
     if (head) {
       if (head.enc === 'v1') {
@@ -2393,7 +2399,7 @@ async function loadRemoteData() {
       let restData = null;
       try {
         restData = await Promise.all(rest.map(async m => {
-          const r = await fetch(`./${USER_ID}_data_${m}.json`);
+          const r = await fetch(`${dataBase}${USER_ID}_data_${m}.json`);
           if (!r.ok) throw new Error('missing ' + m);
           let d = await r.json();
           if (d && d.enc === 'v1') d = await _bjDecryptJSON(d, window._bjPw || '');
@@ -2418,7 +2424,7 @@ async function loadRemoteData() {
       console.log(`[remote] 月別 ${months.length}ファイルから ${total}件 ロード完了`);
       const d0 = head.generated ? new Date(head.generated) : null;
       const dateStr = d0 ? `${d0.getMonth() + 1}/${d0.getDate()} ${String(d0.getHours()).padStart(2, '0')}:${String(d0.getMinutes()).padStart(2, '0')}` : '';
-      _bjRemoteBadge(`データ配信済み ${dateStr}`);
+      _bjRemoteBadge(`データ配信済み ${dateStr}` + (dataBase === './' ? '（予備経路）' : ''));
       return;
     }
 
