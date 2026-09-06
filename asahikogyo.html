@@ -1890,7 +1890,7 @@ const USER_LABEL = '朝日興業さん専用';               // 例: '田中さ�
 const USER_ID = 'asahikogyo';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260906-173404';
+const BJ_VERSION = '20260907-074148';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -19174,6 +19174,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     try{ _bjtNotice(); }catch(e){}
     if(window._bjRoom==='tune'){ try{ _bjtRender(); }catch(e){} }        // 「表示中の店への影響」カードを描き直す
     if(window._bjRoom==='weekly'){ _bjShowLoading(); setTimeout(function(){ try{ _bjwkRender(); }catch(e){} finally { _bjHideLoading(); } },60); }
+    // レポートを見たまま店舗を切り替えると、rival本体は描き直るが週次イベント(万枚)の中身が空のままになる
+    // (中身はタブを開き直した時にしか描かれない)ため、ここでも描き直す(2026-09-07修正)
+    if(window._bjRoom==='report'||window._bjRoom==='post'){ setTimeout(function(){ try{ _bjwrRender(); }catch(e){ console.error('bjwr', e); } try{ _bjweRender(); }catch(e){ console.error('bjwe', e); } },200); }
     if(window._bjRoom==='briefing'){
       _bjShowLoading();
       setTimeout(function(){ try{ _bjbRender(); }catch(e){} finally { _bjHideLoading(); } },60);   // rAFは裏タブで止まるためsetTimeoutで確実に
