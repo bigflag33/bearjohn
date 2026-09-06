@@ -1890,7 +1890,7 @@ const USER_LABEL = '興和商事さん専用';               // 例: '田中さ�
 const USER_ID = 'kowa';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260907-074148';
+const BJ_VERSION = '20260907-081302';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -12025,11 +12025,12 @@ function renderModelTable() {
 
   const dir = _modelSortDir === 'asc' ? 1 : -1;
   rows.sort((a, b) => {
-    if (_modelSortKey === 'trend') {
-      if (a.trend === null && b.trend === null) return 0;
-      if (a.trend === null) return 1;
-      if (b.trend === null) return -1;
-      return dir * (a.trend - b.trend);
+    if (_modelSortKey === 'trend' || _modelSortKey === 'trendPr') {
+      const av2 = a[_modelSortKey], bv2 = b[_modelSortKey];
+      if (av2 === null && bv2 === null) return 0;
+      if (av2 === null) return 1;
+      if (bv2 === null) return -1;
+      return dir * (av2 - bv2);
     }
     const av = a[_modelSortKey], bv = b[_modelSortKey];
     if (typeof av === 'string') return dir * av.localeCompare(bv, 'ja');
@@ -12052,7 +12053,7 @@ function renderModelTable() {
     const up    = trend >= 0;
     const arrow = up ? '▲' : '▼';
     const sign  = up ? '+' : '';
-    const pct   = `${sign}${trend.toFixed(0)}%`;
+    const pct   = abs > 999 ? `${sign}999%超` : `${sign}${trend.toFixed(0)}%`;
     if (abs < 5) {
       // 変化小さい → ダッシュスタイル
       const col = up ? 'var(--green)' : 'var(--text2)';
@@ -12075,7 +12076,8 @@ function renderModelTable() {
     ${_th('営業日数','days')}
     ${_th('平均台数','avgMachines')}
     ${_th('1台平均'+_inLabel(true),'avgIn','background:rgba(108,99,255,0.08);')}
-    ${_th('傾向','trend','text-align:center;')}
+    ${_th('稼働傾向','trend','text-align:center;')}
+    ${_th('粗利傾向','trendPr','text-align:center;')}
     ${_th('推定粗利合計','profit')}
     ${_th('1台平均粗利','avgProfit')}
     ${_th('推定売上合計','sales')}
@@ -12091,6 +12093,7 @@ function renderModelTable() {
     <td>${s.avgMachines.toFixed(1)}台</td>
     <td class="highlight">${fmtAbs(Math.round(s.avgIn))}</td>
     <td style="text-align:center;">${_trendBadge(s.trend)}</td>
+    <td style="text-align:center;">${_trendBadge(s.trendPr)}</td>
     <td class="${colorClass(s.profit)}">${fmt(s.profit)}円</td>
     <td class="${colorClass(s.avgProfit)}">${fmt(s.avgProfit)}円</td>
     <td>${fmtAbs(s.sales)}円</td>
@@ -12140,6 +12143,7 @@ function renderModelTable() {
     <td>${r.avgMachines.toFixed(1)}台</td>
     <td class="highlight">${fmtAbs(Math.round(r.avgIn))}</td>
     <td style="text-align:center;">${_trendBadge(r.trend)}</td>
+    <td style="text-align:center;">${_trendBadge(r.trendPr)}</td>
     <td class="${colorClass(r.profit)}">${fmt(r.profit)}円</td>
     <td class="${colorClass(r.avgProfit)}">${fmt(r.avgProfit)}円</td>
     <td>${fmtAbs(r.sales)}円</td>
@@ -12162,8 +12166,9 @@ function buildModelRows(records){
     agg[k].games += d['G数']||0; agg[k].bb += d['BB']||0;
     agg[k].rb += d['RB']||0; agg[k].art += d['ART']||0;
     agg[k].count++; agg[k].days.add(d.date);
-    if (!agg[k].dateData[d.date]) agg[k].dateData[d.date] = { inmai:0, count:0 };
+    if (!agg[k].dateData[d.date]) agg[k].dateData[d.date] = { inmai:0, profit:0, count:0 };
     agg[k].dateData[d.date].inmai += d['IN枚数']||0;
+    agg[k].dateData[d.date].profit += d['台粗利']||0;
     agg[k].dateData[d.date].count++;
   });
   return Object.values(agg).map(r => {
@@ -12174,22 +12179,25 @@ function buildModelRows(records){
     const profitRate = r.sales !== 0 ? r.profit / r.sales * 100 : 0;
     const coinTanka = r.inmai > 0 ? r.sales / r.inmai : 0;
     const coinProfit = r.inmai > 0 ? r.profit / r.inmai : 0;
-    let trend = null;
+    let trend = null, trendPr = null;
     const sortedDates = Object.keys(r.dateData).sort();
     if (sortedDates.length >= 5) {
       const half = Math.floor(sortedDates.length / 2);
       const firstDates = sortedDates.slice(0, half);
       const lastDates  = sortedDates.slice(sortedDates.length - half);
-      const avgF = firstDates.reduce((s, dt) => { const dd=r.dateData[dt]; return s + (dd.count>0?dd.inmai/dd.count:0); },0)/firstDates.length;
-      const avgL = lastDates.reduce((s, dt) => { const dd=r.dateData[dt]; return s + (dd.count>0?dd.inmai/dd.count:0); },0)/lastDates.length;
+      const avgOf = (arr, f) => arr.reduce((s, dt) => { const dd=r.dateData[dt]; return s + (dd.count>0?f(dd)/dd.count:0); },0)/arr.length;
+      const avgF = avgOf(firstDates, dd=>dd.inmai), avgL = avgOf(lastDates, dd=>dd.inmai);
       if (avgF > 0) trend = (avgL - avgF) / avgF * 100;
+      // 粗利の傾向: 比較テーブルの台粗利傾向と同じ流儀(÷|前半|＝マイナス圏でも「増えた方向=プラス」)
+      const prF = avgOf(firstDates, dd=>dd.profit), prL = avgOf(lastDates, dd=>dd.profit);
+      if (prF !== 0) trendPr = (prL - prF) / Math.abs(prF) * 100;
     }
-    return Object.assign({}, r, { days, avgMachines, avgIn, avgProfit, profitRate, coinTanka, coinProfit, trend });
+    return Object.assign({}, r, { days, avgMachines, avgIn, avgProfit, profitRate, coinTanka, coinProfit, trend, trendPr });
   });
 }
 function _modelTrendBadge(trend){
   if (trend === null) return `<span style="color:var(--text2);font-size:13px;letter-spacing:1px;">—</span>`;
-  const abs = Math.abs(trend), up = trend >= 0, sign = up ? '+' : '', pct = `${sign}${trend.toFixed(0)}%`;
+  const abs = Math.abs(trend), up = trend >= 0, sign = up ? '+' : '', pct = abs > 999 ? `${sign}999%超` : `${sign}${trend.toFixed(0)}%`;   // 前半ほぼ0の粗利傾向は%が爆発するため頭打ち表示
   if (abs < 5){ const col = up ? 'var(--green)' : 'var(--text2)'; return `<span style="color:${col};font-size:11px;font-weight:700;letter-spacing:-.3px;">-- ${pct}</span>`; }
   if (abs < 15){ const col = up?'#34d399':'#f87171', bg = up?'rgba(52,211,153,0.10)':'rgba(248,113,113,0.10)', brd = up?'rgba(52,211,153,0.35)':'rgba(248,113,113,0.35)'; return `<span style="background:${bg};border:1px solid ${brd};color:${col};border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;white-space:nowrap;">${up?'▲':'▼'} ${pct}</span>`; }
   const bg = up ? '#16a34a' : '#dc2626'; return `<span style="background:${bg};color:#fff;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:800;white-space:nowrap;">${up?'▲':'▼'} ${pct}</span>`;
@@ -12200,8 +12208,8 @@ function _aggSummaryRow(records){
   records.forEach(d => { if (!d) return;
     r.profit += d['台粗利']||0; r.sales += d['台売上']||0; r.inmai += d['IN枚数']||0; r.count++;
     r.days.add(d.date);
-    const dd = r.dateData[d.date] = r.dateData[d.date] || { inmai:0, count:0 };
-    dd.inmai += d['IN枚数']||0; dd.count++;
+    const dd = r.dateData[d.date] = r.dateData[d.date] || { inmai:0, profit:0, count:0 };
+    dd.inmai += d['IN枚数']||0; dd.profit += d['台粗利']||0; dd.count++;
   });
   const days = r.days.size;
   const avgMachines = days > 0 ? r.count / days : 0;
@@ -12210,16 +12218,18 @@ function _aggSummaryRow(records){
   const profitRate = r.sales !== 0 ? r.profit / r.sales * 100 : 0;
   const coinTanka = r.inmai > 0 ? r.sales / r.inmai : 0;
   const coinProfit = r.inmai > 0 ? r.profit / r.inmai : 0;
-  let trend = null;
+  let trend = null, trendPr = null;
   const sortedDates = Object.keys(r.dateData).sort();
   if (sortedDates.length >= 5) {
     const half = Math.floor(sortedDates.length / 2);
     const fD = sortedDates.slice(0, half), lD = sortedDates.slice(sortedDates.length - half);
-    const avgF = fD.reduce((s,dt)=>{const dd=r.dateData[dt];return s+(dd.count>0?dd.inmai/dd.count:0);},0)/fD.length;
-    const avgL = lD.reduce((s,dt)=>{const dd=r.dateData[dt];return s+(dd.count>0?dd.inmai/dd.count:0);},0)/lD.length;
+    const avgOf = (arr, f) => arr.reduce((s,dt)=>{const dd=r.dateData[dt];return s+(dd.count>0?f(dd)/dd.count:0);},0)/arr.length;
+    const avgF = avgOf(fD, dd=>dd.inmai), avgL = avgOf(lD, dd=>dd.inmai);
     if (avgF > 0) trend = (avgL - avgF) / avgF * 100;
+    const prF = avgOf(fD, dd=>dd.profit), prL = avgOf(lD, dd=>dd.profit);
+    if (prF !== 0) trendPr = (prL - prF) / Math.abs(prF) * 100;
   }
-  return { days, avgMachines, avgIn, avgProfit, profit:r.profit, sales:r.sales, profitRate, coinTanka, coinProfit, trend };
+  return { days, avgMachines, avgIn, avgProfit, profit:r.profit, sales:r.sales, profitRate, coinTanka, coinProfit, trend, trendPr };
 }
 function modelTableHTML(records, opts){
   opts = opts || {};
@@ -12232,7 +12242,7 @@ function modelTableHTML(records, opts){
   const inLbl = (typeof _inLabel==='function') ? _inLabel(true) : 'アウト';
   const head = `<thead><tr>
     <th>機種名</th><th>営業日数</th><th>平均台数</th><th>1台平均${inLbl}</th>
-    <th style="text-align:center;">傾向</th><th>推定粗利合計</th><th>1台平均粗利</th>
+    <th style="text-align:center;">稼働傾向</th><th style="text-align:center;">粗利傾向</th><th>推定粗利合計</th><th>1台平均粗利</th>
     <th>推定売上合計</th><th>利益率</th><th>${coinLabel}単価</th><th>${coinLabel}粗利</th>
   </tr></thead>`;
   const sumRow = (s, label, bg) => `<tr style="background:${bg};font-weight:800;border-top:2px solid var(--border);">
@@ -12241,6 +12251,7 @@ function modelTableHTML(records, opts){
     <td>${s.avgMachines.toFixed(1)}台</td>
     <td class="highlight">${fmtAbs(Math.round(s.avgIn))}</td>
     <td style="text-align:center;">${_modelTrendBadge(s.trend)}</td>
+    <td style="text-align:center;">${_modelTrendBadge(s.trendPr)}</td>
     <td class="${colorClass(s.profit)}">${fmt(s.profit)}円</td>
     <td class="${colorClass(s.avgProfit)}">${fmt(s.avgProfit)}円</td>
     <td>${fmtAbs(s.sales)}円</td>
@@ -12263,6 +12274,7 @@ function modelTableHTML(records, opts){
     <td>${r.avgMachines.toFixed(1)}台</td>
     <td class="highlight">${fmtAbs(Math.round(r.avgIn))}</td>
     <td style="text-align:center;">${_modelTrendBadge(r.trend)}</td>
+    <td style="text-align:center;">${_modelTrendBadge(r.trendPr)}</td>
     <td class="${colorClass(r.profit)}">${fmt(r.profit)}円</td>
     <td class="${colorClass(r.avgProfit)}">${fmt(r.avgProfit)}円</td>
     <td>${fmtAbs(r.sales)}円</td>
