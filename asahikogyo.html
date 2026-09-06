@@ -1890,7 +1890,7 @@ const USER_LABEL = '朝日興業さん専用';               // 例: '田中さ�
 const USER_ID = 'asahikogyo';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260906-072840';
+const BJ_VERSION = '20260906-173404';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -20290,6 +20290,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         + '<span style="flex:1"></span>'
         + '<button class="bjka-btn" id="bjkaGenSlot" disabled>スロット版をダウンロード</button>'
         + '<button class="bjka-btn" id="bjkaGenPachi" disabled>パチンコ版をダウンロード</button>'
+        + '<button class="bjka-btn" id="bjkaGenAll" disabled title="全店舗ぶんのExcelを1つのZIPにまとめてダウンロード">全店ぶんZIP</button>'
         + '</div>'
         + '<div class="bjka-status" id="bjkaGenSt"></div>'
         + '<div class="bjka-note">機種ごとに「セグメント」と「個別機種列」を選びます（両方選んだ機種は両方の列に計上・どちらも選ばない機種は合計列のみ）。プルダウン最下部の「＋ 新しい〇〇を追加...」でその場で列を増やせます。黄色の行は<b>まだ振り分けていない機種</b>で、自動では何も入りません（人が選んだ行だけ保存されます）。「（なし）」を選ぶとこのPCでは振り分け済みになりますが、安全設計のため他のPCには送られません（他のPCでは黄色のまま。そこで列が選ばれるとそちらが優先されます）。「自動候補の疑い」の行は、以前の自動候補と同じ値のまま確定された可能性がある登録です。値を確かめて「この値でOK」か、正しい列を選び直してください。<br>'
@@ -20304,6 +20305,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       $('bjkaTabPachi').onclick = function () { switchKind('pachi'); };
       $('bjkaSave').onclick = onSave;
       $('bjkaGenSlot').onclick = function () { generate('slot'); };
+      $('bjkaGenAll').onclick = generateAll;
       $('bjkaGenPachi').onclick = function () { generate('pachi'); };
       $('bjkaStore').addEventListener('change', function () {
         var v = $('bjkaStore').value;
@@ -20435,6 +20437,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       curKind = (focusKind && models[focusKind].length) ? focusKind : (models.slot.length ? 'slot' : 'pachi');
       renderAssign();
       renderColEditor();
+      $('bjkaGenAll').disabled = false;
       $('bjkaGenSlot').disabled = !h.slot;
       $('bjkaGenPachi').disabled = !h.pachi;
       $('bjkaSave').disabled = false;
@@ -20949,6 +20952,106 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       console.error(e);
       setStatus($('bjkaGenSt'), '作成に失敗しました: ' + (e && e.message || e), 'err');
     }).then(function () { btn.disabled = false; });
+  }
+
+  /* ── 全店ぶんZIP一括(2026-09-06): 全店舗×スロ/パチのExcelを1つのZIPで ── */
+  var JSZIP_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+  var JSZIP_SRI = 'sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==';
+  var _zipP = null;
+  function ensureJSZip() {
+    if (typeof JSZip !== 'undefined') return Promise.resolve(window.JSZip);
+    if (_zipP) return _zipP;
+    _zipP = new Promise(function (res, rej) {
+      var sc = document.createElement('script');
+      sc.src = JSZIP_SRC; sc.integrity = JSZIP_SRI; sc.crossOrigin = 'anonymous';
+      sc.onload = function () { res(window.JSZip); };
+      sc.onerror = function () { _zipP = null; rej(new Error('ZIP部品の読み込みに失敗しました(通信環境を確認してください)')); };
+      document.head.appendChild(sc);
+    });
+    return _zipP;
+  }
+  function generateAll() {
+    var from = $('bjkaFrom').value, to = $('bjkaTo').value;
+    if (!from || !to) { setStatus($('bjkaGenSt'), '期間（開始日と終了日）を選んでください。', 'err'); return; }
+    if (from > to) { setStatus($('bjkaGenSt'), '開始日が終了日より後になっています。', 'err'); return; }
+    var ymList = KACore.monthsInRange(from, to);
+    if (ymList.length > 13) { setStatus($('bjkaGenSt'), '期間は13か月以内にしてください。', 'err'); return; }
+    // 振り分けは保存済みの台帳(法人で1つ)から。画面で保存していない編集は含まれない
+    var assign = { slot: { seg: {}, ind: {} }, pachi: { seg: {}, ind: {} } };
+    ['slot', 'pachi'].forEach(function (kind) {
+      Object.keys(saved[kind] || {}).forEach(function (n) {
+        var sv = saved[kind][n];
+        assign[kind].seg[n] = sv.seg || '';
+        assign[kind].ind[n] = sv.ind || '';
+      });
+    });
+    // 店の一覧(部門の重複を除いてホール単位に)
+    var halls = [];
+    var seen = {};
+    storeIndex.forEach(function (x) {
+      if (seen[x.hall.base]) return;
+      seen[x.hall.base] = 1;
+      halls.push(x.hall);
+    });
+    var btn = $('bjkaGenAll');
+    btn.disabled = true;
+    setStatus($('bjkaGenSt'), '全店ぶんを作成中...');
+    Promise.all([ensureExcelJS(), ensureJSZip()]).then(function (libs) {
+      var EJ = libs[0], JZ = libs[1];
+      var zip = new JZ();
+      var made = 0, skipped = 0;
+      var i = 0;
+      function next() {
+        if (i >= halls.length) {
+          if (!made) { setStatus($('bjkaGenSt'), '選択期間にデータのある店がありません。', 'err'); btn.disabled = false; return; }
+          setStatus($('bjkaGenSt'), 'ZIPにまとめています...');
+          zip.generateAsync({ type: 'blob' }).then(function (blob) {
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = '稼働粗利表_全店_' + from + '〜' + to + '.zip';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 30000);
+            setStatus($('bjkaGenSt'), 'ダウンロードしました: ' + a.download + '（Excel ' + made + 'ファイル' + (skipped ? '・期間内データ無しで省いた部門 ' + skipped + '件' : '') + '。振り分けは保存済みの内容で作成）', 'ok');
+            btn.disabled = false;
+          });
+          return;
+        }
+        var h = halls[i++];
+        setStatus($('bjkaGenSt'), '作成中... (' + i + '/' + halls.length + ') ' + h.base);
+        var jobs = [['slot', h.slot], ['pachi', h.pachi]].filter(function (p2) { return p2[1]; });
+        (function nextKind(j) {
+          if (j >= jobs.length) { Promise.resolve().then(next); return; }   // setTimeoutは非表示タブで絞られるので使わない
+          var kind = jobs[j][0], st = jobs[j][1];
+          var pr = recCache[st.key] ? Promise.resolve(recCache[st.key]) : getRecords(st.key).then(function (r) { recCache[st.key] = r; return r; });
+          pr.then(function (records) {
+            var byDate = KACore.aggregateByDate(records, kind, assign[kind]);
+            var hasData = Object.keys(byDate).some(function (d) { return d >= from && d <= to; });
+            if (!hasData) { skipped++; nextKind(j + 1); return; }
+            var layout = KACore.computeLayout(kind, effCols(kind, h.base));
+            var sheets = ymList.map(function (ym) {
+              return {
+                ym: ym,
+                daily: KACore.dailyTable(byDate, layout.groups, ym, from, to),
+                monthly: KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym)),
+                sheetName: ymList.length === 1 ? h.base : Number(ym.slice(0, 4)) + '年' + Number(ym.slice(5)) + '月',
+              };
+            });
+            var wb = KACore.buildWorkbookMulti(EJ, kind, layout, h.base, sheets, Number(totalFor(h.base)) || null);
+            var label = kind === 'slot' ? 'スロットメイン稼働粗利表' : 'パチンコメイン稼働粗利表';
+            wb.xlsx.writeBuffer().then(function (buf) {
+              zip.file(h.base + '_' + label + '_' + from + '〜' + to + '.xlsx', buf);
+              made++;
+              nextKind(j + 1);
+            }).catch(function (e) { console.error('[全店ZIP]', h.base, kind, e); skipped++; nextKind(j + 1); });
+          }).catch(function (e) { console.error(h.base, e); skipped++; nextKind(j + 1); });
+        })(0);
+      }
+      next();
+    }).catch(function (e) {
+      console.error(e);
+      setStatus($('bjkaGenSt'), '作成に失敗しました: ' + (e && e.message || e), 'err');
+      btn.disabled = false;
+    });
   }
 
   /* ── フッターボタンの設置（元データDLの左隣）──
