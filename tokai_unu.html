@@ -1890,7 +1890,7 @@ const USER_LABEL = '東海UNUさん専用';               // 例: '田中さん�
 const USER_ID = 'tokai_unu';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260907-081302';
+const BJ_VERSION = '20260907-082004';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -12077,9 +12077,9 @@ function renderModelTable() {
     ${_th('平均台数','avgMachines')}
     ${_th('1台平均'+_inLabel(true),'avgIn','background:rgba(108,99,255,0.08);')}
     ${_th('稼働傾向','trend','text-align:center;')}
-    ${_th('粗利傾向','trendPr','text-align:center;')}
     ${_th('推定粗利合計','profit')}
     ${_th('1台平均粗利','avgProfit')}
+    ${_th('粗利傾向','trendPr','text-align:center;')}
     ${_th('推定売上合計','sales')}
     ${_th('利益率','profitRate')}
     ${_th(coinLabel+'単価','coinTanka')}
@@ -12093,9 +12093,9 @@ function renderModelTable() {
     <td>${s.avgMachines.toFixed(1)}台</td>
     <td class="highlight">${fmtAbs(Math.round(s.avgIn))}</td>
     <td style="text-align:center;">${_trendBadge(s.trend)}</td>
-    <td style="text-align:center;">${_trendBadge(s.trendPr)}</td>
     <td class="${colorClass(s.profit)}">${fmt(s.profit)}円</td>
     <td class="${colorClass(s.avgProfit)}">${fmt(s.avgProfit)}円</td>
+    <td style="text-align:center;">${_trendBadge(s.trendPr)}</td>
     <td>${fmtAbs(s.sales)}円</td>
     <td class="${colorClass(s.profitRate)}">${s.profitRate.toFixed(1)}%</td>
     <td>${s.coinTanka.toFixed(2)}円</td>
@@ -12143,9 +12143,9 @@ function renderModelTable() {
     <td>${r.avgMachines.toFixed(1)}台</td>
     <td class="highlight">${fmtAbs(Math.round(r.avgIn))}</td>
     <td style="text-align:center;">${_trendBadge(r.trend)}</td>
-    <td style="text-align:center;">${_trendBadge(r.trendPr)}</td>
     <td class="${colorClass(r.profit)}">${fmt(r.profit)}円</td>
     <td class="${colorClass(r.avgProfit)}">${fmt(r.avgProfit)}円</td>
+    <td style="text-align:center;">${_trendBadge(r.trendPr)}</td>
     <td>${fmtAbs(r.sales)}円</td>
     <td class="${colorClass(r.profitRate)}">${r.profitRate.toFixed(1)}%</td>
     <td>${r.coinTanka.toFixed(2)}円</td>
@@ -12242,7 +12242,7 @@ function modelTableHTML(records, opts){
   const inLbl = (typeof _inLabel==='function') ? _inLabel(true) : 'アウト';
   const head = `<thead><tr>
     <th>機種名</th><th>営業日数</th><th>平均台数</th><th>1台平均${inLbl}</th>
-    <th style="text-align:center;">稼働傾向</th><th style="text-align:center;">粗利傾向</th><th>推定粗利合計</th><th>1台平均粗利</th>
+    <th style="text-align:center;">稼働傾向</th><th>推定粗利合計</th><th>1台平均粗利</th><th style="text-align:center;">粗利傾向</th>
     <th>推定売上合計</th><th>利益率</th><th>${coinLabel}単価</th><th>${coinLabel}粗利</th>
   </tr></thead>`;
   const sumRow = (s, label, bg) => `<tr style="background:${bg};font-weight:800;border-top:2px solid var(--border);">
@@ -12251,9 +12251,9 @@ function modelTableHTML(records, opts){
     <td>${s.avgMachines.toFixed(1)}台</td>
     <td class="highlight">${fmtAbs(Math.round(s.avgIn))}</td>
     <td style="text-align:center;">${_modelTrendBadge(s.trend)}</td>
-    <td style="text-align:center;">${_modelTrendBadge(s.trendPr)}</td>
     <td class="${colorClass(s.profit)}">${fmt(s.profit)}円</td>
     <td class="${colorClass(s.avgProfit)}">${fmt(s.avgProfit)}円</td>
+    <td style="text-align:center;">${_modelTrendBadge(s.trendPr)}</td>
     <td>${fmtAbs(s.sales)}円</td>
     <td class="${colorClass(s.profitRate)}">${s.profitRate.toFixed(1)}%</td>
     <td>${s.coinTanka.toFixed(2)}円</td>
@@ -12274,9 +12274,9 @@ function modelTableHTML(records, opts){
     <td>${r.avgMachines.toFixed(1)}台</td>
     <td class="highlight">${fmtAbs(Math.round(r.avgIn))}</td>
     <td style="text-align:center;">${_modelTrendBadge(r.trend)}</td>
-    <td style="text-align:center;">${_modelTrendBadge(r.trendPr)}</td>
     <td class="${colorClass(r.profit)}">${fmt(r.profit)}円</td>
     <td class="${colorClass(r.avgProfit)}">${fmt(r.avgProfit)}円</td>
+    <td style="text-align:center;">${_modelTrendBadge(r.trendPr)}</td>
     <td>${fmtAbs(r.sales)}円</td>
     <td class="${colorClass(r.profitRate)}">${r.profitRate.toFixed(1)}%</td>
     <td>${r.coinTanka.toFixed(2)}円</td>
