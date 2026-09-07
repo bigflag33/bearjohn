@@ -1890,7 +1890,7 @@ const USER_LABEL = 'ダイナムさん専用';               // 例: '田中さ�
 const USER_ID = 'dynam';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260907-154455';
+const BJ_VERSION = '20260907-203603';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2266,6 +2266,7 @@ var BJ_HANE_TANKA = {
   'Pはねものファインプレー': 0.8,
   'Pニュートキオ ハカマタイプ': 0.6,
   'PニュートキオGREEN': 0.7,
+  '遊moreLT PエガブレイブVVV': 1.3,
 };
 var _bjRates = null;   // rates.json（店名キーはNFC+空白除去）
 function _bjRateKey(x) { try { return String(x || '').normalize('NFC').replace(/[\s　]/g, ''); } catch (e) { return String(x || ''); } }
@@ -2312,6 +2313,84 @@ function _bjCacheHane(key) {
           bjTuneBump();   // _bjTuneVer込みで無効化＝朝礼/週報/全店キャッシュ等の下流メモも一括で作り直させる
         }
       }).catch(function () {});
+  } catch (e) {}
+})();
+
+// ── データ欠損の帯（2026-09-07）──
+// 同期サーバが毎回 kesson.json を配信（昨日ぶんが届いていない店・回復した店）。
+// この法人に該当があるときだけヘッダー下に帯を出す。回復の帯は回復した当日だけ表示。
+// 文言ルール: ホール向けなので「pision」とは書かず「データ提供元」と書く。
+var _bjKesson = null;
+function _bjKessonMd(d) { return d ? (parseInt(d.slice(5, 7), 10) + '/' + parseInt(d.slice(8, 10), 10)) : ''; }
+function _bjKessonEsc(x) { return String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function _bjKessonRender() {
+  try {
+    if (!_bjKesson) return;
+    var mine = function (arr) {
+      arr = arr || [];
+      if (USER_ID === 'admin') return arr;
+      return arr.filter(function (x) { return x.corp === USER_ID; });
+    };
+    var corpLabel = function (cid) {
+      try {
+        var u = (typeof USERS_CONFIG !== 'undefined' ? USERS_CONFIG : []).find(function (c) { return c.file === cid; });
+        return u && u.label ? String(u.label).replace(/さん専用$|専用$/, '') : cid;
+      } catch (e) { return cid; }
+    };
+    var label = function (x) { return _bjKessonEsc((USER_ID === 'admin' ? corpLabel(x.corp) + '：' : '') + x.store); };
+    var miss = mine(_bjKesson.missing);
+    var _fmtD = function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+    var _d = new Date();
+    var todayStr = _fmtD(_d);
+    var _y = new Date(_d.getTime() - 86400000);
+    var ydayStr = _fmtD(_y);
+    // 回復は今日+昨日ぶんを表示(土曜深夜の週次同期で検知した回復が日曜に見えるように)
+    var rec = mine(_bjKesson.recovered).filter(function (x) { return x.at === todayStr || x.at === ydayStr; });
+    var bar = document.getElementById('bjKessonBar');
+    if (!miss.length && !rec.length) { if (bar) bar.style.display = 'none'; return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'bjKessonBar';
+      var hd = document.querySelector('.header');
+      if (hd && hd.parentNode) { hd.insertAdjacentElement('afterend', bar); }
+      else { document.body.insertBefore(bar, document.body.firstChild); }
+    }
+    var html = '';
+    if (miss.length) {
+      var parts = miss.map(function (m) {
+        var ds = m.dates || [];
+        var when;
+        if (ds.length <= 2) { when = ds.map(_bjKessonMd).join('・') + '分'; }
+        else {
+          var consec = true;
+          for (var i = 1; i < ds.length; i++) {
+            if (new Date(ds[i] + 'T12:00:00') - new Date(ds[i - 1] + 'T12:00:00') !== 86400000) { consec = false; break; }
+          }
+          when = _bjKessonMd(ds[0]) + (consec ? 'から' : 'など') + ds.length + '日分';
+        }
+        return label(m) + '（' + when + '）';
+      });
+      html += '<div style="background:#fff8e1;border:1px solid #f5c542;border-left-width:4px;border-radius:8px;'
+            + 'padding:8px 14px;margin:8px 16px 0;font-size:13px;line-height:1.7;color:#92400e;">'
+            + '⚠ データがまだ届いていない店舗があります： ' + parts.join('、')
+            + ' <span style="opacity:.75">（データ提供元の反映待ちです。毎朝自動で取得し直します）</span></div>';
+    }
+    if (rec.length) {
+      var parts2 = rec.map(function (m) { return label(m) + 'の' + _bjKessonMd(m.date) + '分'; });
+      html += '<div style="background:#ecfdf5;border:1px solid #34d399;border-left-width:4px;border-radius:8px;'
+            + 'padding:8px 14px;margin:8px 16px 0;font-size:13px;line-height:1.7;color:#065f46;">'
+            + '遅れていたデータが届きました（反映済み）： ' + parts2.join('、') + '</div>';
+    }
+    bar.innerHTML = html;
+    bar.style.display = '';
+  } catch (e) {}
+}
+(function () {
+  try {
+    fetch('https://d17k53m2wpr7dx.cloudfront.net/kesson.json?t=' + Date.now())
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) { if (d) { _bjKesson = d; _bjKessonRender(); } })
+      .catch(function () {});
   } catch (e) {}
 })();
 
@@ -3518,6 +3597,7 @@ function renderAIGreeting() {
   el.innerHTML = `<span style="font-size:15px;flex-shrink:0;"></span><span><strong>${greeting}！</strong>${contextMsg}${insightHtml}</span>`;
 }
 
+var _bjAutoRange = null;   // 直近に自動セットした既定期間(当月)。この値のまま＝手動変更なしの目印
 function reloadAll() {
   _invalidateLoadAllCache();
   _renderCache = {};   // データ更新時は全キャッシュクリア
@@ -3529,10 +3609,18 @@ function reloadAll() {
   const curFrom = document.getElementById('dateFrom').value;
   const curTo   = document.getElementById('dateTo').value;
   if (!curFrom) {
-    document.getElementById('dateFrom').value = allDates[0];
+    const _rYm = (allDates[allDates.length - 1] || '').slice(0, 7);
+    let _rFrom = (typeof USER_ID !== 'undefined' && USER_ID === 'central')
+      ? (allDates.find(d => d.slice(0, 7) === _rYm) || allDates[0] || '')
+      : (allDates[0] || '');
+    if (curTo && _rFrom > curTo) _rFrom = allDates[0] || '';   // 終了日が古いまま開始日だけ空→期間が逆転しないよう全期間側へ
+    document.getElementById('dateFrom').value = _rFrom;
   }
   if (!curTo) {
-    document.getElementById('dateTo').value = allDates[allDates.length-1];
+    document.getElementById('dateTo').value = allDates[allDates.length-1] || '';
+  }
+  if (!curFrom && !curTo) {
+    _bjAutoRange = { from: document.getElementById('dateFrom').value, to: document.getElementById('dateTo').value };
   }
   document.getElementById('dataRange').textContent = `データ期間: ${allDates[0]} 〜 ${allDates[allDates.length-1]}`;
   renderAIGreeting();
@@ -3577,8 +3665,16 @@ const dates = [...new Set(RAW_DATA.map(d => d.date))].sort();
 
 function init() {
   const _initAll = [...new Set(loadAllData().map(d=>d.date))].sort();
-  document.getElementById('dateFrom').value = _initAll[0];
-  document.getElementById('dateTo').value = _initAll[_initAll.length - 1];
+  // ログイン直後の既定期間: セントラル(コンコルドさん)のページだけ「当月」(データがある最新の月。
+  // 月初でまだ当月分が無い間は自然に前月になる)。他法人は従来どおり全期間。2026-09-07 ユーザー指示(A案)
+  const _initLast = _initAll[_initAll.length - 1] || '';
+  const _bjMonthDefault = (typeof USER_ID !== 'undefined' && USER_ID === 'central');
+  const _initFrom = _bjMonthDefault
+    ? (_initAll.find(d => d.slice(0, 7) === _initLast.slice(0, 7)) || _initAll[0] || '')
+    : (_initAll[0] || '');
+  document.getElementById('dateFrom').value = _initFrom;
+  document.getElementById('dateTo').value = _initLast;
+  _bjAutoRange = { from: _initFrom, to: _initLast };
   const _allDates = [...new Set(loadAllData().map(d=>d.date))].sort();
   document.getElementById('dataRange').textContent = `データ期間: ${_allDates[0]} 〜 ${_allDates[_allDates.length-1]}`;
   updateDateDots();
@@ -3933,6 +4029,13 @@ function switchStore(id) {
   const stEl = document.getElementById('storeTitle'); if(stEl) stEl.textContent = store.name;
   const _mf = document.getElementById('modelFilter');
   if (_mf) _mf.value = '';            // 前店舗の機種選択を持ち越さない（全機種に戻す）
+  // 期間が自動セットの既定(当月)のままなら、切替先の店のデータで当月を作り直す。
+  // 手動で選んだ期間はこれまでどおり維持(一致しない＝手動と判定)。2026-09-07 レビュー指摘の修正:
+  // 切替先に当月データが無い店(配信停止・休止中など)で全ゼロ表示のまま固まるのを防ぐ。
+  const _pf = document.getElementById('dateFrom'), _pt = document.getElementById('dateTo');
+  if (_bjAutoRange && _pf && _pt && _pf.value === _bjAutoRange.from && _pt.value === _bjAutoRange.to) {
+    _pf.value = ''; _pt.value = '';
+  }
   reloadAll();
   if (_mf) {                          // 新店舗の機種でドロップダウンを作り直す
     const _cnt = {};
