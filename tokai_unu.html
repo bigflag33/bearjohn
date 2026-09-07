@@ -1890,7 +1890,7 @@ const USER_LABEL = '東海UNUさん専用';               // 例: '田中さん�
 const USER_ID = 'tokai_unu';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260907-082004';
+const BJ_VERSION = '20260907-154455';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2042,10 +2042,10 @@ var _bjTuneVer = 0;   // 機種別チューニングの世代番号（下の方�
 function loadAllData() {
   const store = _activeStore();
   const added = DB_CACHE[store.key] || [];
-  const cacheKey = store.key + '|' + added.length + '|' + _bjTuneVer;
+  const cacheKey = store.key + '|' + added.length + '|' + _bjTuneVer + '|' + (_bjRates ? 'r1' : 'r0');
   if (_loadAllCache && _loadAllCacheKey === cacheKey) return _loadAllCache;
   const base = store.id === 'ueda' ? RAW_DATA : [];
-  _loadAllCache = _bjApplyTune([...base, ...added], store);
+  _loadAllCache = _bjApplyHane(_bjApplyTune([...base, ...added], store), store);
   _loadAllCacheKey = cacheKey;
   return _loadAllCache;
 }
@@ -2253,6 +2253,67 @@ function _bjApplyTuneWith(records, store, models) {
 }
 
 function _bjApplyTune(records, store) { return _bjApplyTuneWith(records, store, bjTuneDeptModels(bjTuneDeptOf(store))); }
+
+// ── 羽根モノの売上・粗利の逆算（2026-09-07）──
+// データ元は羽根モノの金額を計算しない（全行0円）。アウト・差枚は正確（豊田のホールコン実測と玉単位で一致を確認済み）なので、
+//   売上 = アウト × 玉単価（法人のチューニング入力があればそれ・無ければSIS由来の既定値）
+//   粗利 = 売上 × (1 − 交換単価/貸玉料) − 差枚 × 交換単価   （交換単価 = 100円 ÷ 交換玉数）
+// で埋める。交換率は店ごと（rates.json＝同期サーバが毎週pisionの店舗一覧から更新）。等価の店の粗利は玉単価と無関係に正確。
+// ⚠️0円＝羽根モノとは限らない（データ抜けの0円が実在する）ため、下の表にある機種しか埋めない。新しい羽根モノは表に追加すること。
+var BJ_HANE_TANKA = {
+  'Pポチッと一発!おだてブタ2': 0.6,
+  'Pハネモノ ファミリースタジアム': 0.7,
+  'Pはねものファインプレー': 0.8,
+  'Pニュートキオ ハカマタイプ': 0.6,
+  'PニュートキオGREEN': 0.7,
+};
+var _bjRates = null;   // rates.json（店名キーはNFC+空白除去）
+function _bjRateKey(x) { try { return String(x || '').normalize('NFC').replace(/[\s　]/g, ''); } catch (e) { return String(x || ''); } }
+function _bjApplyHane(records, store) {
+  if (!store || store.id === '__benchmark__') return records;
+  var baseName = String(store.name || '').replace(/（4P）$/, '');
+  var rate = (_bjRates && _bjRates.stores && _bjRates.stores[_bjRateKey(baseName)]) || null;
+  var kashi = (rate && rate.kashi > 0) ? rate.kashi : 4.0;
+  var kokanTanka = (rate && rate.kokan > 0) ? (100 / rate.kokan) : kashi;   // 交換率の情報が無い店は等価として扱う
+  var pachiTune = bjTunePachi();
+  return records.map(function (r) {
+    if ((r['台売上'] || 0) !== 0 || (r['台粗利'] || 0) !== 0) return r;   // 金額が入っている行は触らない
+    var name = r['機種名'];
+    if (!(name in BJ_HANE_TANKA)) return r;
+    var out = r['IN枚数'] || 0;
+    if (!out) return r;
+    var entry = pachiTune[name];
+    var tanka = entry ? bjTunePriceAt(entry, r.date) : null;   // 法人が入力した玉単価が最優先（月ごとの版に追随）
+    if (tanka == null || !(tanka > 0)) tanka = BJ_HANE_TANKA[name];
+    var c = Object.assign({}, r);
+    var sales = Math.round(out * tanka);
+    c['台売上'] = sales;
+    c['台粗利'] = Math.round(sales * (1 - kokanTanka / kashi) - (r['差枚'] || 0) * kokanTanka);
+    return c;
+  });
+}
+// キーからDB_CACHEを読み、羽根モノ埋めを通して返す（店舗比較・挨拶・稼働粗利表などloadAllDataを通らない読み手用）
+function _bjCacheHane(key) {
+  var recs = (typeof DB_CACHE !== 'undefined' && DB_CACHE[key]) || [];
+  if (!recs.length) return recs;
+  try {
+    var st = (getStores() || []).find(function (x) { return x.key === key; });
+    return st ? _bjApplyHane(recs, st) : recs;
+  } catch (e) { return recs; }
+}
+// 交換率一覧の読み込み（全ページ共通・失敗しても等価扱いで動く）
+(function () {
+  try {
+    fetch('https://d17k53m2wpr7dx.cloudfront.net/rates.json?t=' + Date.now())
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (d && d.stores) {
+          _bjRates = d;
+          bjTuneBump();   // _bjTuneVer込みで無効化＝朝礼/週報/全店キャッシュ等の下流メモも一括で作り直させる
+        }
+      }).catch(function () {});
+  } catch (e) {}
+})();
 
 // 合計だけ欲しい場面（保存前の「店全体への影響」）用。配列を複製せず合計だけ出す
 // models はその店の部門のマスタを渡すこと
@@ -3362,7 +3423,7 @@ function renderAIGreeting() {
   // ── データインサイト ──
   const allStores = getStores();
   const allRecords = [];
-  allStores.forEach(s => { (DB_CACHE[s.key]||[]).forEach(r => allRecords.push({...r, _sn: s.name})); });
+  allStores.forEach(s => { _bjCacheHane(s.key).forEach(r => allRecords.push({...r, _sn: s.name})); });
 
   let insightHtml = '';
   if (allRecords.length) {
@@ -13351,7 +13412,7 @@ function _pearsonCorr(xs, ys) {
 function _cmpAggByModel(key) {
   const from = document.getElementById('cmpFrom')?.value || null;
   const to   = document.getElementById('cmpTo')?.value   || null;
-  const rows = (DB_CACHE[key] || []).filter(r => {
+  const rows = _bjCacheHane(key).filter(r => {
     if (!r.date) return false;
     if (from && r.date < from) return false;
     if (to   && r.date > to)   return false;
@@ -13377,7 +13438,7 @@ function _cmpAggByModel(key) {
 function _cmpAggByDate(key, modelFilter) {
   const from = document.getElementById('cmpFrom')?.value || null;
   const to   = document.getElementById('cmpTo')?.value   || null;
-  const rows = (DB_CACHE[key] || []).filter(r => {
+  const rows = _bjCacheHane(key).filter(r => {
     if (!r.date) return false;
     if (modelFilter && modelFilter !== '__all__' && r['機種名'] !== modelFilter) return false;
     if (from && r.date < from) return false;
@@ -13775,7 +13836,7 @@ function _renderCmpModelTable(keyA, keyB, nameA, nameB) {
 function _cmpBuildPPMData(key) {
   const from = document.getElementById('cmpFrom')?.value || null;
   const to   = document.getElementById('cmpTo')?.value   || null;
-  const rows = (DB_CACHE[key] || []).filter(r => {
+  const rows = _bjCacheHane(key).filter(r => {
     if (!r.date) return false;
     if (from && r.date < from) return false;
     if (to   && r.date > to)   return false;
@@ -14220,8 +14281,8 @@ function _renderCmpNotableDays_DISABLED(keyA, keyB, nameA, nameB) {
     return true;
   };
 
-  const rowsA = (DB_CACHE[keyA] || []).filter(filter);
-  const rowsB = (DB_CACHE[keyB] || []).filter(filter);
+  const rowsA = _bjCacheHane(keyA).filter(filter);
+  const rowsB = _bjCacheHane(keyB).filter(filter);
   if (!rowsA.length && !rowsB.length) { el.style.display = 'none'; return; }
 
   // 日×機種で集計
@@ -14628,8 +14689,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   const _cmpFmtInVal = v => Math.round(v).toLocaleString() + _cmpInUnit();
 
   // ─── 機種別集計（全期間、5台以上のみ対象）───
-  const rowsA = DB_CACHE[keyA] || [];
-  const rowsB = DB_CACHE[keyB] || [];
+  const rowsA = _bjCacheHane(keyA);
+  const rowsB = _bjCacheHane(keyB);
 
   const aggModel = (rows) => {
     const m = {};
@@ -19949,8 +20010,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
 
   /* ── データ読み: DB_CACHE(メモリ)優先 → IndexedDB。法人ページ経路を必ず先に見る ── */
   function getRecords(key) {
-    var cached = (typeof DB_CACHE !== 'undefined' && DB_CACHE[key] && DB_CACHE[key].length) ? DB_CACHE[key] : null;
-    if (cached) return Promise.resolve(cached);
+    // 羽根モノの売上・粗利埋め(_bjCacheHane)を通す＝ダッシュボードと稼働粗利表Excelの数字を一致させる(2026-09-07)
+    if (typeof _bjCacheHane === 'function' && typeof DB_CACHE !== 'undefined' && DB_CACHE[key] && DB_CACHE[key].length) {
+      return Promise.resolve(_bjCacheHane(key));
+    }
     if (typeof _idbGet === 'function') return _idbGet(key).then(function (r) { return r || []; });
     return Promise.resolve([]);
   }
