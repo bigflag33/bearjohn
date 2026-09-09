@@ -1890,7 +1890,7 @@ const USER_LABEL = '興和商事さん専用';               // 例: '田中さ�
 const USER_ID = 'kowa';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260910-073743';
+const BJ_VERSION = '20260910-080450';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2267,6 +2267,14 @@ var BJ_HANE_TANKA = {
   'Pニュートキオ ハカマタイプ': 0.6,
   'PニュートキオGREEN': 0.7,
   '遊moreLT PエガブレイブVVV': 1.3,
+  'Pうまい棒2': 2.3,
+  'P沖ドキ!ドキドキ弾丸ツアー': 2.2,
+  'P牙狼11〜冴島大河〜XX': 2.3,
+  'P魔王学院の不適合者': 2.5,
+  'PA魔王学院の不適合者 魔王再臨 99Ver': 1.8,
+  'P痛いのは嫌なので防御力に極振りしたいと思います。': 2.4,
+  'Pバベル5000': 2.6,
+  'P桃剣閃撃 極': 2.4,
 };
 var _bjRates = null;   // rates.json（店名キーはNFC+空白除去）
 function _bjRateKey(x) { try { return String(x || '').normalize('NFC').replace(/[\s　]/g, ''); } catch (e) { return String(x || ''); } }
