@@ -1890,7 +1890,7 @@ const USER_LABEL = '北上文化さん専用';               // 例: '田中さ�
 const USER_ID = 'kitakami';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260910-093359';
+const BJ_VERSION = '20260910-161445';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -18415,8 +18415,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var sv=seg?seg.value:'', iv=ind?ind.value:'';
     if(!sv && !iv){
       // 空の振り分けは全店共有に送られない(9/1事故対策の鉄則)。嘘の成功表示をしない
-      window._bjkaForTune.set(kind, r.name, '', '');
-      if(msg){ msg.className='bjt-msg'; msg.textContent='「'+r.name+'」を（なし）にしました。※安全設計のため空の振り分けは全店共有に送られません。他のPCの設定が残っていれば次回開いたとき戻ります（完全に外す運用が必要なら言ってください）。'; }
+      window._bjkaForTune.set(kind, r.name, '', '').then(function(ok){
+        if(!ok && msg){ msg.className='bjt-msg ng'; msg.textContent='「'+r.name+'」の（なし）をサーバに送れませんでした（このPCには保存済み・次回接続時に自動送信）。'; }
+      });
+      if(msg){ msg.className='bjt-msg ok'; msg.textContent='「'+r.name+'」を（なし）にしました（全店共有・他のPCにも反映されます）。'; }
       return;
     }
     if(msg){ msg.className='bjt-msg'; msg.textContent='「'+r.name+'」の振り分けを保存しています…'; }
@@ -20301,6 +20303,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       syncOk = false; setSyncNote();
       return Promise.resolve(false);
     }
+    var syncT0 = new Date().toISOString();   // この同期の開始時刻(これ以降に立った未送信印は消さない)
     return boxGet().then(function (box) {
       box = box || emptyBox();
       var now = new Date().toISOString();
@@ -20310,7 +20313,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         var centralNames = {};
         Object.keys(bx).forEach(function (n) {
           var v = bx[n] || {};
-          centralNames[n] = { seg: v.s || '', ind: v.i || '', c: v.c ? 1 : 0, at: v.at || '' };
+          centralNames[n] = { seg: v.s || '', ind: v.i || '', c: v.c ? 1 : 0, at: v.at || '', none: v.no ? 1 : 0 };
         });
         // 旧版が「保存」で黙って書いた空エントリ(箱にも無い)を一回だけ捨てて、未振り分け(黄色)に戻す
         if (!localStorage.getItem(EMPTYRESET_KEY)) {
@@ -20321,24 +20324,25 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         }
         Object.keys(centralNames).forEach(function (n) {
           var cv = centralNames[n], sv = saved[kind][n];
-          if (isEmptyAssign(cv) && !isEmptyAssign(sv)) {
+          if (isEmptyAssign(cv) && !cv.none && !isEmptyAssign(sv)) {
             // 箱が空・手元が本物 → 手元を残して箱を修復する
             pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: now, c: sv.c ? 1 : 0 }; });
             return;
           }
-          if (!isEmptyAssign(sv) && asgDirty[kind + '|' + n]) {
-            // このPCで送れていない編集 → 手元を残して箱へ(PC時計には頼らない)
+          if ((!isEmptyAssign(sv) || (sv && sv.none)) && asgDirty[kind + '|' + n]) {
+            // このPCで送れていない編集(明示の（なし）含む) → 手元を残して箱へ(PC時計には頼らない)
             var svAt = sv.at || now;
-            pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: svAt, c: 1 }; });
+            pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: svAt, c: 1, no: sv.none ? 1 : 0 }; });
             return;
           }
           saved[kind][n] = { seg: cv.seg, ind: cv.ind, c: cv.c, at: cv.at };
+          if (cv.none) saved[kind][n].none = 1;   // 明示の（なし）は手元にも印を残す(次の同期で消えないように)
         });
         Object.keys(saved[kind]).forEach(function (n) {
           if (centralNames[n]) return;
           var sv = saved[kind][n];
-          if (isEmptyAssign(sv)) return;   // 空は送らない
-          pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: sv.at || now, c: sv.c ? 1 : 0 }; });
+          if (isEmptyAssign(sv) && !sv.none) return;   // 黙った空は送らない(明示の（なし）=none印は送る)
+          pending.push(function (b) { (b[kind] = b[kind] || {})[n] = { s: sv.seg || '', i: sv.ind || '', at: sv.at || now, c: sv.c ? 1 : 0, no: sv.none ? 1 : 0 }; });
         });
         var bc = box.cols && box.cols[kind];
         if (Array.isArray(bc) && bc.length) {
@@ -20408,7 +20412,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       saveAssign(saved); saveColumns(columns); saveTotals(totals); saveStoreCols();
       if (!pending.length) { syncOk = true; setSyncNote(); return true; }
       return boxUpdate(function (b) { pending.forEach(function (f) { f(b); }); }).then(function () {
-        scDirty = {}; saveScDirty(); asgDirty = {}; saveAsgDirty(); colsDirty = {}; saveColsDirty();   // 同期一式が通ったので未送信フラグを解除
+        scDirty = {}; saveScDirty(); colsDirty = {}; saveColsDirty();
+        // 振り分けの未送信印は「この同期が始まる前のもの」だけ解除(同期中に失敗した送信の印を巻き添えにしない。2026-09-10)
+        Object.keys(asgDirty).forEach(function (k) { if (!asgDirty[k] || asgDirty[k] <= syncT0) delete asgDirty[k]; });
+        saveAsgDirty();
         syncOk = true; setSyncNote(); return true;
       });
     }).catch(function (e) {
@@ -20420,11 +20427,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   // 保存後の送信: 変更のあった機種だけを箱へ(最新を読んでから重ねる=機種ごとの後勝ち)
   function pushAssigns(kind, names) {
     // 鉄則: 空の振り分けは箱へ送らない(空が他PCの本物を消すのを防ぐ)
-    var sendable = names.filter(function (n) { return !isEmptyAssign(saved[kind][n]); });
-    var skipped = names.filter(function (n) { return isEmptyAssign(saved[kind][n]); });
+    // 鉄則の適用範囲(2026-09-10): 「黙って空になったもの」は送らない・「人が明示した（なし）(none印)」は墓標として送る
+    var sendable = names.filter(function (n) { var sv = saved[kind][n]; return sv && (!isEmptyAssign(sv) || sv.none); });
+    var skipped = names.filter(function (n) { var sv = saved[kind][n]; return !sv || (isEmptyAssign(sv) && !sv.none); });
     skipped.forEach(function (n) { delete dirty[kind][n]; });
     var now = new Date().toISOString();
-    var items = sendable.map(function (n) { var sv = saved[kind][n]; sv.at = now; sv.c = 1; return { n: n, s: sv.seg || '', i: sv.ind || '' }; });   // 呼び出し時点の値を写し取る
+    var items = sendable.map(function (n) { var sv = saved[kind][n]; sv.at = now; sv.c = 1; return { n: n, s: sv.seg || '', i: sv.ind || '', no: sv.none ? 1 : 0 }; });   // 呼び出し時点の値を写し取る
     saveAssign(saved);
     if (!sendable.length) return Promise.resolve(true);
     if (!boxEnabled()) {
@@ -20436,7 +20444,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }
     sendable.forEach(function (n) { asgDirty[kind + '|' + n] = now; }); saveAsgDirty();
     return boxUpdate(function (b) {
-      items.forEach(function (it) { (b[kind] = b[kind] || {})[it.n] = { s: it.s, i: it.i, at: now, c: 1 }; });
+      items.forEach(function (it) { (b[kind] = b[kind] || {})[it.n] = { s: it.s, i: it.i, at: now, c: 1, no: it.no || 0 }; });
     }).then(function () {
       sendable.forEach(function (n) { delete dirty[kind][n]; delete asgDirty[kind + '|' + n]; });
       saveAsgDirty();
@@ -20917,7 +20925,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if (!v) return;
       // 自動候補なし(2026-09-03): 黄色(触っていない)の行は保存しない。_pendingが消えるのは人の操作経路だけ
       if (v._pending) { left++; return; }
-      if (!dirty[curKind][m.name] && saved[curKind][m.name]) return;   // 触っていない機種は既存(at/c付き)をそのまま
+      if (!dirty[curKind][m.name]) return;   // 触っていない機種は書かない(none墓標を作れるのは人の操作=dirtyだけ。2026-09-10)
       var ent = { seg: v.seg || '', ind: v.ind || '', c: 1 };
       if (!ent.seg && !ent.ind) ent.none = 1;   // 人が選んだ（なし）(旧版が黙って書いた空と区別する)
       saved[curKind][m.name] = ent;
@@ -21091,7 +21099,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if (sv.ind && deletedInd[sv.ind]) sv.ind = '';
       if (sv.seg && segRen[sv.seg] != null) sv.seg = segRen[sv.seg];
       if (sv.ind && indRen[sv.ind] != null) sv.ind = indRen[sv.ind];
-      if (name && sv.seg + '|' + sv.ind !== b) migChanged.push(name);
+      if (name && sv.seg + '|' + sv.ind !== b) {
+        migChanged.push(name);
+        // 列名の削除で完全な空になった場合は墓標(none)を立てる(2026-09-10)。台帳の名前削除は人の明示操作なので
+        // 「黙った空は送らない」鉄則には反しない。これが無いと箱に旧振り分けのゴーストが残り、全PCが毎回巻き戻る
+        if (!sv.seg && !sv.ind) sv.none = 1; else delete sv.none;
+      }
     };
     Object.keys(saved[kind]).forEach(function (m) { migrate(saved[kind][m], m); });
     saveAssign(saved);
@@ -21358,6 +21371,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     set: function (kind, name, seg, ind) {
       if (!saved) return Promise.resolve(false);
       saved[kind][name] = { seg: seg || '', ind: ind || '' };
+      if (!seg && !ind) saved[kind][name].none = 1;   // 人が明示した（なし）＝墓標として全店共有される(2026-09-10)
       saveAssign(saved);
       dirty[kind][name] = 1;
       return pushAssigns(kind, [name]);
