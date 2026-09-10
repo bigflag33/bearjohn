@@ -1890,7 +1890,7 @@ const USER_LABEL = '中原商事さん専用';               // 例: '田中さ�
 const USER_ID = 'nakahara';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260910-080450';
+const BJ_VERSION = '20260910-093359';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -15355,6 +15355,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjt-badge{ display:inline-block; font-size:10.5px; color:var(--accent); border:1px solid var(--accent);
               border-radius:3px; padding:0 4px; margin-left:6px; vertical-align:1px; white-space:nowrap; }
   .bjt-badge.ng{ color:var(--red); border-color:var(--red); }
+  .bjt-badge.nw{ color:var(--green); border-color:var(--green); }
   /* 「いまの設定」列（現在値・経緯の要約・保存予告） */
   table.bjt-t td.bjt-now{ white-space:normal; line-height:1.55; min-width:200px; max-width:300px; }
   .bjt-cw{ color:var(--text2); font-size:11px; }
@@ -17383,6 +17384,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var _bjtDept='20S',   // 表示中の部門（'20S'=スロット/'4P'=パチンコ）。タブを開くたび表示中の店の部門に合わせる
       _bjtRetry=0, _bjtDraft={}, _bjtFind='', _bjtOnlyEmpty=false, _bjtShowAll=false,
       _bjtStat=null, _bjtStatKey='', _bjtSumT=null, _bjtRows=[],   // _bjtRows＝描画した行の並び（入力欄のdata-iはこれを指す）
+      _bjtSortNew=false,   // 導入列の並び替え(true=導入が新しい順・2026-09-10 コンコルドさん要望)
       _bjtMonWin=6,     // 表示する月数（今月を含む過去ぶん。0=全部。翌月の予約列は常に出す）
       _bjtAsgState=0,   // 振り分け読み込み: 0=未着手/1=読み込み中/2=使える/3=この法人では無し
       _bjtMode='tanka'; // 'tanka'=コイン単価/玉単価（補正） / 'price'=新台価格（円・入力口のみ）
@@ -17679,8 +17681,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     stores.forEach(function(s){ total+=recsOf(s).length; });
     var key=_bjtDept+'|'+stores.length+'|'+total+'|'+(typeof _bjDataGen!=='undefined'?_bjDataGen:0);
     if(_bjtStat && _bjtStatKey===key) return _bjtStat;
-    var last='', first='';
-    stores.forEach(function(s){ var rr=recsOf(s); for(var i=0;i<rr.length;i++){ var d=rr[i].date; if(!d) continue; if(d>last) last=d; if(!first||d<first) first=d; } });
+    var last='', first='', storeFirst={}, storeDates={};
+    stores.forEach(function(s){ var rr=recsOf(s); var mn=''; var ds=storeDates[s.key]={}; for(var i=0;i<rr.length;i++){ var d=rr[i].date; if(!d) continue; if(d>last) last=d; if(!first||d<first) first=d; if(!mn||d<mn) mn=d; ds[d]=1; } storeFirst[s.key]=mn; });
     var from30 = last ? _bjbAddDays(last,-29) : '';
     var m={};
     stores.forEach(function(s){
@@ -17692,6 +17694,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         a.fullS+=r['台売上']||0; a.fullO+=r['IN枚数']||0;
         if(d>a.last) a.last=d;
         if(d&&(!a.first||d<a.first)) a.first=d;
+        if(d){ var fb=a.fsBy||(a.fsBy={}); if(!fb[s.key]||d<fb[s.key]) fb[s.key]=d; }
         if(from30 && d>=from30){
           a.s30+=r['台売上']||0; a.o30+=r['IN枚数']||0; a.n30++;
           // 粗利は「店×週」のトータルで持つ（符号の判定単位。1台1日ごとに見ない＝2026-08-04）
@@ -17712,6 +17715,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       // 店別の逆算値には貸玉条件による店固有のスケール差（±5%前後）があるが、それは正しい店差
       // なので警告しない。係数は全店合算の比で1つ＝店差は素の数字のまま保たれる（2026-08-03確認）
       a2.price = a2.o30>0 ? a2.s30/a2.o30 : (a2.fullO>0 ? a2.fullS/a2.fullO : 0);
+      // 導入年月が「分かる」条件: その初出日を出した店の、店自身のデータ開始+7日より後に現れたこと。
+      // 店のデータ開始と同時に居る機種は「前から有ったかもしれない」ので不明扱い(後から参加した店の
+      // 過去データ回収で、到着月が導入月に化けるのを防ぐ。2026-09-10 レビュー指摘の修正)
+      a2.introKnown=false;
+      if(a2.first && a2.fsBy){
+        for(var sk in a2.fsBy){
+          if(a2.fsBy[sk]!==a2.first || !storeFirst[sk] || a2.first<=_bjbAddDays(storeFirst[sk],7)) continue;
+          // その店のデータが初出の直前30日内に存在すること(休止・取込漏れの再開月を導入月と誤認しない)
+          var ds2=storeDates[sk]||{}, lo2=_bjbAddDays(a2.first,-30), near2=false;
+          for(var dd2 in ds2){ if(dd2<a2.first && dd2>=lo2){ near2=true; break; } }
+          if(near2){ a2.introKnown=true; break; }
+        }
+      }
+      delete a2.fsBy;
       a2.recent = !!(from30 && a2.last>=from30);   // 直近1ヶ月に稼働があるか（既定の表示対象）
       rows.push(a2);
     }
@@ -17944,13 +17961,14 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(_bjtAsgState===2 && window._bjkaForTune){
       var cat=window._bjkaForTune.catalog(kind);
       var cur=window._bjkaForTune.get(kind, r.name)||{seg:'',ind:''};
-      var opt=function(list, sel){
+      var opt=function(list, sel, addLabel){
         return '<option value="">（なし）</option>'+list.map(function(o){
           return '<option value="'+_bjtEsc(o)+'"'+(o===sel?' selected':'')+'>'+_bjtEsc(o)+'</option>';
-        }).join('');
+        }).join('')
+        +'<option value="__add__">＋ 新しい'+addLabel+'を追加...</option>';
       };
-      asgH='<td><select class="bjt-asg" data-i="'+i+'" data-f="seg">'+opt(cat.seg,cur.seg)+'</select></td>'
-          +'<td><select class="bjt-asg" data-i="'+i+'" data-f="ind">'+opt(cat.ind,cur.ind)+'</select></td>';
+      asgH='<td><select class="bjt-asg" data-i="'+i+'" data-f="seg">'+opt(cat.seg,cur.seg,'セグメント')+'</select></td>'
+          +'<td><select class="bjt-asg" data-i="'+i+'" data-f="ind">'+opt(cat.ind,cur.ind,'個別機種列')+'</select></td>';
     } else {
       var t=(_bjtAsgState===1)?'読み込み中…':(_bjtAsgState===3?'—':'…');
       asgH='<td class="bjt-asgna">'+t+'</td><td class="bjt-asgna">'+t+'</td>';
@@ -17958,6 +17976,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var h='<td class="l bjt-sticky">'+_bjtEsc(r.name)+(r.recent?'':'<span class="bjt-badge">直近1ヶ月稼働なし</span>')+'</td>'
       +'<td class="l" id="bjtB'+i+'">'+badge+'</td>'
       +'<td>'+(r.units||'—')+'</td>'
+      +(function(){ var it=_bjtIntroInfo(r); return '<td>'+it.label+(it.isNew?' <span class="bjt-badge nw" title="最新データ日から8週間以内に初登場">新台</span>':'')+'</td>'; })()
       +asgH
       +'<td>'+(_bjtIsPrice()?'円/台':(r.price?r.price.toFixed(2):'—'))+'</td>'
       +_bjtCellHtml(r, i, vers, savedVers, '', false);
@@ -17973,6 +17992,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     tr.className=(_bjtRowVers(r).length||_bjtDraft[r.name])?'tuned':'';
   }
 
+  // ── 導入年月(2026-09-10 コンコルドさん要望) ──
+  // 「導入」= その法人のデータにその機種が最初に現れた月(自動計算・入力不要)。
+  // データ開始月から居る機種は導入時期が分からないので「—」。直近8週間以内の初出は「新台」バッジ。
+  function _bjtIntroInfo(r){
+    var st=_bjtStat||{};
+    if(!r.first || !r.introKnown) return {label:'—', isNew:false};
+    var fm=r.first.slice(0,7);
+    var isNew=!!(st.last && r.first>=_bjbAddDays(st.last,-55));
+    return {label:(+fm.slice(0,4))+'/'+String(+fm.slice(5,7)).padStart(2,'0'), isNew:isNew};
+  }
+  window._bjtToggleIntroSort=function(){ _bjtSortNew=!_bjtSortNew; _bjtRender(); };
+
   function _bjtVisibleRows(){
     var st=_bjtStats();
     return st.rows.filter(function(r){
@@ -17980,6 +18011,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       // 「未入力のみ」でも、いま入力中（下書きあり）の行は消さない＝打っている最中に行が消えると困る
       if(_bjtOnlyEmpty && _bjtSavedEntry(r.name) && _bjtDraft[r.name]===undefined) return false;
       return true;
+    }).sort(function(x,y){
+      if(!_bjtSortNew) return 0;   // 既定は元の並び(直近30日アウト順)のまま
+      // 導入不明(「—」表示)の機種は日付で比べず末尾へ(到着日で新台より上に浮かないように)
+      var xf=(x.introKnown&&x.first)||'', yf=(y.introKnown&&y.first)||'';
+      return yf.localeCompare(xf) || y.o30-x.o30;
     });
   }
 
@@ -18019,6 +18055,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var html=''
       +'<table class="bjt-t" id="bjtTable"><thead><tr>'
       +'<th class="l bjt-sticky">機種名</th><th>状態</th><th>台数</th>'
+      +'<th style="cursor:pointer" onclick="window._bjtToggleIntroSort&&window._bjtToggleIntroSort()" title="クリックで並び替え（導入が新しい順 ⇄ 稼働順）">導入'+(_bjtSortNew?' ▼':'')+'<br><span class="bjt-sub">'+(_bjtSortNew?'新しい順で表示中':'クリックで新しい順')+'</span></th>'
       +'<th>セグメント<br><span class="bjt-sub">稼働粗利表の列</span></th><th>個別機種列<br><span class="bjt-sub">稼働粗利表の列</span></th>'
       +(_bjtIsPrice()?'<th>単位</th>':'<th>推定単価<br><span class="bjt-sub">データから逆算</span></th>')
       +monHead
@@ -18038,6 +18075,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         ? '「仮価格」＝まだ入力が無く、上のカードの<b>仮の価格</b>で扱う機種（薄い数字で表示）。<b>予約</b>＝来月の値を先に入れておけます。新台価格は円・1台あたりで、中古で入れた月にはその時価を入れればその月から効きます。<br>'
         : '「未入力」＝まだ単価が無く、補正されず素の値のままの機種。<b>予約</b>＝来月の値を先に入れておけます。<br>')
       +'入力した月の欄を空にして保存すると、その月の入力を取り消して引き継ぎに戻します。すべての欄を空にすると、'+(_bjtIsPrice()?'その機種の入力を（履歴ごと）消して仮の価格に戻します。':'その機種の補正を（履歴ごと）解除します。')+'<br>'
+      +'<b>導入</b>＝御社のデータにその機種が最初に現れた月（自動計算・見出しクリックで新しい順に並び替え）。「—」＝導入時期が分からない機種（データの開始からずっと居るもの）。<b>新台</b>＝最新データ日から8週間以内に初登場。'
       +'セグメント・個別機種列は稼働粗利表の振り分けと同じもの（全店共通・選ぶと即保存）。'+(_bjtIsPrice()?'台数は':'台数・推定単価は')+'<b>直近30日（'+_bjtDeptName()+'の全店合算）</b>の数字です。<br>'
       +'このデータの範囲：'+(st.first||'—')+' 〜 '+(st.last||'—')+'　／　対象 '+st.stores+' 店'
       +(hiddenMon>0?('　／　表示していない過去の月 '+hiddenMon+' か月（上の「表示する月」で広げられます。入力済みの補正は表示に関係なく効き続けます）'):'')
@@ -18350,8 +18388,31 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var tr=sel.closest('tr'); if(!tr) return;
     var seg=tr.querySelector('select.bjt-asg[data-f=seg]');
     var ind=tr.querySelector('select.bjt-asg[data-f=ind]');
-    var sv=seg?seg.value:'', iv=ind?ind.value:'';
     var msg=document.getElementById('bjtMsg');
+    // 「＋ 新しい〜を追加...」(2026-09-10): 稼働粗利表と同じ検証・保存先で列を作り、この機種に割り当てる
+    if(sel.value==='__add__'){
+      var isSeg=sel.getAttribute('data-f')==='seg';
+      var label=isSeg?'セグメント':'個別機種列';
+      var nm=window.prompt('新しい'+label+'の名前を入力してください','')||'';
+      if(!nm.trim()){ _bjtRepaintRow(i); return; }
+      var res=window._bjkaForTune.addCatalog(kind, isSeg, nm);
+      if(!res || !res.ok){ window.alert((res&&res.msg)||'追加できませんでした。'); _bjtRepaintRow(i); return; }
+      var sv2=isSeg?res.name:(seg?seg.value:''), iv2=isSeg?(ind?ind.value:''):res.name;
+      if(sv2==='__add__') sv2=''; if(iv2==='__add__') iv2='';
+      window._bjkaForTune.set(kind, r.name, sv2, iv2).then(function(ok){
+        if(!ok && msg){ msg.className='bjt-msg ng'; msg.textContent='「'+res.name+'」の割り当てをサーバに送れませんでした（このPCには保存済み）。'; }
+      });
+      // ② 列定義の共有送信の失敗も正直に伝える(9/1事故対策「嘘の成功表示をしない」と同じ流儀)
+      if(res.push && res.push.then){
+        res.push.then(function(ok2){
+          if(ok2===false && msg){ msg.className='bjt-msg ng'; msg.textContent='列「'+res.name+'」の共有をサーバに送れませんでした（このPCには保存済み・次回接続時に自動で送り直します）。'; }
+        }).catch(function(){});
+      }
+      _bjtRender();   // 1行でなく全体を描き直す=他の行のプルダウンにも新しい名前が出る(下書きは保持される)
+      if(msg){ msg.className='bjt-msg ok'; msg.textContent=label+'「'+res.name+'」を追加し、「'+r.name+'」に割り当てました（稼働粗利表と共通・全店共有）。専用の列並びを持つ店のExcelに出すには、稼働粗利表の「列の設定」でその店にも追加してください。'; }
+      return;
+    }
+    var sv=seg?seg.value:'', iv=ind?ind.value:'';
     if(!sv && !iv){
       // 空の振り分けは全店共有に送られない(9/1事故対策の鉄則)。嘘の成功表示をしない
       window._bjkaForTune.set(kind, r.name, '', '');
@@ -21300,6 +21361,24 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       saveAssign(saved);
       dirty[kind][name] = 1;
       return pushAssigns(kind, [name]);
+    },
+    addCatalog: function (kind, isSeg, rawName) {
+      // 新しいセグメント/個別機種列を共通の列構成へ追加(モーダルの「＋追加」と同じ検証・同じ保存先)。
+      // チューニングタブから呼ばれる(2026-09-10 コンコルドさん要望)。戻り: {ok, name?, msg?}
+      if (!columns) return { ok: false, msg: '列の設定を読み込めていません。少し待ってからもう一度どうぞ。' };
+      var nm = nfc(rawName || '');
+      if (!nm) return { ok: false, msg: '名前が空です。' };
+      if (nm === KACore.TOTAL_NAME.slot || nm === KACore.TOTAL_NAME.pachi) return { ok: false, msg: '「' + nm + '」は合計列の名前なので使えません。' };
+      var sameType = KACore.colNames(columns[kind], isSeg ? 'seg' : 'ind');
+      var otherType = KACore.colNames(columns[kind], isSeg ? 'ind' : 'seg');
+      if (otherType.indexOf(nm) >= 0) return { ok: false, msg: '「' + nm + '」は' + (isSeg ? '個別機種列' : 'セグメント') + 'に既にあります。' };
+      if (sameType.indexOf(nm) < 0) {
+        columns[kind].push({ name: nm, type: isSeg ? 'seg' : 'ind' });
+        saveColumns(columns);
+        colDraft = null; colDraftKind = null;
+        return { ok: true, name: nm, push: pushCols(kind) };
+      }
+      return { ok: true, name: nm };
     },
     setMany: function (kind, list) {   // [{name,seg,ind}] をまとめて1回の書き込みで
       if (!saved) return Promise.resolve(false);
