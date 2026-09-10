@@ -1890,7 +1890,7 @@ const USER_LABEL = 'コンチェルトさん専用';               // 例: '田�
 const USER_ID = 'concerto';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260910-161445';
+const BJ_VERSION = '20260910-201735';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -20067,7 +20067,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     TOTAL_NAME, TITLE_SUFFIX, DEFAULT_TOTALS,
     DEFAULT_COLUMNS, computeLayout, colNames,
     aggregateByDate, dailyTable, monthlyTable, monthWindow, monthsInRange,
-    buildWorkbook, buildWorkbookMulti, colLetter,
+    buildWorkbook, buildWorkbookMulti, addSheet, colLetter,
   };
 });
 
@@ -21238,7 +21238,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if (!from || !to) { setStatus($('bjkaGenSt'), '期間（開始日と終了日）を選んでください。', 'err'); return; }
     if (from > to) { setStatus($('bjkaGenSt'), '開始日が終了日より後になっています。', 'err'); return; }
     var ymList = KACore.monthsInRange(from, to);
-    if (ymList.length > 13) { setStatus($('bjkaGenSt'), '期間は13か月以内にしてください。', 'err'); return; }
+    // 全店ぶんは「スロット/パチンコの2ファイル×1店舗1シート」形式のため単月専用(2026-09-10 確定仕様。
+    // 運用は①会議用: 月初〜18日ごろ ②月間: 前月まるごと、のどちらも単月)
+    if (ymList.length > 1) { setStatus($('bjkaGenSt'), '全店ぶんZIPは同一月内の期間で使ってください（例: 9/1〜9/18、前月の1日〜末日）。', 'err'); return; }
     // 振り分けは保存済みの台帳(法人で1つ)から。画面で保存していない編集は含まれない
     var assign = { slot: { seg: {}, ind: {} }, pachi: { seg: {}, ind: {} } };
     ['slot', 'pachi'].forEach(function (kind) {
@@ -21263,18 +21265,42 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var EJ = libs[0], JZ = libs[1];
       var zip = new JZ();
       var made = 0, skipped = 0;
+      var wbs = { slot: null, pachi: null }, sheetCount = { slot: 0, pachi: 0 };   // 部門ごとに1冊・1店舗1シート
+      var errored = 0;   // データはあるのに作成に失敗した部門(データ無しのskippedと分けて正直に報告)
+      var usedNames = { slot: {}, pachi: {} };   // シート名の衝突番人(ExcelJSは大文字小文字を区別せずthrowする)
+      function uniqueSheetName(kind, base) {
+        var nm = String(base).replace(/[\[\]:*?\/\\]/g, '・').slice(0, 31).replace(/^'+|'+$/g, '');
+        if (!nm) nm = 'シート';
+        var key = nm.toLowerCase();
+        if (!usedNames[kind][key]) { usedNames[kind][key] = 1; return nm; }
+        for (var t2 = 2; t2 < 100; t2++) {
+          var cand = (nm.slice(0, 31 - String(t2).length - 1) + '~' + t2).replace(/^'+|'+$/g, '');
+          var ck = cand.toLowerCase();
+          if (!usedNames[kind][ck]) { usedNames[kind][ck] = 1; return cand; }
+        }
+        return nm.slice(0, 20) + '~x';
+      }
       var i = 0;
       function next() {
         if (i >= halls.length) {
-          if (!made) { setStatus($('bjkaGenSt'), '選択期間にデータのある店がありません。', 'err'); btn.disabled = false; return; }
+          if (!made) { setStatus($('bjkaGenSt'), errored ? ('作成に失敗しました（' + errored + '部門・詳細はブラウザのコンソール）。') : '選択期間にデータのある店がありません。', 'err'); btn.disabled = false; return; }
           setStatus($('bjkaGenSt'), 'ZIPにまとめています...');
-          zip.generateAsync({ type: 'blob' }).then(function (blob) {
+          var kindsOut = [['slot', 'スロットメイン稼働粗利表'], ['pachi', 'パチンコメイン稼働粗利表']].filter(function (p2) { return wbs[p2[0]] && sheetCount[p2[0]] > 0; });
+          Promise.all(kindsOut.map(function (p2) {
+            return wbs[p2[0]].xlsx.writeBuffer().then(function (buf) { zip.file(p2[1] + '_全店_' + from + '〜' + to + '.xlsx', buf); });
+          })).then(function () {
+            return zip.generateAsync({ type: 'blob' });
+          }).then(function (blob) {
             var a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
             a.download = '稼働粗利表_全店_' + from + '〜' + to + '.zip';
             document.body.appendChild(a); a.click(); a.remove();
             setTimeout(function () { URL.revokeObjectURL(a.href); }, 30000);
-            setStatus($('bjkaGenSt'), 'ダウンロードしました: ' + a.download + '（Excel ' + made + 'ファイル' + (skipped ? '・期間内データ無しで省いた部門 ' + skipped + '件' : '') + '。振り分けは保存済みの内容で作成）', 'ok');
+            setStatus($('bjkaGenSt'), 'ダウンロードしました: ' + a.download + '（Excel ' + kindsOut.length + 'ファイル＝スロット' + sheetCount.slot + '店シート・パチンコ' + sheetCount.pachi + '店シート' + (skipped ? '・期間内データ無しで省いた部門 ' + skipped + '件' : '') + (errored ? '・作成に失敗した部門 ' + errored + '件（詳細はブラウザのコンソール）' : '') + '。振り分けは保存済みの内容で作成）', errored ? 'err' : 'ok');
+            btn.disabled = false;
+          }).catch(function (e) {
+            console.error('[全店ZIP]', e);
+            setStatus($('bjkaGenSt'), '作成に失敗しました: ' + (e && e.message || e), 'err');
             btn.disabled = false;
           });
           return;
@@ -21291,22 +21317,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
             var hasData = Object.keys(byDate).some(function (d) { return d >= from && d <= to; });
             if (!hasData) { skipped++; nextKind(j + 1); return; }
             var layout = KACore.computeLayout(kind, effCols(kind, h.base));
-            var sheets = ymList.map(function (ym) {
-              return {
-                ym: ym,
-                daily: KACore.dailyTable(byDate, layout.groups, ym, from, to),
-                monthly: KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym)),
-                sheetName: ymList.length === 1 ? h.base : Number(ym.slice(0, 4)) + '年' + Number(ym.slice(5)) + '月',
-              };
-            });
-            var wb = KACore.buildWorkbookMulti(EJ, kind, layout, h.base, sheets, Number(totalFor(h.base)) || null);
-            var label = kind === 'slot' ? 'スロットメイン稼働粗利表' : 'パチンコメイン稼働粗利表';
-            wb.xlsx.writeBuffer().then(function (buf) {
-              zip.file(h.base + '_' + label + '_' + from + '〜' + to + '.xlsx', buf);
-              made++;
-              nextKind(j + 1);
-            }).catch(function (e) { console.error('[全店ZIP]', h.base, kind, e); skipped++; nextKind(j + 1); });
-          }).catch(function (e) { console.error(h.base, e); skipped++; nextKind(j + 1); });
+            var ym = ymList[0];
+            if (!wbs[kind]) wbs[kind] = new EJ.Workbook();
+            try {
+              KACore.addSheet(wbs[kind], kind, layout, h.base, ym,
+                KACore.dailyTable(byDate, layout.groups, ym, from, to),
+                KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym)),
+                uniqueSheetName(kind, h.base),   // 禁止文字・31文字・重複・端のクォートの番人
+                Number(totalFor(h.base)) || null);
+              made++; sheetCount[kind]++;
+            } catch (e) { console.error('[全店ZIP]', h.base, kind, e); errored++; }
+            nextKind(j + 1);
+          }).catch(function (e) { console.error(h.base, e); errored++; nextKind(j + 1); });
         })(0);
       }
       next();
