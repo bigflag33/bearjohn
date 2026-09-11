@@ -1890,7 +1890,7 @@ const USER_LABEL = 'キスケ株式会社さん専用';               // 例: '�
 const USER_ID = 'kisuke';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260911-070839';
+const BJ_VERSION = '20260911-112103';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2331,6 +2331,162 @@ function _bjCacheHane(key) {
 var _bjKesson = null;
 function _bjKessonMd(d) { return d ? (parseInt(d.slice(5, 7), 10) + '/' + parseInt(d.slice(8, 10), 10)) : ''; }
 function _bjKessonEsc(x) { return String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+// ── 店休OK(2026-09-11 案1): 欠損帯の店×日付を「店休(データ無しで正常)」として帯から外す ──
+//    印は法人ごとの箱(kind='kessonok'・_bjtSettingsApi経由)で法人内の全PC共有。帯の表示だけを変える＝朝の点検メールには残る。
+//    ボタンは全法人ページで使える(2026-09-11ユーザー指示。サーバ認証は全法人登録済み・箱は法人別なので混ざらない)。
+//    adminは全体監視のため対象外(印があっても隠さない)。
+var _bjKessonOkSt = { marks: {}, pending: {}, revealed: false, synced: false, tries: 0 };   // pending=このPCで追加したがサーバに未送信の印(キー単位。全量マージは他PCの取消を復活させるため禁止)
+function _bjKessonOkLsKey() { return 'bj_kessonok_' + (typeof USER_ID !== 'undefined' ? USER_ID : 'admin'); }
+function _bjKessonOkCan() {
+  try { return typeof USER_ID !== 'undefined' && USER_ID !== 'admin'; } catch (e) { return false; }
+}
+function _bjKessonOkKey(m, d) { return m.corp + '|' + m.store + '|' + d; }
+function _bjKessonOkLoadLs() {
+  try {
+    var o = JSON.parse(localStorage.getItem(_bjKessonOkLsKey()) || 'null');
+    if (o && typeof o === 'object') {
+      if (o.marks && typeof o.marks === 'object') _bjKessonOkSt.marks = o.marks;
+      if (o.pending && typeof o.pending === 'object') _bjKessonOkSt.pending = o.pending;
+    }
+  } catch (e) {}
+}
+function _bjKessonOkSaveLs() {
+  try { localStorage.setItem(_bjKessonOkLsKey(), JSON.stringify({ v: 2, marks: _bjKessonOkSt.marks, pending: _bjKessonOkSt.pending })); } catch (e) {}
+}
+function _bjKessonOkPrune(marks) {
+  // 窓(7日)からとっくに外れた古い印を掃除して箱を小さく保つ(35日)。
+  // 基準はPCの時計ではなくサーバ生成のkesson.jsonの日付(時計が未来にズレたPCが法人の箱を全消ししないため)。基準が無ければ掃除しない
+  try {
+    var baseStr = _bjKesson && _bjKesson.date;
+    if (!baseStr) return marks;
+    var c = new Date(new Date(baseStr + 'T12:00:00').getTime() - 35 * 86400000);
+    var cut = c.getFullYear() + '-' + String(c.getMonth() + 1).padStart(2, '0') + '-' + String(c.getDate()).padStart(2, '0');
+    Object.keys(marks).forEach(function (k) { var d = k.split('|')[2] || ''; if (d && d < cut) delete marks[k]; });
+  } catch (e) {}
+  return marks;
+}
+function _bjKessonOkApi() { var a = window._bjtSettingsApi; try { return (a && (a.enabledAny ? a.enabledAny() : a.enabled())) ? a : null; } catch (e) { return null; } }
+// 通信は1本ずつ順番に(同期とOKクリックが同時に走って互いの書き込みを消さないため)
+var _bjKessonOkQ = Promise.resolve();
+function _bjKessonOkReadMarks(hit) {
+  if (hit && hit.corrupt) throw new Error('kessonok corrupt');   // 壊れた箱は触らない(上書きもしない)
+  return (hit && hit.value && hit.value.marks && typeof hit.value.marks === 'object') ? hit.value.marks : {};
+}
+// 起動時の取り込み: サーバの箱を正にする。未送信の追加(pending)があればそのキーだけ合流して送る
+// (ローカル全量のマージは「他PCが取消した印」を区別できず復活させるので絶対にしない)
+// 合流の書き込みもapplyと同じ書後verify付き(同時刻に別PCが押した印を黙って消さないため)
+function _bjKessonOkSync() {
+  if (!_bjKessonOkCan() || _bjKessonOkSt.synced) return;
+  var a = _bjKessonOkApi(); if (!a) return;
+  var run = function () {
+    if (_bjKessonOkSt.synced) return Promise.resolve();
+    // adopt: svを正として採用。confirmed=falseなら次の同期で答え合わせを続ける
+    var adopt = function (sv, confirmed) {
+      _bjKessonOkSt.marks = sv;
+      Object.keys(_bjKessonOkSt.pending).forEach(function (k) { if (sv[k]) delete _bjKessonOkSt.pending[k]; });
+      _bjKessonOkSt.synced = !!confirmed;
+      _bjKessonOkSaveLs(); _bjKessonRender();
+      if (!confirmed) _bjKessonOkWatch();
+    };
+    var attempt = function (n) {
+      return a.get('kessonok').then(_bjKessonOkReadMarks).then(function (sv) {
+        _bjKessonOkPrune(_bjKessonOkSt.pending);   // 35日超の未送信の残骸は送らない(掃除して終わり)
+        var pend = _bjKessonOkSt.pending;
+        var add = Object.keys(pend).filter(function (k) { return !sv[k]; });
+        if (!add.length) { adopt(sv, true); return; }   // 送るものが無い=サーバを正として確定
+        add.forEach(function (k) { sv[k] = pend[k]; });
+        _bjKessonOkPrune(sv);
+        return a.put('kessonok', { v: 1, marks: sv }).then(function () {
+          return a.get('kessonok').then(_bjKessonOkReadMarks).then(null, function () { return null; });
+        }).then(function (sv2) {
+          if (sv2 === null) { adopt(sv, false); return; }   // putは成功・確認の読みだけ失敗→暫定採用し後で再確認
+          var ok = add.every(function (k) { return !!sv2[k]; });
+          if (ok) { adopt(sv2, true); return; }
+          if (n >= 2) { adopt(sv2, false); return; }   // 競り負け続き→サーバ値を採用しpendingは次の機会へ残す
+          return attempt(n + 1);
+        });
+      });
+    };
+    return attempt(0);
+  };
+  var p = _bjKessonOkQ.then(run, run);
+  _bjKessonOkQ = p.catch(function () {});
+  p.catch(function () {});
+}
+// 印の追加/取消: このPCへ即反映→「サーバの最新を読み→この操作を重ねて→書き→読み直して確認」(稼働粗利表の箱と同じ書後verify・最大3回)
+function _bjKessonOkApply(addKeys, delKeys) {
+  var now = new Date().toISOString();
+  addKeys.forEach(function (k) { _bjKessonOkSt.marks[k] = { at: now }; _bjKessonOkSt.pending[k] = { at: now }; });
+  delKeys.forEach(function (k) { delete _bjKessonOkSt.marks[k]; delete _bjKessonOkSt.pending[k]; });
+  _bjKessonOkPrune(_bjKessonOkSt.marks);
+  _bjKessonOkPrune(_bjKessonOkSt.pending);
+  _bjKessonOkSaveLs(); _bjKessonRender();
+  var a = _bjKessonOkApi();
+  if (!a) {
+    // 追加はpendingに退避済み=つながったとき自動で合流。取消はこのPCだけになってしまうので巻き戻して正直に伝える
+    if (delKeys.length) {
+      delKeys.forEach(function (k) { if (!_bjKessonOkSt.marks[k]) _bjKessonOkSt.marks[k] = { at: now }; });
+      _bjKessonOkSaveLs(); _bjKessonRender();
+      try { alert('いまはサーバにつながらないため取消できませんでした。つながる環境でもう一度お試しください。'); } catch (e) {}
+    }
+    _bjKessonOkSt.synced = false; _bjKessonOkWatch();
+    return;
+  }
+  var mutate = function (sv) {
+    var k;
+    for (k in _bjKessonOkSt.pending) if (!sv[k]) sv[k] = _bjKessonOkSt.pending[k];   // 未送信の追加(キー単位)だけ合流
+    addKeys.forEach(function (kk) { if (!sv[kk]) sv[kk] = { at: now }; });
+    delKeys.forEach(function (kk) { delete sv[kk]; });
+    return _bjKessonOkPrune(sv);
+  };
+  var run = function () {
+    var attempt = function (n) {
+      return a.get('kessonok').then(_bjKessonOkReadMarks).then(function (sv0) {
+        var sv = mutate(sv0);
+        return a.put('kessonok', { v: 1, marks: sv }).then(function () {
+          // 書いた直後に読み直し、自分の変更が載っているか確認(別PCの同時書き込みで消えていたら重ね直す・最大3回)。
+          // 確認の読みだけ失敗した場合はnull=putは成功済みなので失敗扱いにしない(巻き戻すと嘘のalertになる)
+          return a.get('kessonok').then(_bjKessonOkReadMarks).then(null, function () { return null; });
+        }).then(function (sv2) {
+          if (sv2 === null) {
+            _bjKessonOkSt.marks = sv;   // 書いた内容を暫定の正として採用し、次の同期で答え合わせ
+            Object.keys(_bjKessonOkSt.pending).forEach(function (k) { if (sv[k]) delete _bjKessonOkSt.pending[k]; });
+            _bjKessonOkSt.synced = false;
+            _bjKessonOkSaveLs(); _bjKessonRender(); _bjKessonOkWatch();
+            return;
+          }
+          var ok = addKeys.every(function (k) { return !!sv2[k]; }) && delKeys.every(function (k) { return !sv2[k]; });
+          if (!ok) {
+            if (n >= 2) throw new Error('kessonok conflict');
+            return attempt(n + 1);
+          }
+          _bjKessonOkSt.marks = sv2;   // 読み直した値=中央の正(他PCの同時変更も取り込む)
+          Object.keys(_bjKessonOkSt.pending).forEach(function (k) { if (sv2[k]) delete _bjKessonOkSt.pending[k]; });
+          _bjKessonOkSt.synced = true;
+          _bjKessonOkSaveLs(); _bjKessonRender();
+        });
+      });
+    };
+    return attempt(0);
+  };
+  var p = _bjKessonOkQ.then(run, run);
+  _bjKessonOkQ = p.catch(function () {});
+  p.catch(function () {
+    if (addKeys.length) {
+      // pendingに残っている=あとで自動合流。同期でmarksが差し替わっていても表示に印を戻す
+      addKeys.forEach(function (k) { if (_bjKessonOkSt.pending[k] && !_bjKessonOkSt.marks[k]) _bjKessonOkSt.marks[k] = _bjKessonOkSt.pending[k]; });
+      _bjKessonOkSaveLs(); _bjKessonRender();
+      try { alert('サーバに送れなかったため、この店休OKはまだこのPCだけの反映です（つながったとき自動で全PCへ共有されます）。'); } catch (e) {}
+    }
+    if (delKeys.length) {
+      // 取消が届かないままこのPCだけ消えると他PCと食い違うので、印を戻して正直に知らせる
+      delKeys.forEach(function (k) { if (!_bjKessonOkSt.marks[k]) _bjKessonOkSt.marks[k] = { at: now }; });
+      _bjKessonOkSaveLs(); _bjKessonRender();
+      try { alert('サーバに送れなかったため取消できませんでした。あとでもう一度お試しください。'); } catch (e) {}
+    }
+    _bjKessonOkSt.synced = false; _bjKessonOkWatch();   // 再送の見張りを再開(「つながったとき自動で共有」を本当にする)
+  });
+}
 function _bjKessonRender() {
   try {
     if (!_bjKesson) return;
@@ -2346,7 +2502,7 @@ function _bjKessonRender() {
       } catch (e) { return cid; }
     };
     var label = function (x) { return _bjKessonEsc((USER_ID === 'admin' ? corpLabel(x.corp) + '：' : '') + x.store); };
-    var miss = mine(_bjKesson.missing);
+    var missAll = mine(_bjKesson.missing);
     var _fmtD = function (d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
     var _d = new Date();
     var todayStr = _fmtD(_d);
@@ -2354,8 +2510,19 @@ function _bjKessonRender() {
     var ydayStr = _fmtD(_y);
     // 回復は今日+昨日ぶんを表示(土曜深夜の週次同期で検知した回復が日曜に見えるように)
     var rec = mine(_bjKesson.recovered).filter(function (x) { return x.at === todayStr || x.at === ydayStr; });
+    // 店休OKの印で仕分け(印が効くのは法人ページのみ)
+    var canOk = _bjKessonOkCan();
+    var marks = canOk ? (_bjKessonOkSt.marks || {}) : {};
+    var shown = [], okd = [];
+    missAll.forEach(function (m) {
+      var ds = m.dates || [];
+      var vis = [], hid = [];
+      ds.forEach(function (d) { (marks[_bjKessonOkKey(m, d)] ? hid : vis).push(d); });
+      if (vis.length) shown.push({ m: m, vis: vis });
+      if (hid.length) okd.push({ m: m, hid: hid });
+    });
     var bar = document.getElementById('bjKessonBar');
-    if (!miss.length && !rec.length) { if (bar) bar.style.display = 'none'; return; }
+    if (!shown.length && !rec.length && !okd.length) { if (bar) bar.style.display = 'none'; return; }
     if (!bar) {
       bar = document.createElement('div');
       bar.id = 'bjKessonBar';
@@ -2363,25 +2530,45 @@ function _bjKessonRender() {
       if (hd && hd.parentNode) { hd.insertAdjacentElement('afterend', bar); }
       else { document.body.insertBefore(bar, document.body.firstChild); }
     }
+    var whenTxt = function (ds) {
+      if (ds.length <= 2) { return ds.map(_bjKessonMd).join('・') + '分'; }
+      var consec = true;
+      for (var i = 1; i < ds.length; i++) {
+        if (new Date(ds[i] + 'T12:00:00') - new Date(ds[i - 1] + 'T12:00:00') !== 86400000) { consec = false; break; }
+      }
+      return _bjKessonMd(ds[0]) + (consec ? 'から' : 'など') + ds.length + '日分';
+    };
+    var revLink = okd.length
+      ? ' <a href="#" data-bjkorev="1" style="color:#92400e;white-space:nowrap;">店休OK済み ' + okd.length + '件を' + (_bjKessonOkSt.revealed ? '隠す' : '表示') + '</a>'
+      : '';
     var html = '';
-    if (miss.length) {
-      var parts = miss.map(function (m) {
-        var ds = m.dates || [];
-        var when;
-        if (ds.length <= 2) { when = ds.map(_bjKessonMd).join('・') + '分'; }
-        else {
-          var consec = true;
-          for (var i = 1; i < ds.length; i++) {
-            if (new Date(ds[i] + 'T12:00:00') - new Date(ds[i - 1] + 'T12:00:00') !== 86400000) { consec = false; break; }
-          }
-          when = _bjKessonMd(ds[0]) + (consec ? 'から' : 'など') + ds.length + '日分';
-        }
-        return label(m) + '（' + when + '）';
+    if (shown.length) {
+      var parts = shown.map(function (e, i) {
+        var btn = canOk
+          ? ' <button type="button" data-bjko="' + i + '" title="この欠損を店休（データ無しで正常）として帯から外す" '
+            + 'style="font-size:11px;padding:0 6px;border:1px solid #d9a520;border-radius:6px;background:#fffdf5;color:#92400e;cursor:pointer;vertical-align:1px;">店休OK</button>'
+          : '';
+        return label(e.m) + '（' + whenTxt(e.vis) + '）' + btn;
       });
       html += '<div style="background:#fff8e1;border:1px solid #f5c542;border-left-width:4px;border-radius:8px;'
             + 'padding:8px 14px;margin:8px 16px 0;font-size:13px;line-height:1.7;color:#92400e;">'
             + '⚠ データがまだ届いていない店舗があります： ' + parts.join('、')
-            + ' <span style="opacity:.75">（データ提供元の反映待ちです。毎朝自動で取得し直します）</span></div>';
+            + ' <span style="opacity:.75">（データ提供元の反映待ちです。毎朝自動で取得し直します。店休日もこの表示になります）</span>'
+            + revLink + '</div>';
+    } else if (okd.length) {
+      html += '<div style="background:#f8fafc;border:1px solid #cbd5e1;border-left-width:4px;border-radius:8px;'
+            + 'padding:6px 14px;margin:8px 16px 0;font-size:12.5px;line-height:1.7;color:#64748b;">'
+            + '欠損の表示はすべて店休OK済みです（' + okd.length + '件）' + revLink + '</div>';
+    }
+    if (_bjKessonOkSt.revealed && okd.length) {
+      var parts3 = okd.map(function (e, i) {
+        return label(e.m) + '（' + whenTxt(e.hid) + '・OK済み）'
+          + ' <button type="button" data-bjkodel="' + i + '" '
+          + 'style="font-size:11px;padding:0 6px;border:1px solid #94a3b8;border-radius:6px;background:#fff;color:#475569;cursor:pointer;vertical-align:1px;">取消</button>';
+      });
+      html += '<div style="background:#f8fafc;border:1px solid #cbd5e1;border-left-width:4px;border-radius:8px;'
+            + 'padding:8px 14px;margin:8px 16px 0;font-size:12.5px;line-height:1.7;color:#64748b;">'
+            + '店休OKにした欠損： ' + parts3.join('、') + '</div>';
     }
     if (rec.length) {
       var parts2 = rec.map(function (m) { return label(m) + 'の' + _bjKessonMd(m.date) + '分'; });
@@ -2391,14 +2578,69 @@ function _bjKessonRender() {
     }
     bar.innerHTML = html;
     bar.style.display = '';
+    // クリック配線(店名はHTMLの属性に埋めず、番号で引く)
+    if (canOk) {
+      Array.prototype.forEach.call(bar.querySelectorAll('button[data-bjko]'), function (el) {
+        el.addEventListener('click', function () {
+          var e = shown[Number(el.getAttribute('data-bjko'))]; if (!e) return;
+          var mdTxt = e.vis.map(_bjKessonMd).join('・');
+          if (!confirm('「' + e.m.store + '」の ' + mdTxt + ' 分を店休（データ無しで正常）としてOKにします。\nこの帯から消えます（法人内の全PCで共通）。よろしいですか？')) return;
+          _bjKessonOkApply(e.vis.map(function (d) { return _bjKessonOkKey(e.m, d); }), []);
+        });
+      });
+      Array.prototype.forEach.call(bar.querySelectorAll('button[data-bjkodel]'), function (el) {
+        el.addEventListener('click', function () {
+          var e = okd[Number(el.getAttribute('data-bjkodel'))]; if (!e) return;
+          _bjKessonOkApply([], e.hid.map(function (d) { return _bjKessonOkKey(e.m, d); }));
+        });
+      });
+      Array.prototype.forEach.call(bar.querySelectorAll('a[data-bjkorev]'), function (el) {
+        el.addEventListener('click', function (ev) {
+          ev.preventDefault();
+          _bjKessonOkSt.revealed = !_bjKessonOkSt.revealed;
+          _bjKessonRender();
+        });
+      });
+    }
   } catch (e) {}
+}
+// 同期の見張り(15秒間隔)。ログイン前(箱API未使用可)の間は回数を数えずに待つ。二重起動しない
+var _bjKessonOkTimer = null;
+function _bjKessonOkWatch() {
+  _bjKessonOkSt.tries = 0;
+  if (_bjKessonOkTimer) return;
+  _bjKessonOkTimer = setInterval(function () {
+    try {
+      if (_bjKessonOkSt.synced) { clearInterval(_bjKessonOkTimer); _bjKessonOkTimer = null; return; }
+      if (!_bjKessonOkCan()) { clearInterval(_bjKessonOkTimer); _bjKessonOkTimer = null; return; }   // adminは対象外
+      if (!_bjKessonOkApi()) return;   // ログイン待ち=回数を数えない
+      _bjKessonOkSt.tries++;
+      if (_bjKessonOkSt.tries > 20) {
+        var hasPend = false;
+        try { hasPend = Object.keys(_bjKessonOkSt.pending).length > 0; } catch (e2) {}
+        // 未送信の印を抱えている間は諦めない(「つながったとき自動で共有」の約束を守る)。ペースは1分に1回へ落とす
+        if (!hasPend) { clearInterval(_bjKessonOkTimer); _bjKessonOkTimer = null; return; }
+        if (_bjKessonOkSt.tries % 4) return;
+      }
+      _bjKessonOkSync();
+    } catch (e) {}
+  }, 15000);
 }
 (function () {
   try {
+    _bjKessonOkLoadLs();
     fetch('https://d17k53m2wpr7dx.cloudfront.net/kesson.json?t=' + Date.now())
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) { if (d) { _bjKesson = d; _bjKessonRender(); } })
+      .then(function (d) {
+        if (!d) return;
+        _bjKesson = d;
+        // 初回描画はHTML全体の読み込み後に(BJ_FEATURE_CORPS等の定義がこのscriptより後方にあるため)
+        var go = function () { _bjKessonRender(); _bjKessonOkSync(); };
+        if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', go); }
+        else { go(); }
+      })
       .catch(function () {});
+    _bjKessonOkWatch();
   } catch (e) {}
 })();
 
@@ -13303,6 +13545,7 @@ async function checkAuth() {
     await loadRemoteData();
     init();
     try{ if(window._bjtSyncNow) window._bjtSyncNow(); }catch(e){}   // 機種別チューニング：設定サーバから取り込む（失敗しても画面は動く）
+    try{ _bjKessonOkSync(); }catch(e){}   // 欠損帯の店休OK印もログイン直後に同期(見張りintervalを待たない)
   } else {
     const err = document.getElementById('authErr');
     err.textContent = 'パスワードが違います';
@@ -13364,7 +13607,7 @@ window.addEventListener('DOMContentLoaded', () => {
     window._bjPw = (_sv === '1') ? '' : _sv;
     document.getElementById('authOverlay').style.display = 'none';
     initDB().then(_buildBenchmarkFromCache).then(loadRemoteData).then(init).then(_checkAdminDataEmpty)
-      .then(() => { try{ if(window._bjtSyncNow) window._bjtSyncNow(); }catch(e){} })   // 機種別チューニング：設定サーバから取り込む
+      .then(() => { try{ if(window._bjtSyncNow) window._bjtSyncNow(); }catch(e){} try{ _bjKessonOkSync(); }catch(e){} })   // 機種別チューニング＋店休OK印：設定サーバから取り込む
       .catch(e => { console.error('[initDB]', e); init(); });
   } else {
     // authOverlayを表示したままにする（init()は呼ばない）
@@ -17480,7 +17723,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function _bjtCorp(){ return window.BJ_TUNE_CORP || (typeof USER_ID!=='undefined'?USER_ID:'admin'); }
   // file:// で開いているとき（弊社のローカル版）はサーバに繋がない＝このPCの中だけ
   function _bjtApiEnabled(){
-    if(!_bjtOn) return false;   // 配信対象外の法人ではサーバに触らない
+    if(!_bjtOn) return false;   // 配信対象外の法人ではチューニング系の機能を動かさない
+    return _bjtApiReachable();
+  }
+  // 箱サーバに手が届くか(ログイン済みの法人ページなら法人を問わずtrue)。サーバの認証は corp+パスワードで全法人ぶん登録済み(cloudshell_pw_sync.sh)
+  function _bjtApiReachable(){
     try{ return /^https?:$/.test(location.protocol) && !!(window._bjPw||''); }catch(e){ return false; }
   }
   function _bjtWho(){
@@ -17638,9 +17885,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   // ── 他機能(稼働粗利表の振り分け等)への窓口: 同じ「法人ごとの箱」を kind 別に読み書きする(2026-09-03) ──
   //    法人はサーバ側で入場券から決まる＝クライアントは法人IDを送らない。file://(admin)や配信対象外の法人では enabled=false
   window._bjtSettingsApi={
-    enabled: function(){ return _bjtApiEnabled(); },
+    enabled: function(){ return _bjtApiEnabled(); },        // チューニング・稼働粗利表(提供先=BJ_FEATURE_CORPSの法人だけ)
+    enabledAny: function(){ return _bjtApiReachable(); },   // 法人を問わない窓口(欠損帯の店休OK等)。箱は法人別なので混ざらない
     get: function(kind){
-      if(!_bjtApiEnabled()) return Promise.reject(new Error('local'));
+      if(!_bjtApiReachable()) return Promise.reject(new Error('local'));
       return _bjtCall('settings',{method:'GET'})
         .then(function(r){ if(!r.ok) throw new Error('get '+r.status); return r.json(); })
         .then(function(j){
@@ -17650,7 +17898,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         });
     },
     put: function(kind, obj){
-      if(!_bjtApiEnabled()) return Promise.reject(new Error('local'));
+      if(!_bjtApiReachable()) return Promise.reject(new Error('local'));
       return _bjtCall('settings',{method:'PUT',headers:{'content-type':'application/json'},
         body:JSON.stringify({kind:kind, scope:'*', value:JSON.stringify(obj), updatedBy:_bjtWho()})})
         .then(function(r){ if(!r.ok) throw new Error('put '+r.status); return true; });
@@ -19761,15 +20009,20 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
 
   // 月別表: 各月 {label, values:{group→[台数,稼働,台粗] or null}}
-  // 台数=Σ台日/営業日数(その店にデータがある日数)・稼働=Σアウト/Σ台日・台粗=Σ粗利/Σ台日（全て月内平均）
-  function monthlyTable(byDate, groups, ymList) {
-    const acc = {};   // ym → {biz, per:{group→{tn,out,pf}}}
-    for (const ym of ymList) acc[ym] = { biz: 0, per: {} };
+  // 台数=その月の「最後にデータがある日」の台数(=いまの設置台数のスナップショット。2026-09-11変更・旧: 月内平均)
+  //   ※最終日がたまたま部分欠けだと少なく出るが、翌日のデータで自動で直る割り切り(ユーザー指示)
+  // 稼働=Σアウト/Σ台日・台粗=Σ粗利/Σ台日(月内平均)
+  // toDs(任意)=集計の打ち切り日。期間指定エクスポートで当月の月別行に「期間の外の日」が混ざり、
+  //   上の日別表と数字が合わなくなるのを防ぐ(2026-09-11)。過去月の日付は全部toDs以前なので実質は当月だけ打ち切られる
+  function monthlyTable(byDate, groups, ymList, toDs) {
+    const acc = {};   // ym → {last, per:{group→{tn,out,pf}}}
+    for (const ym of ymList) acc[ym] = { last: '', per: {} };
     for (const date of Object.keys(byDate)) {
+      if (toDs && date > toDs) continue;
       const ym = date.slice(0, 7);
       const a = acc[ym];
       if (!a) continue;
-      a.biz += 1;
+      if (date > a.last) a.last = date;
       const slot = byDate[date];
       for (const g of Object.keys(slot)) {
         let p = a.per[g];
@@ -19781,11 +20034,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }
     return ymList.map(ym => {
       const a = acc[ym];
+      const lastSlot = (a.last && byDate[a.last]) || {};
       const values = {};
       for (const g of groups) {
         const p = a.per[g.name];
         values[g.name] = (p && p.tn > 0)
-          ? [Math.round(p.tn / a.biz), Math.round(p.out / p.tn), Math.round(p.pf / p.tn)]
+          ? [lastSlot[g.name] ? lastSlot[g.name].n : 0, Math.round(p.out / p.tn), Math.round(p.pf / p.tn)]
           : null;
       }
       return { label: Number(ym.slice(5)) + '月', values };
@@ -21182,7 +21436,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         return {
           ym: ym,
           daily: KACore.dailyTable(byDate, layout.groups, ym, from, to),
-          monthly: KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym)),
+          monthly: KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym), to),
           sheetName: ymList.length === 1 ? h.base : Number(ym.slice(0, 4)) + '年' + Number(ym.slice(5)) + '月',
         };
       });
@@ -21322,7 +21576,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
             try {
               KACore.addSheet(wbs[kind], kind, layout, h.base, ym,
                 KACore.dailyTable(byDate, layout.groups, ym, from, to),
-                KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym)),
+                KACore.monthlyTable(byDate, layout.groups, KACore.monthWindow(ym), to),
                 uniqueSheetName(kind, h.base),   // 禁止文字・31文字・重複・端のクォートの番人
                 Number(totalFor(h.base)) || null);
               made++; sheetCount[kind]++;
