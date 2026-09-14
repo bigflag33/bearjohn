@@ -1890,7 +1890,7 @@ const USER_LABEL = '北上文化さん専用';               // 例: '田中さ�
 const USER_ID = 'kitakami';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260911-112103';
+const BJ_VERSION = '20260914-091206';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2487,6 +2487,22 @@ function _bjKessonOkApply(addKeys, delKeys) {
     _bjKessonOkSt.synced = false; _bjKessonOkWatch();   // 再送の見張りを再開(「つながったとき自動で共有」を本当にする)
   });
 }
+// 緑帯(回復のお知らせ)は各PCで1回表示したら以後出さない(2026-09-14ユーザー指示)。表示中のページでは消えない
+var _bjKessonRecShown = {};   // このページで表示済みのキー(開いている間は出し続ける)
+function _bjKessonRecSeenKey() { return 'bj_kessonrec_seen_' + (typeof USER_ID !== 'undefined' ? USER_ID : 'admin'); }
+function _bjKessonRecSeen() {
+  try { var o = JSON.parse(localStorage.getItem(_bjKessonRecSeenKey()) || 'null'); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; }
+}
+function _bjKessonRecMarkSeen(keys) {
+  try {
+    var seen = _bjKessonRecSeen();
+    var now = Date.now();
+    keys.forEach(function (k) { if (!seen[k]) seen[k] = now; });
+    var cut = now - 14 * 86400000;   // 古い既読は掃除(お知らせ自体が2日で消えるので14日あれば十分)
+    Object.keys(seen).forEach(function (k) { if (seen[k] < cut) delete seen[k]; });
+    localStorage.setItem(_bjKessonRecSeenKey(), JSON.stringify(seen));
+  } catch (e) {}
+}
 function _bjKessonRender() {
   try {
     if (!_bjKesson) return;
@@ -2508,8 +2524,14 @@ function _bjKessonRender() {
     var todayStr = _fmtD(_d);
     var _y = new Date(_d.getTime() - 86400000);
     var ydayStr = _fmtD(_y);
-    // 回復は今日+昨日ぶんを表示(土曜深夜の週次同期で検知した回復が日曜に見えるように)
-    var rec = mine(_bjKesson.recovered).filter(function (x) { return x.at === todayStr || x.at === ydayStr; });
+    // 回復は今日+昨日ぶんが対象(土曜深夜の週次同期で検知した回復が日曜に見えるように)。
+    // ただし各PCで1回表示したら以後は出さない(表示中のページでは消えない)
+    var recSeen = _bjKessonRecSeen();
+    var rec = mine(_bjKesson.recovered).filter(function (x) {
+      if (x.at !== todayStr && x.at !== ydayStr) return false;
+      var k = x.corp + '|' + x.store + '|' + x.date;
+      return _bjKessonRecShown[k] || !recSeen[k];
+    });
     // 店休OKの印で仕分け(印が効くのは法人ページのみ)
     var canOk = _bjKessonOkCan();
     var marks = canOk ? (_bjKessonOkSt.marks || {}) : {};
@@ -2521,6 +2543,26 @@ function _bjKessonRender() {
       if (vis.length) shown.push({ m: m, vis: vis });
       if (hid.length) okd.push({ m: m, hid: hid });
     });
+    // 4Pと20Sの同じ店は1つにまとめて表示(欠けている日付が同じ場合だけ)。表記=「店名（4P20S）」(2026-09-14ユーザー指示)
+    var dispShown = [];
+    (function () {
+      var byKey = {}, used = {};
+      shown.forEach(function (e) { byKey[e.m.corp + '|' + e.m.store] = e; });
+      shown.forEach(function (e) {
+        var k = e.m.corp + '|' + e.m.store;
+        if (used[k]) return;
+        var isP = /（4P）$/.test(e.m.store);
+        var base = e.m.store.replace(/（4P）$/, '');
+        var pair = byKey[e.m.corp + '|' + (isP ? base : base + '（4P）')];
+        if (pair && !used[e.m.corp + '|' + pair.m.store] && pair.vis.join(',') === e.vis.join(',')) {
+          used[k] = 1; used[e.m.corp + '|' + pair.m.store] = 1;
+          dispShown.push({ corp: e.m.corp, name: base + '（4P20S）', stores: [base, base + '（4P）'], vis: e.vis });
+        } else {
+          used[k] = 1;
+          dispShown.push({ corp: e.m.corp, name: e.m.store, stores: [e.m.store], vis: e.vis });
+        }
+      });
+    })();
     var bar = document.getElementById('bjKessonBar');
     if (!shown.length && !rec.length && !okd.length) { if (bar) bar.style.display = 'none'; return; }
     if (!bar) {
@@ -2543,12 +2585,12 @@ function _bjKessonRender() {
       : '';
     var html = '';
     if (shown.length) {
-      var parts = shown.map(function (e, i) {
+      var parts = dispShown.map(function (e, i) {
         var btn = canOk
           ? ' <button type="button" data-bjko="' + i + '" title="この欠損を店休（データ無しで正常）として帯から外す" '
             + 'style="font-size:11px;padding:0 6px;border:1px solid #d9a520;border-radius:6px;background:#fffdf5;color:#92400e;cursor:pointer;vertical-align:1px;">店休OK</button>'
           : '';
-        return label(e.m) + '（' + whenTxt(e.vis) + '）' + btn;
+        return label({ corp: e.corp, store: e.name }) + '（' + whenTxt(e.vis) + '）' + btn;
       });
       html += '<div style="background:#fff8e1;border:1px solid #f5c542;border-left-width:4px;border-radius:8px;'
             + 'padding:8px 14px;margin:8px 16px 0;font-size:13px;line-height:1.7;color:#92400e;">'
@@ -2571,21 +2613,45 @@ function _bjKessonRender() {
             + '店休OKにした欠損： ' + parts3.join('、') + '</div>';
     }
     if (rec.length) {
-      var parts2 = rec.map(function (m) { return label(m) + 'の' + _bjKessonMd(m.date) + '分'; });
+      // ここも4Pと20Sの同じ店×同じ日付は1つにまとめる
+      var parts2 = [], usedR = {}, byR = {};
+      rec.forEach(function (x) { byR[x.corp + '|' + x.store + '|' + x.date] = x; });
+      rec.forEach(function (x) {
+        var k = x.corp + '|' + x.store + '|' + x.date;
+        if (usedR[k]) return;
+        var isP = /（4P）$/.test(x.store);
+        var base = x.store.replace(/（4P）$/, '');
+        var pair = byR[x.corp + '|' + (isP ? base : base + '（4P）') + '|' + x.date];
+        if (pair) {
+          usedR[k] = 1; usedR[x.corp + '|' + pair.store + '|' + x.date] = 1;
+          parts2.push(label({ corp: x.corp, store: base + '（4P20S）' }) + 'の' + _bjKessonMd(x.date) + '分');
+        } else {
+          usedR[k] = 1;
+          parts2.push(label(x) + 'の' + _bjKessonMd(x.date) + '分');
+        }
+      });
       html += '<div style="background:#ecfdf5;border:1px solid #34d399;border-left-width:4px;border-radius:8px;'
             + 'padding:8px 14px;margin:8px 16px 0;font-size:13px;line-height:1.7;color:#065f46;">'
             + '遅れていたデータが届きました（反映済み）： ' + parts2.join('、') + '</div>';
     }
     bar.innerHTML = html;
     bar.style.display = '';
+    // 緑帯は「このPCで1回表示した」印を付ける(次の読み込みからは出ない・開いている間は出続ける)
+    if (rec.length) {
+      var rkeys = rec.map(function (x) { return x.corp + '|' + x.store + '|' + x.date; });
+      rkeys.forEach(function (k) { _bjKessonRecShown[k] = 1; });
+      _bjKessonRecMarkSeen(rkeys);
+    }
     // クリック配線(店名はHTMLの属性に埋めず、番号で引く)
     if (canOk) {
       Array.prototype.forEach.call(bar.querySelectorAll('button[data-bjko]'), function (el) {
         el.addEventListener('click', function () {
-          var e = shown[Number(el.getAttribute('data-bjko'))]; if (!e) return;
+          var e = dispShown[Number(el.getAttribute('data-bjko'))]; if (!e) return;
           var mdTxt = e.vis.map(_bjKessonMd).join('・');
-          if (!confirm('「' + e.m.store + '」の ' + mdTxt + ' 分を店休（データ無しで正常）としてOKにします。\nこの帯から消えます（法人内の全PCで共通）。よろしいですか？')) return;
-          _bjKessonOkApply(e.vis.map(function (d) { return _bjKessonOkKey(e.m, d); }), []);
+          if (!confirm('「' + e.name + '」の ' + mdTxt + ' 分を店休（データ無しで正常）としてOKにします。\nこの帯から消えます（法人内の全PCで共通）。よろしいですか？')) return;
+          var keys = [];
+          e.stores.forEach(function (stn) { e.vis.forEach(function (d) { keys.push(_bjKessonOkKey({ corp: e.corp, store: stn }, d)); }); });
+          _bjKessonOkApply(keys, []);
         });
       });
       Array.prototype.forEach.call(bar.querySelectorAll('button[data-bjkodel]'), function (el) {
@@ -15688,7 +15754,15 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     document.querySelectorAll('#bjTabsNav a').forEach(function(a){a.classList.toggle('on',a.dataset.r===room);});
     document.querySelectorAll('.bj-panel').forEach(function(p){p.classList.toggle('on',p.id==='bj-'+room);});
     window.scrollTo(0,0);
+    var _prevRoom = window._bjRoom;
     window._bjRoom=room;
+    // 画面を切り替えたら緑帯(回復のお知らせ)は役目を終えたとみなして消す(2026-09-14ユーザー指示)。黄色の欠損帯は残る
+    try{
+      if(_prevRoom && _prevRoom!==room && typeof _bjKessonRecShown!=='undefined' && Object.keys(_bjKessonRecShown).length){
+        _bjKessonRecShown={};
+        try{ _bjKessonRender(); }catch(e){}
+      }
+    }catch(e){}
     try{ document.body.setAttribute('data-bjroom', room); }catch(e){}
     try{ _bjUpdateContext(); }catch(e){}
     if(room==='basic'){ setTimeout(function(){ if(window.bjDrawComp) window.bjDrawComp(); },80); return; }
