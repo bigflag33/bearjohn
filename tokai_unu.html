@@ -1890,7 +1890,7 @@ const USER_LABEL = '東海UNUさん専用';               // 例: '田中さん�
 const USER_ID = 'tokai_unu';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260914-123156';
+const BJ_VERSION = '20260914-144824';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -4270,9 +4270,27 @@ function getActiveStore() {
   return getStores().find(s => s.id === getActiveStoreId()) || DEFAULT_STORE;
 }
 
+// ── 店舗の表示順(コンコルドさんの会議資料の並び・2026-09-14ユーザー指定) ──
+// スロとパチでZENT刈谷の位置だけ違う。最後に本巣・ベガビック・島、その後ろに自店2店。
+// この一覧に無い店(他法人のページ等)は従来の並びのまま(順位999999で安定ソート)。
+var BJ_STORE_ORDER_SLOT = ['サンパレス','ZENT刈谷','プレイランドキャッスル高浜','キクヤ春日井','プレイランドキャッスル春日井','マルハン新守山駅前','KEIZ尾張旭','ZENT稲沢','キクヤ穂積','キクヤ一宮','ZENT木曽川','メガガイア一宮','ラッキープラザ名古屋西インター七宝','プレイランドキャッスル大垣','ZENT豊田本店','リブレ遊援館','ZENT梅坪','ABC刈谷','ZENT住吉','コスモジャパン大府','KEIZ港','ZENT扶桑','マルハン小牧','プレイランドキャッスル熱田','KEIZ大高','ZENT555','ABC豊川','Zing大樹寺','ZENT岡崎インター','サンシャインKYORAKU南','ZENT長久手','プレイランドキャッスル天白','玉越東郷','グランワールドカップ本巣','ベガビック1200岐阜六条','キクヤ島','メガコンコルド春日井','メガコンコルド豊田インター'];
+var BJ_STORE_ORDER_PACHI = ['サンパレス','プレイランドキャッスル高浜','キクヤ春日井','プレイランドキャッスル春日井','マルハン新守山駅前','KEIZ尾張旭','ZENT稲沢','キクヤ穂積','キクヤ一宮','ZENT木曽川','メガガイア一宮','ラッキープラザ名古屋西インター七宝','プレイランドキャッスル大垣','ZENT豊田本店','リブレ遊援館','ZENT梅坪','ABC刈谷','ZENT刈谷','ZENT住吉','コスモジャパン大府','KEIZ港','ZENT扶桑','マルハン小牧','プレイランドキャッスル熱田','KEIZ大高','ABC豊川','Zing大樹寺','ZENT岡崎インター','サンシャインKYORAKU南','ZENT長久手','プレイランドキャッスル天白','玉越東郷','グランワールドカップ本巣','ベガビック1200岐阜六条','キクヤ島','メガコンコルド春日井','メガコンコルド豊田インター'];
+function bjStoreOrderIdx(name, kind) {
+  var base = String(name || '').replace(/（4P）$/, '');
+  var arr = (kind === 'pachi') ? BJ_STORE_ORDER_PACHI : BJ_STORE_ORDER_SLOT;
+  var i = arr.indexOf(base);
+  return i < 0 ? 999999 : i;
+}
 function buildStoreSelect() {
   const sel = document.getElementById('storeSelect');
-  const stores = getStores();
+  // 表示だけ会議資料の順に(スロ基準・同じ店の（4P）はスロの隣)。一覧に無い店は従来順のまま
+  const stores = getStores().slice().sort((a, b) => {
+    const ia = bjStoreOrderIdx(a.name, 'slot'), ib = bjStoreOrderIdx(b.name, 'slot');
+    if (ia >= 999999 && ib >= 999999) return 0;
+    const ka = ia * 2 + (String(a.name).includes('（4P）') ? 1 : 0);
+    const kb = ib * 2 + (String(b.name).includes('（4P）') ? 1 : 0);
+    return ka - kb;
+  });
   const activeId = getActiveStoreId();
   sel.innerHTML = stores.map(s =>
     `<option value="${s.id}" ${s.id === activeId ? 'selected' : ''}>${s.name}</option>`
@@ -20947,7 +20965,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       h[kind] = s;
       if (mates.length === 1) h[other] = mates[0];
       return { store: s, kind: kind, hall: h, label: s.name + (nameCount[s.name] > 1 ? '（' + s.key + '）' : '') };
-    }).sort(function (a, b) { return a.label.localeCompare(b.label, 'ja'); });
+    }).sort(function (a, b) {
+      // 会議資料の店順(スロ基準)。一覧に無い店同士は従来どおり五十音
+      var ia = (typeof bjStoreOrderIdx === 'function') ? bjStoreOrderIdx(a.hall.base, 'slot') : 999999;
+      var ib = (typeof bjStoreOrderIdx === 'function') ? bjStoreOrderIdx(b.hall.base, 'slot') : 999999;
+      if (ia !== ib) return ia - ib;
+      return a.label.localeCompare(b.label, 'ja');
+    });
     var sel = $('bjkaStore');
     if (!storeIndex.length) {
       sel.innerHTML = '<option value="">店舗が見つかりません</option>';
@@ -21597,6 +21621,16 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       seen[x.hall.base] = 1;
       halls.push(x.hall);
     });
+    // シートの並び=会議資料の店順(2026-09-14ユーザー指定・部門ごとに順が違う: スロはZENT刈谷が2番目・パチはABC刈谷の隣)。
+    // 一覧に無い店は末尾(五十音)。スロの全シート→パチの全シートの順に作る
+    var jobsAll = [];
+    ['slot', 'pachi'].forEach(function (kindK) {
+      halls.slice().sort(function (a, b) {
+        var ia = bjStoreOrderIdx(a.base, kindK), ib = bjStoreOrderIdx(b.base, kindK);
+        if (ia !== ib) return ia - ib;
+        return String(a.base).localeCompare(String(b.base), 'ja');
+      }).forEach(function (hh) { if (hh[kindK]) jobsAll.push({ kind: kindK, st: hh[kindK], base: hh.base }); });
+    });
     var btn = $('bjkaGenAll');
     btn.disabled = true;
     setStatus($('bjkaGenSt'), '全店ぶんを作成中...');
@@ -21621,7 +21655,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       }
       var i = 0;
       function next() {
-        if (i >= halls.length) {
+        if (i >= jobsAll.length) {
           if (!made) { setStatus($('bjkaGenSt'), errored ? ('作成に失敗しました（' + errored + '部門・詳細はブラウザのコンソール）。') : '選択期間にデータのある店がありません。', 'err'); btn.disabled = false; return; }
           setStatus($('bjkaGenSt'), 'ZIPにまとめています...');
           var kindsOut = [['slot', 'スロットメイン稼働粗利表'], ['pachi', 'パチンコメイン稼働粗利表']].filter(function (p2) { return wbs[p2[0]] && sheetCount[p2[0]] > 0; });
@@ -21644,12 +21678,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           });
           return;
         }
-        var h = halls[i++];
-        setStatus($('bjkaGenSt'), '作成中... (' + i + '/' + halls.length + ') ' + h.base);
-        var jobs = [['slot', h.slot], ['pachi', h.pachi]].filter(function (p2) { return p2[1]; });
+        var job = jobsAll[i++];
+        var h = { base: job.base };
+        setStatus($('bjkaGenSt'), '作成中... (' + i + '/' + jobsAll.length + ') ' + h.base + (job.kind === 'slot' ? '（スロ）' : '（パチ）'));
         (function nextKind(j) {
-          if (j >= jobs.length) { Promise.resolve().then(next); return; }   // setTimeoutは非表示タブで絞られるので使わない
-          var kind = jobs[j][0], st = jobs[j][1];
+          if (j >= 1) { Promise.resolve().then(next); return; }   // setTimeoutは非表示タブで絞られるので使わない
+          var kind = job.kind, st = job.st;
           var pr = recCache[st.key] ? Promise.resolve(recCache[st.key]) : getRecords(st.key).then(function (r) { recCache[st.key] = r; return r; });
           pr.then(function (records) {
             var byDate = KACore.aggregateByDate(records, kind, assign[kind]);
