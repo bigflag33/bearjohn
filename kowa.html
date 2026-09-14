@@ -1890,7 +1890,7 @@ const USER_LABEL = '興和商事さん専用';               // 例: '田中さ�
 const USER_ID = 'kowa';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260914-091206';
+const BJ_VERSION = '20260914-092726';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2647,10 +2647,21 @@ function _bjKessonRender() {
       Array.prototype.forEach.call(bar.querySelectorAll('button[data-bjko]'), function (el) {
         el.addEventListener('click', function () {
           var e = dispShown[Number(el.getAttribute('data-bjko'))]; if (!e) return;
-          var mdTxt = e.vis.map(_bjKessonMd).join('・');
-          if (!confirm('「' + e.name + '」の ' + mdTxt + ' 分を店休（データ無しで正常）としてOKにします。\nこの帯から消えます（法人内の全PCで共通）。よろしいですか？')) return;
+          var pick;
+          if (e.vis.length === 1) {
+            if (!confirm('「' + e.name + '」の ' + _bjKessonMd(e.vis[0]) + ' 分を店休（データ無しで正常）としてOKにします。\nこの帯から消えます（法人内の全PCで共通）。よろしいですか？')) return;
+            pick = e.vis;
+          } else {
+            // 複数日は「全部まとめて」か「1日ずつ選ぶ」かを選べる(例: 9/11は店休・9/12は本物の欠損)
+            if (confirm('「' + e.name + '」の ' + e.vis.length + '日分（' + e.vis.map(_bjKessonMd).join('・') + '）を店休としてまとめてOKにします。\n「OK」＝全部まとめて ／ 「キャンセル」＝日付を1日ずつ選ぶ')) {
+              pick = e.vis;
+            } else {
+              pick = e.vis.filter(function (d) { return confirm('「' + e.name + '」の ' + _bjKessonMd(d) + ' 分を店休OKにしますか？\n（OK＝この日は消す ／ キャンセル＝この日は残す）'); });
+              if (!pick.length) return;
+            }
+          }
           var keys = [];
-          e.stores.forEach(function (stn) { e.vis.forEach(function (d) { keys.push(_bjKessonOkKey({ corp: e.corp, store: stn }, d)); }); });
+          e.stores.forEach(function (stn) { pick.forEach(function (d) { keys.push(_bjKessonOkKey({ corp: e.corp, store: stn }, d)); }); });
           _bjKessonOkApply(keys, []);
         });
       });
