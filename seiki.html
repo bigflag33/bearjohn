@@ -1890,7 +1890,7 @@ const USER_LABEL = '21世紀さん専用';               // 例: '田中さん�
 const USER_ID = 'seiki';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260914-092726';
+const BJ_VERSION = '20260914-123156';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2587,8 +2587,8 @@ function _bjKessonRender() {
     if (shown.length) {
       var parts = dispShown.map(function (e, i) {
         var btn = canOk
-          ? ' <button type="button" data-bjko="' + i + '" title="この欠損を店休（データ無しで正常）として帯から外す" '
-            + 'style="font-size:11px;padding:0 6px;border:1px solid #d9a520;border-radius:6px;background:#fffdf5;color:#92400e;cursor:pointer;vertical-align:1px;">店休OK</button>'
+          ? ' <button type="button" data-bjko="' + i + '" title="店休（データ無しで正常）かどうかを確認して帯から外す" '
+            + 'style="font-size:11px;padding:0 6px;border:1px solid #d9a520;border-radius:6px;background:#fffdf5;color:#92400e;cursor:pointer;vertical-align:1px;">確認する</button>'
           : '';
         return label({ corp: e.corp, store: e.name }) + '（' + whenTxt(e.vis) + '）' + btn;
       });
