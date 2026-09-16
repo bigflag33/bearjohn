@@ -1030,10 +1030,7 @@
     </div>
     <button class="filter-btn" onclick="applyFilter()">適用</button>
     <button class="filter-btn reset" onclick="resetFilter()">リセット</button>
-    <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);white-space:nowrap;padding:4px 0;" title="IN枚数=0かつ翌日から稼働の台を集計から除外します">
-      <input type="checkbox" id="excludeSettingDay" onchange="applyFilter()" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;">
-      新台セッティング日を除外
-    </label>
+    <!-- 「新台セッティング日を除外」チェックは2026-09-16撤去。検査止め・初稼働前のゼロ行は読み込み時に全画面共通で自動除外(_bjCleanRecords) -->
   </div>
 
   <div id="aiGreetingBar" class="ai-greeting-bar" style="display:none;"></div>
@@ -1890,7 +1887,7 @@ const USER_LABEL = 'エム・アイ・ディ ジャパンさん専用';         
 const USER_ID = 'mid_japan';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260914-144824';
+const BJ_VERSION = '20260916-093314';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -2045,7 +2042,7 @@ function loadAllData() {
   const cacheKey = store.key + '|' + added.length + '|' + _bjTuneVer + '|' + (_bjRates ? 'r1' : 'r0');
   if (_loadAllCache && _loadAllCacheKey === cacheKey) return _loadAllCache;
   const base = store.id === 'ueda' ? RAW_DATA : [];
-  _loadAllCache = _bjApplyHane(_bjApplyTune([...base, ...added], store), store);
+  _loadAllCache = _bjApplyHane(_bjApplyTune(_bjCleanRecords([...base, ...added]), store), store);
   _loadAllCacheKey = cacheKey;
   return _loadAllCache;
 }
@@ -2059,7 +2056,7 @@ function _invalidateLoadAllCache() {
   _bjDataGen++;
 }
 
-// ── 機種別チューニング（コイン単価の補正）2026/08/03 単価直接入力方式 ─────
+// ── 機種別チューニング（コイン単価の入力）2026-09-16 単価再計算方式(B方式) ─────
 // 元データの推定の作られ方（データ提供元）:
 //   G数 → 推定アウト → 推定売上 = アウト × コイン単価（メーカー発表の設定1の値）
 //   セーフ = アウト + 差枚 → 景品玉 → 推定台粗利 = 推定売上 − 景品玉 × 交換単価
@@ -2067,30 +2064,23 @@ function _invalidateLoadAllCache() {
 // つまり売上が過大で、その分そのまま粗利も過大になっている。
 //
 // 直すつまみは「コイン単価」1つだけ。ホールが機種ごとに正解のコイン単価を入力する。
-//   推定単価 = Σ台売上 ÷ Σアウト（法人の20円スロット全店・その機種・その週の合算から逆算）
-//   係数 a  = 正解単価 ÷ 推定単価  …… 全店に同じ係数を掛ける（比で配る）
-//   台売上' = 台売上 × a
-//   台粗利' = その機種がその週トータルで黒字なら × a ／ 赤字なら ÷ a（赤字は膨らむ向き。
-//             掛けるだけだと赤字まで小さくなり、負けている機種を見落とす）
-// ⚠️黒字か赤字かは「この店×この機種×この週のトータル（素の台粗利の合計）」で判定する。
-//   1台1日ごとに符号を見てはいけない（2026-08-04 ユーザー差し戻し）。荒い機種は勝ち日と
-//   負け日が混ざるのが普通の姿（ただの振れ幅）で、日ごとに赤字を膨らませると二重補正になり
-//   ゴッドの台粗利が実態の半分まで落ちた。系統的なズレは清算した期間のトータルに効く。
-//   週トータルなら、後からデータが増えても過去の週の符号は変わらない＝過去の数字が動かない。
-//   同じ週の中は全レコードを同じ向きに揃える（週の合計がちょうど 合計×a／合計÷a になる）。
-// ⚠️推定単価を店ごとに出してはいけない（2026-08-03 実データで確認）。
-//   店別の逆算値には貸玉条件などによる店固有のスケール差（±5%前後・全機種で同じ向き）があり、
-//   店ごとに割るとその正しい店差まで消してしまう。全店合算から比を1つ作って全店に配る。
+// 入力された機種は、元の売上粗利を使わず「アウトと差枚」から作り直す(_bjApplyRecalc):
+//   台売上' = round(アウト × 入力単価)
+//   台粗利' = round(台売上' × (1−交換単価÷貸単価) − 差枚 × 交換単価)   …店レートは bjStoreRateOf
+// 未入力の機種はデータ元の値のまま(2026-09-16 ユーザー決定)。
+// 旧方式(〜2026-09-15)は推定単価との比で係数を掛けていたが、ホールコン実測との突き合わせで
+// 再計算方式のほうが誤差が約1/3(平均台粗利誤差 約1,260円→約400円/台日)と確認して全廃した。
+// bjTuneCorpEst(週ごとの推定単価表)は画面の「推定単価」列の表示用にだけ残っている。
 //
 // 正解単価は時期で変わる（例: ゴッドの3月と8月）ので「どの週から」を版で持つ。
 //   形: window.BJ_TUNE = { v:2, models:{ 機種名:{ vers:[{from:'',price:3.2},{from:'2026-08-03',price:3.5}] } } }
 //   from は適用開始週の月曜（週の区切りは週報と同じ 月〜日）。'' は最初から。
 //   レコードの日付が属する週で版を選ぶので、過去に入れた値は過去のまま動かない。
 //
-// アウト(IN枚数)と差枚は触らないので出玉率・勝率は不変。機種ごとの粗利率も不変。
+// アウト(IN枚数)と差枚は触らないので出玉率・勝率は不変。
 // 部門は2つ（2026-08-28 パチンコ対応）: 20円スロット＝コイン単価／4円パチンコ＝玉単価。
-//   マスタも推定単価のプールも部門ごとに完全に分ける（同名機種があっても互いに影響しない）。
-//   店舗名の末尾（4P）でパチンコの店と判定する。計算式・週の区切り・黒×赤÷のルールは両部門で同一。
+//   マスタは部門ごとに完全に分ける（同名機種があっても互いに影響しない）。
+//   店舗名の末尾（4P）でパチンコの店と判定する。計算式は両部門で同一(単価と店レートだけ違う)。
 // 設定が空のときは元の配列をそのまま返すため、従来と完全に同じ動きになる。
 window.BJ_TUNE = window.BJ_TUNE || {};
 
@@ -2207,52 +2197,105 @@ function bjTuneCorpEst(dept) {
   return tbl;
 }
 
-// 1レコードに効く係数。効かないときは 0 を返す
-function _bjTuneFactorFor(r, models, est) {
-  const m = r['機種名'], entry = m && models[m];
-  if (!entry || !r.date) return 0;
-  const price = bjTunePriceAt(entry, r.date);
-  if (price === null) return 0;
-  const e = est[m + '|' + bjTuneMonday(r.date)];
-  const pe = (e && e.o > 0) ? e.s / e.o : 0;     // 推定単価（全店合算・この週）
-  if (!(pe > 0)) return 0;
-  const a = price / pe;
-  return (isFinite(a) && a > 0) ? a : 0;
+// ── 店舗レートのマスタ(2026-09-16 根本改造) ──────────────────────────────
+// 法人の箱(kind='rates'・ホールの実数)を正とし、無い店はデータ元由来のrates.json(パチのみ)→等価の順で代用。
+// 形: {v:1, stores:{基底店名:{pk:P貸, pt:P交換単価, sk:S貸, st:S交換単価}}} 単位はすべて円。
+// データ元(pision)のレート登録は実数と食い違いが多いことを実測で確認済み(2026-09-16・28店中16店)なのでマスタにしない。
+window.BJ_STORE_RATES = null;
+var _bjStoreRatesIdx = null;   // 正規化キー→値(店名の表記ゆれ対策)
+function _bjAdoptStoreRates(rv) {
+  window.BJ_STORE_RATES = rv;
+  _bjStoreRatesIdx = {};
+  try { Object.keys(rv.stores || {}).forEach(function (k) { _bjStoreRatesIdx[_bjRateKey(k)] = rv.stores[k]; }); } catch (e) {}
+  try { localStorage.setItem(USER_ID + '_bj_rates_box', JSON.stringify(rv)); } catch (e) {}
 }
-
-// 符号表＝この店の「機種×週」ごとの素の台粗利の合計。黒字週は×a・赤字週は÷aの判定に使う
-function _bjTuneSignTable(records, models) {
-  const sign = {};
-  for (let i = 0; i < records.length; i++) {
-    const r = records[i], m = r['機種名'];
-    if (!m || !models[m] || !r.date) continue;
-    const k = m + '|' + bjTuneMonday(r.date);
-    sign[k] = (sign[k] || 0) + (r['台粗利'] || 0);
+// 前回サーバから受け取ったレートをこのPCに控えておき、初回描画から使う
+// (サーバ到着待ちの間だけ素の値で描いて、あとから黙って数字が変わるのを防ぐ。2026-09-16レビュー指摘)
+(function () {
+  try {
+    var s = localStorage.getItem(USER_ID + '_bj_rates_box');
+    if (s) { var v = JSON.parse(s); if (v && v.stores) _bjAdoptStoreRates(v); }
+  } catch (e) {}
+})();
+// 店→{kashi:貸単価, kokan:交換単価, src:'box'|'pision'|'touka'}(部門は店名の（4P）で判定)
+function bjStoreRateOf(store) {
+  var name = String((store && store.name) || '');
+  var isP = bjTuneIsPachi(name);
+  var key = _bjRateKey(name.replace(/[（(]4P[）)]\s*$/, ''));
+  var v = _bjStoreRatesIdx && _bjStoreRatesIdx[key];
+  if (v) {
+    if (isP && v.pk > 0) return { kashi: v.pk, kokan: (v.pt > 0 ? v.pt : v.pk), src: 'box' };
+    if (!isP && v.sk > 0) return { kashi: v.sk, kokan: (v.st > 0 ? v.st : v.sk), src: 'box' };
   }
-  return sign;
+  var r = (_bjRates && _bjRates.stores && _bjRates.stores[key]) || null;   // データ元由来(パチの玉数形式のみ)
+  // パチはデータ元の登録レートでも再計算してよい: データ元の粗利自体が同じ登録レートで計算されている
+  // =レートの誤差は素の値と共通で、再計算は単価側だけを直す(等価「仮定」とは条件が違う)
+  if (isP && r && r.kashi > 0) return { kashi: r.kashi, kokan: (r.kokan > 0 ? 100 / r.kokan : r.kashi), src: 'pision' };
+  return isP ? { kashi: 4.0, kokan: 4.0, src: 'touka' } : { kashi: 20.0, kokan: 20.0, src: 'touka' };
 }
 
-// 補正の本体。models を差し替えられる形＝保存前のプレビューでも同じ計算を使う
-// models はその店の部門のマスタを渡すこと（スロット店にパチンコのマスタを渡さない）
-function _bjApplyTuneWith(records, store, models) {
-  // 業界ベンチマークは他社比較の物差しなので補正しない
+// ── データ掃除(2026-09-16): 集計を汚す2種類のゼロ行を共通口で落とす ──────────
+// ①ゼロ行型の店休: 店全体のアウトが0の日(データ元が店休を0埋め行で返す店がある。実例=ZENT住吉9/8ほか)
+// ②新台の検査止め: 機種×台番ごとに「初めてアウト>0になった日」より前のゼロ行(実例=リコリコ5店)
+// 営業中にたまたまアウト0の台は残す(既定②「未稼働台も台数・アウトに含める」は不変)。
+function _bjCleanRecords(recs) {
+  if (!recs || !recs.length) return recs;
+  try {
+    var day = {}, firstOn = {};
+    for (var i = 0; i < recs.length; i++) {
+      var r = recs[i], o = +r['IN枚数'] || 0;
+      var d = day[r.date] || (day[r.date] = { o: 0, m: 0 });
+      d.o += o;
+      d.m += Math.abs(+r['台売上'] || 0) + Math.abs(+r['台粗利'] || 0);
+      if (o > 0) {
+        var k = r['機種名'] + '|' + r['台番'];
+        if (!firstOn[k] || r.date < firstOn[k]) firstOn[k] = r.date;
+      }
+    }
+    var out = [], dropped = 0;
+    for (var j = 0; j < recs.length; j++) {
+      var r2 = recs[j], dd = day[r2.date];
+      // 金額も見る=アウト列が欠けたデータ(将来の別ルート店など)を「店休」と誤認して丸ごと消さない保険
+      if (dd && dd.o === 0 && dd.m === 0) { dropped++; continue; }   // ①店休(全台アウト0かつ金額も全部0の日)
+      if ((+r2['IN枚数'] || 0) === 0 && !(+r2['台売上'] || 0) && !(+r2['台粗利'] || 0)) {
+        var f = firstOn[r2['機種名'] + '|' + r2['台番']];
+        if (!f || r2.date < f) { dropped++; continue; }          // ②検査止め(初稼働前)・一度も稼働の無い台のゼロ
+      }
+      out.push(r2);
+    }
+    return dropped ? out : recs;
+  } catch (e) { return recs; }
+}
+
+// ── 単価再計算(2026-09-16 根本改造・旧「係数チューニング」を全廃) ──────────────
+// 売上 = アウト × 入力単価(機種×月の版) ／ 粗利 = 売上×(1−交換単価÷貸単価) − 差枚×交換単価
+// データ元の売上粗利には依存しない(アウト・差枚・G数はデータ元のまま)。
+// 単価が未入力の機種はデータ元の値のまま(ユーザー決定 2026-09-16)。ベンチマークは物差しなので触らない。
+// 正解データ(ホールコン実測)との突き合わせで旧係数方式より誤差1/3を確認済み(2026-09-14 豊田インター検証)。
+function _bjApplyRecalc(records, store, models) {
   if (!store || store.id === '__benchmark__') return records;
-  if (!models || !Object.keys(models).length) return records;   // 設定なし＝素のまま（同じ配列を返す）
-  const est = bjTuneCorpEst(bjTuneDeptOf(store));   // 部門の全店合算＝店固有のスケール差を消さない
-  const sign = _bjTuneSignTable(records, models);   // 符号はこの店の週トータルで見る
-  return records.map(r => {
-    const a = _bjTuneFactorFor(r, models, est);
-    if (!a || Math.abs(a - 1) < 1e-9) return r;                 // 対象外の機種は複製しない（巨大店舗の負荷対策）
-    const c = Object.assign({}, r);
-    const s0 = r['台売上'] || 0, p0 = r['台粗利'] || 0;
-    const wkNet = sign[r['機種名'] + '|' + bjTuneMonday(r.date)] || 0;
-    c['台売上'] = Math.round(s0 * a);
-    c['台粗利'] = Math.round(wkNet >= 0 ? p0 * a : p0 / a);     // 週トータル黒字は掛け、赤字は割る
+  if (!models || !Object.keys(models).length) return records;   // 設定なし(提供外の法人含む)＝素のまま
+  var rate = bjStoreRateOf(store);
+  // ⚠️レートが登録されていない店は再計算しない(データ元の値のまま)。
+  //   等価と仮定して再計算すると誤差が素の値より悪化することを実測で確認済み
+  //   (豊田インター×ホールコン正解: 素1,278円/台日・B実レート601円・B等価仮定3,380円。2026-09-16)。
+  //   実数が箱に入った店から順にB方式が効き始める。ほんとうに等価の店は箱に等価と登録されている。
+  if (rate.src === 'touka') return records;
+  var kf = 1 - (rate.kokan / rate.kashi);
+  return records.map(function (r) {
+    var m = r['機種名'], entry = m && models[m];
+    if (!entry || !r.date) return r;
+    var price = bjTunePriceAt(entry, r.date);
+    if (price === null) return r;
+    var c = Object.assign({}, r);
+    var sales = Math.round((+r['IN枚数'] || 0) * price);
+    c['台売上'] = sales;
+    c['台粗利'] = Math.round(sales * kf - (+r['差枚'] || 0) * rate.kokan);
     return c;
   });
 }
 
-function _bjApplyTune(records, store) { return _bjApplyTuneWith(records, store, bjTuneDeptModels(bjTuneDeptOf(store))); }
+function _bjApplyTune(records, store) { return _bjApplyRecalc(records, store, bjTuneDeptModels(bjTuneDeptOf(store))); }
 
 // ── 羽根モノの売上・粗利の逆算（2026-09-07）──
 // データ元は羽根モノの金額を計算しない（全行0円）。アウト・差枚は正確（豊田のホールコン実測と玉単位で一致を確認済み）なので、
@@ -2280,10 +2323,9 @@ var _bjRates = null;   // rates.json（店名キーはNFC+空白除去）
 function _bjRateKey(x) { try { return String(x || '').normalize('NFC').replace(/[\s　]/g, ''); } catch (e) { return String(x || ''); } }
 function _bjApplyHane(records, store) {
   if (!store || store.id === '__benchmark__') return records;
-  var baseName = String(store.name || '').replace(/（4P）$/, '');
-  var rate = (_bjRates && _bjRates.stores && _bjRates.stores[_bjRateKey(baseName)]) || null;
-  var kashi = (rate && rate.kashi > 0) ? rate.kashi : 4.0;
-  var kokanTanka = (rate && rate.kokan > 0) ? (100 / rate.kokan) : kashi;   // 交換率の情報が無い店は等価として扱う
+  var rt = bjStoreRateOf(store);   // 箱(実数)→データ元→等価の順(2026-09-16にマスタを一本化)
+  var kashi = rt.kashi;
+  var kokanTanka = rt.kokan;
   var pachiTune = bjTunePachi();
   return records.map(function (r) {
     if ((r['台売上'] || 0) !== 0 || (r['台粗利'] || 0) !== 0) return r;   // 金額が入っている行は触らない
@@ -2301,13 +2343,14 @@ function _bjApplyHane(records, store) {
     return c;
   });
 }
-// キーからDB_CACHEを読み、羽根モノ埋めを通して返す（店舗比較・挨拶・稼働粗利表などloadAllDataを通らない読み手用）
+// キーからDB_CACHEを読み、loadAllDataと同じ加工(掃除→単価再計算→羽根モノ埋め)を通して返す
+// (店舗比較・挨拶・稼働粗利表などloadAllDataを通らない読み手用。2026-09-16からB方式を通す=画面とExcelの数字が一致する)
 function _bjCacheHane(key) {
   var recs = (typeof DB_CACHE !== 'undefined' && DB_CACHE[key]) || [];
   if (!recs.length) return recs;
   try {
     var st = (getStores() || []).find(function (x) { return x.key === key; });
-    return st ? _bjApplyHane(recs, st) : recs;
+    return st ? _bjApplyHane(_bjApplyTune(_bjCleanRecords(recs), st), st) : recs;
   } catch (e) { return recs; }
 }
 // 交換率一覧の読み込み（全ページ共通・失敗しても等価扱いで動く）
@@ -2725,19 +2768,20 @@ function _bjKessonOkWatch() {
 // models はその店の部門のマスタを渡すこと
 function bjTuneTotals(records, store, models) {
   const t = { s0: 0, p0: 0, s1: 0, p1: 0 };
-  const on = store && store.id !== '__benchmark__'
-             && models && Object.keys(models).length;
-  const est = on ? bjTuneCorpEst(bjTuneDeptOf(store)) : null;
-  const sign = on ? _bjTuneSignTable(records, models) : null;
+  let rate = (store && store.id !== '__benchmark__' && models && Object.keys(models).length) ? bjStoreRateOf(store) : null;
+  if (rate && rate.src === 'touka') rate = null;   // レート未登録の店は再計算しない(_bjApplyRecalcと同じガード)
+  const on = !!rate;
+  const kf = rate ? (1 - rate.kokan / rate.kashi) : 0;
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     const s0 = r['台売上'] || 0, p0 = r['台粗利'] || 0;
     t.s0 += s0; t.p0 += p0;
-    const a = on ? _bjTuneFactorFor(r, models, est) : 0;
-    if (a) {
-      const wkNet = sign[r['機種名'] + '|' + bjTuneMonday(r.date)] || 0;
-      t.s1 += Math.round(s0 * a);
-      t.p1 += Math.round(wkNet >= 0 ? p0 * a : p0 / a);
+    const entry = on && r['機種名'] && models[r['機種名']];
+    const price = (entry && r.date) ? bjTunePriceAt(entry, r.date) : null;
+    if (price !== null && price !== undefined) {
+      const sales = Math.round((+r['IN枚数'] || 0) * price);
+      t.s1 += sales;
+      t.p1 += Math.round(sales * kf - (+r['差枚'] || 0) * rate.kokan);
     }
     else { t.s1 += s0; t.p1 += p0; }
   }
@@ -4049,67 +4093,18 @@ function init() {
   if (_initAllD.length) document.getElementById('pinDateInput').value = _initAllD[_initAllD.length-1];
 }
 
-// 新台セッティング日を判定する：
-// 条件：その機種・台番がデータ上で「初登場」した日 かつ IN枚数=0 かつ 翌営業日に稼働している
-function buildSettingDaySet(data) {
-  const settingSet = new Set();
-
-  // 機種名_台番 → { dates: [ソート済み], dateInMap: {date: IN枚数} }
-  const machineMap = {};
-  for (const r of data) {
-    const mKey = `${r['機種名']}_${r['台番']}`;
-    if (!machineMap[mKey]) machineMap[mKey] = { dates: [], dateInMap: {} };
-    machineMap[mKey].dates.push(r.date);
-    machineMap[mKey].dateInMap[r.date] = (r['IN枚数'] || 0);
-  }
-
-  // 全日付をソート（翌日検索用）
-  const allDates = [...new Set(data.map(d => d.date))].sort();
-  const dateIdx  = {};
-  allDates.forEach((d, i) => dateIdx[d] = i);
-
-  for (const mKey of Object.keys(machineMap)) {
-    const { dates, dateInMap } = machineMap[mKey];
-    const sortedDates = [...new Set(dates)].sort();
-    const firstDate   = sortedDates[0];                    // この機種・台番の初登場日
-
-    if ((dateInMap[firstDate] || 0) > 0) continue;        // 初日に稼働あり → セッティング日ではない
-
-    // 翌営業日（データ上の次の日付）を取得
-    const idx = dateIdx[firstDate];
-    if (idx === undefined || idx >= allDates.length - 1) continue;
-    const nextDate = allDates[idx + 1];
-    const nextIn   = dateInMap[nextDate];
-    if (nextIn > 0) {
-      settingSet.add(`${firstDate}_${mKey}`);              // 初日セッティングとして記録
-    }
-  }
-  return settingSet;
-}
-
+// (旧「新台セッティング日を除外」機能は2026-09-16撤去。_bjCleanRecordsが初稼働前のゼロ行を読み込み時に自動除外する)
 function applyFilter() {
   const from  = document.getElementById('dateFrom').value;
   const to    = document.getElementById('dateTo').value;
   const model = document.getElementById('modelFilter').value;
-  const excludeSetting = document.getElementById('excludeSettingDay')?.checked;
   const all   = loadAllData();
-
-  // セッティング日セットを事前構築（チェック時のみ）
-  const settingSet = excludeSetting ? buildSettingDaySet(all) : null;
 
   filtered = all.filter(d => {
     if (d.date < from || d.date > to) return false;
     if (model && d['機種名'] !== model) return false;
-    if (settingSet) {
-      if (settingSet.has(`${d.date}_${d['機種名']}_${d['台番']}`)) return false;
-    }
     return true;
   });
-
-  // 除外件数をメッセージ表示
-  if (settingSet && settingSet.size > 0) {
-    showMsg(`新台セッティング日: ${settingSet.size}件を除外しました`, 'ok');
-  }
 
   render();
 }
@@ -5137,13 +5132,12 @@ function _makeRenderKey() {
   const from  = document.getElementById('dateFrom')?.value || '';
   const to    = document.getElementById('dateTo')?.value   || '';
   const model = document.getElementById('modelFilter')?.value || '';
-  const excl  = document.getElementById('excludeSettingDay')?.checked ? '1' : '0';
   const store = _activeStore().key;
   const dataLen = loadAllData().length;
   // 機種別チューニングの世代も入れる。件数は変わらないので、これが無いと
   // 補正を変えても「同じ条件だ」と判断されて重い関数の再計算がとばされる
   const tune = (typeof _bjTuneVer !== 'undefined') ? _bjTuneVer : 0;
-  return `${store}|${from}|${to}|${model}|${excl}|${dataLen}|${tune}`;
+  return `${store}|${from}|${to}|${model}|${dataLen}|${tune}`;
 }
 
 function render() {
@@ -17716,10 +17710,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }catch(e){ console.error('bjwr', e); host.innerHTML=''; }
   }
 
-  // ═══ 機種別チューニング（コイン単価の補正）2026/08/03 単価直接入力方式 ═══
+  // ═══ 機種別チューニング（コイン単価の入力）2026-09-16 単価再計算方式 ═══
   // 設計：法人の20円スロット全店から機種一覧を自動で作り、機種ごとに「正解のコイン単価」を入力する。
-  //  ・係数 = 正解単価 ÷ 推定単価（データから逆算）。売上×係数、粗利は黒字×係数・赤字÷係数
-  //  ・単価は時期で変わるので「どの週から」を版で持つ（週の区切りは週報と同じ 月〜日）
+  //  ・入力した機種は アウト×入力単価＋店レート で売上粗利を作り直す(_bjApplyRecalc。旧・係数方式は2026-09-16全廃)
+  //  ・単価は時期で変わるので「どの月から」を版で持つ
   //  ・新台はデータを取り込んだ時点で「未入力」として自動で現れる。毎回ゼロから入れ直す必要はない
   //  ・実際に掛ける処理は loadAllData()（本体上部）。ここは一覧を見せて単価を入力する画面
   // 画面（2026-09-02 月次刷新。ユーザー承認済みのモック _mockups/tune_monthly_mock.html が原型）:
@@ -17888,6 +17882,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       .then(function(j){
         // 読み込んでいる間にこのPCで保存されたら、その種別の返事は捨てる（保存を消さないため）。単価と新台価格は別々に判定
         var useT=(rev===_bjtRev), useP=(revP===_bjtRevP), useS=(revS===_bjtRevS);
+        // 交換率マスタ(kind='rates')はBIに編集UIが無い=消える保存が無いので、rev判定に関係なく毎回採用してよい
+        try{
+          (j.items||[]).forEach(function(it){
+            if(it.kind!=='rates') return;
+            var rr=JSON.parse(it.value);
+            if(rr && typeof rr==='object' && rr.stores && JSON.stringify(rr)!==JSON.stringify(window.BJ_STORE_RATES||null)){
+              _bjAdoptStoreRates(rr);   // localStorageにも控える=次回は初回描画から効く
+              if(typeof bjTuneBump==='function') bjTuneBump();   // 単価再計算の粗利が店レートに依存するため下流キャッシュも作り直す
+              _bjtAfterChange();        // 表示中の画面もその場で描き直す(黙って数字が変わったように見せない)
+            }
+          });
+        }catch(e){}
         if(!useT && !useP && !useS){ _bjtSyncState='ok'; _bjtNotice();
           if(window._bjRoom==='tune'){ try{ _bjtSyncLine(); }catch(e){} } return; }
         var models=null, pachi=null, meta=null, pm=null, pp=null, pd=null, sm=null;
@@ -18063,8 +18069,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       for(var wk3 in a2.wn){ a2.nets30.push(a2.wn[wk3]); a2.p30+=a2.wn[wk3]; }
       delete a2.wn;
       // 推定単価（全店合算）。直近30日ぶんが基本、無ければ全期間から。
-      // 店別の逆算値には貸玉条件による店固有のスケール差（±5%前後）があるが、それは正しい店差
-      // なので警告しない。係数は全店合算の比で1つ＝店差は素の数字のまま保たれる（2026-08-03確認）
+      // 画面の「推定単価」列と保存時の打ち間違いチェックに使う目安(2026-09-16から売上粗利の計算そのものには使わない)
       a2.price = a2.o30>0 ? a2.s30/a2.o30 : (a2.fullO>0 ? a2.fullS/a2.fullO : 0);
       // 導入年月が「分かる」条件: その初出日を出した店の、店自身のデータ開始+7日より後に現れたこと。
       // 店のデータ開始と同時に居る機種は「前から有ったかもしれない」ので不明扱い(後から参加した店の
@@ -18370,6 +18375,53 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     });
   }
 
+  // 交換率レート一覧(2026-09-16・閲覧のみ)。単価再計算が使う貸単価・交換単価を店ごとに確かめる場所
+  // 編集UIは意図的に無し(マスタは法人の箱kind='rates'・更新はベアジョン側で実施)
+  function _bjtRatesOpen(){
+    var old=document.getElementById('bjtRatesOv'); if(old) old.remove();
+    var stores=[];
+    try{ stores=(getStores()||[]).filter(function(s){ return s && s.id!=='__benchmark__' && s.name!=='デフォルト店舗' && s.name!=='機種フォーマッタテスト店舗'; }); }catch(e){}
+    var rows='';
+    stores.forEach(function(s){
+      var rt=bjStoreRateOf(s);
+      var isP=bjTuneIsPachi(s.name);
+      var srcTxt = rt.src==='box' ? 'ホール実数' : (rt.src==='pision' ? 'データ提供元の登録値' : '未登録（再計算しない・データ提供元の値のまま）');
+      var srcCol = rt.src==='box' ? 'var(--accent)' : (rt.src==='pision' ? 'var(--text2)' : 'var(--accent4)');
+      var kokan = Math.round(rt.kokan*10000)/10000;
+      var toka = Math.abs(rt.kashi-rt.kokan)<1e-9;
+      rows+='<tr>'
+        +'<td style="padding:6px 10px;border-bottom:1px solid var(--border);">'+_bjKessonEsc(s.name)+'</td>'
+        +'<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;">'+(isP?'パチンコ':'スロット')+'</td>'
+        +'<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;">'+rt.kashi+'円</td>'
+        +'<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;">'+kokan+'円</td>'
+        +'<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:center;">'+(toka?'等価':'非等価')+'</td>'
+        +'<td style="padding:6px 10px;border-bottom:1px solid var(--border);color:'+srcCol+';font-weight:600;">'+srcTxt+'</td>'
+        +'</tr>';
+    });
+    var ov=document.createElement('div');
+    ov.id='bjtRatesOv';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.innerHTML='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;max-width:780px;width:100%;max-height:82vh;overflow:auto;padding:18px 20px;color:var(--text);">'
+      +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">'
+      +'<b style="font-size:15px;">交換率レート一覧</b>'
+      +'<span style="font-size:11px;color:var(--text2);">単価再計算で使う貸単価・交換単価（閲覧のみ）</span>'
+      +'<button type="button" id="bjtRatesClose" class="bjt-btn" style="margin-left:auto;">閉じる</button></div>'
+      +'<div style="font-size:11px;color:var(--text2);margin-bottom:10px;">粗利の計算式：売上×(1−交換単価÷貸単価) − 差枚(差玉)×交換単価。レートが「未登録」の店舗は実数をいただくまで単価の再計算をせず、データ提供元の値のまま表示します。内容を直したいときはベアジョン窓口までご連絡ください（この画面からは変更できません）。</div>'
+      +'<table style="width:100%;border-collapse:collapse;font-size:12px;">'
+      +'<thead><tr>'
+      +'<th style="padding:6px 10px;border-bottom:2px solid var(--border);text-align:left;color:var(--text2);">店舗</th>'
+      +'<th style="padding:6px 10px;border-bottom:2px solid var(--border);color:var(--text2);">部門</th>'
+      +'<th style="padding:6px 10px;border-bottom:2px solid var(--border);text-align:right;color:var(--text2);">貸単価</th>'
+      +'<th style="padding:6px 10px;border-bottom:2px solid var(--border);text-align:right;color:var(--text2);">交換単価</th>'
+      +'<th style="padding:6px 10px;border-bottom:2px solid var(--border);color:var(--text2);">等価/非等価</th>'
+      +'<th style="padding:6px 10px;border-bottom:2px solid var(--border);text-align:left;color:var(--text2);">数字の出どころ</th>'
+      +'</tr></thead>'
+      +'<tbody>'+rows+'</tbody></table></div>';
+    ov.addEventListener('click', function(ev){ if(ev.target===ov) ov.remove(); });
+    document.body.appendChild(ov);
+    var cb=document.getElementById('bjtRatesClose'); if(cb) cb.addEventListener('click', function(){ ov.remove(); });
+  }
+
   function _bjtRender(){
     var host=document.getElementById('bjtBody'); if(!host) return;
     var st=_bjtStats();
@@ -18466,13 +18518,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(before && !after){ removed++; return; }
       if(!after) return;
       changed++;
-      if(_bjtIsPrice()) return;   // 新台価格は係数の話ではない
-      // 係数の極端チェックは「いま効く値」で（推定単価は直近30日の全店合算）
+      if(_bjtIsPrice()) return;   // 新台価格は単価の話ではない
+      // 打ち間違いチェック: 入力単価が推定単価(直近30日の全店合算)から大きく外れていたら注意を出す(保存は止めない)
       var r=by[n];
       var cur=bjTunePriceAt({vers:after.vers}, st.last||_bjtToday());
       if(cur!=null && r && r.price>0){
         var a=cur/r.price;
-        if(a<0.5||a>1.5) warn.push(n+'：係数 '+a.toFixed(3)+' は極端です。入力の打ち間違いがないかご確認ください');
+        if(a<0.5||a>1.5) warn.push(n+'：入力単価が推定単価の '+a.toFixed(2)+' 倍と極端です。打ち間違いがないかご確認ください');
       }
     });
     _bjtStore(_bjtComposeSave(nx.models));   // 表示中の部門だけ差し替え（もう片方は無傷）
@@ -19049,7 +19101,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     panel.innerHTML=''
       +'<div class="bjt-head"><div class="bj-wordmark" style="font-size:21px;">MODEL TUNING</div></div>'
       +'<div class="bjt-lead">取り込んだ数値は、データ提供元が想定単価（スロットは<b>設定1のコイン単価</b>）で推定したものです。実際のホールの営業とはズレるので、売上も粗利も実態と差が出ます。<br>'
-      +'機種ごとに<b>正解の単価</b>（スロット＝コイン単価／パチンコ＝玉単価）を<b>月ごと</b>に入力すると、その比率で売上と粗利を補正します。各月の値は<b>その月の1日から</b>効き、空欄の月は前の月の値を引き継ぎます。粗利は<b>週トータルで黒字の機種は係数を掛け、赤字の機種は係数で割ります</b>（赤字は膨らむ向き。判定は店×機種×週のトータル）。<br>'
+      +'機種ごとに<b>正解の単価</b>（スロット＝コイン単価／パチンコ＝玉単価）を<b>月ごと</b>に入力すると、その機種の売上と粗利を<b>アウト×入力単価と店舗の交換率から計算し直します</b>（データ提供元の推定値を使いません。未入力の機種はデータ提供元の値のままです）。各月の値は<b>その月の1日から</b>効き、空欄の月は前の月の値を引き継ぎます。店舗ごとの貸単価・交換単価は上の<b>「交換率レート一覧」</b>で確認できます（レートが未登録の店舗は、実数をいただくまで再計算せずデータ提供元の値のままです）。<br>'
       +'部門は上の<b>スロット／パチンコ</b>で切り替えます（タブを開くと表示中の店の部門になります）。設定は部門ごとに別々で、互いに影響しません。<br>'
       +'一覧は選んだ部門の<b>全店</b>から自動で作られ、新しい機種はデータを取り込むと「未入力」として現れます。<b>セグメント・個別機種列</b>（稼働粗利表の振り分け）もこの表で設定できます（選ぶと即保存・全店共通）。<br>'
       +'まとめて直すときは<b>CSVダウンロード→Excelで修正→CSVアップロード</b>が早いです（CSVの空欄＝変更なし）。'
@@ -19072,6 +19124,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       +'<option value="6" selected>直近6か月</option><option value="12">直近12か月</option><option value="0">全部</option>'
       +'</select></label>'
       +'<span class="bjt-sp"></span>'
+      +'<button type="button" class="bjt-btn" id="bjtRatesBtn" title="この法人の貸単価・交換単価の一覧（閲覧のみ）">交換率レート一覧</button>'
       +'<button type="button" class="bjt-btn" id="bjtCsvDl">CSVダウンロード</button>'
       +'<button type="button" class="bjt-btn" id="bjtCsvUl">CSVアップロード</button>'
       +'<input type="file" id="bjtCsvFile" accept=".csv,text/csv" style="display:none">'
@@ -19129,6 +19182,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(mw) mw.addEventListener('change', function(){ _bjtMonWin=+mw.value; _bjtRender(); });
     var cdl=document.getElementById('bjtCsvDl');
     if(cdl) cdl.addEventListener('click', function(){ try{ _bjtCsvDownload(); }catch(e){ console.error('tune csv dl', e); } });
+    var rb=document.getElementById('bjtRatesBtn');
+    if(rb) rb.addEventListener('click', function(){ try{ _bjtRatesOpen(); }catch(e){ console.error('rates view', e); } });
     var cul=document.getElementById('bjtCsvUl'), cfl=document.getElementById('bjtCsvFile');
     if(cul&&cfl){
       cul.addEventListener('click', function(){ cfl.value=''; cfl.click(); });
@@ -20573,6 +20628,11 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   var storeIndex = [], hall = null, curKind = 'slot';
   var allMode = false;                    // true=「全店舗まとめて」(振り分け専用モード・Excel作成は不可)
   var recCache = {}, models = { slot: [], pachi: [] };
+  // recCacheの世代管理(2026-09-16): 単価保存・レート到着(_bjTuneVer)やデータ入れ替え(_bjDataGen)で作り直す。
+  // 固めっぱなしだと同じセッション内の変更が稼働粗利表Excelに乗らず、画面と数字がズレる(レビュー指摘)
+  function _kaRecGen() { return (typeof _bjTuneVer !== 'undefined' ? _bjTuneVer : 0) + 'g' + (typeof _bjDataGen !== 'undefined' ? _bjDataGen : 0); }
+  function _kaRec(key) { var g = _kaRecGen(); if (recCache.__gen !== g) recCache = { __gen: g }; return recCache[key]; }
+  function _kaRecPut(key, r) { var g = _kaRecGen(); if (recCache.__gen !== g) recCache = { __gen: g }; recCache[key] = r; return r; }
   var saved = null, columns = null, storeCols = null;
   var uiValues = { slot: {}, pachi: {} };
   var colDraft = null, colDraftKind = null;
@@ -21012,7 +21072,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     (function next(i) {
       if (i >= jobs.length) { done(); return; }
       var kind = jobs[i][0], st = jobs[i][1];
-      var p = recCache[st.key] ? Promise.resolve(recCache[st.key]) : getRecords(st.key).then(function (r) { recCache[st.key] = r; return r; });
+      var _c0 = _kaRec(st.key);
+      var p = _c0 ? Promise.resolve(_c0) : getRecords(st.key).then(function (r) { return _kaRecPut(st.key, r); });
       p.then(function (recs) {
         if (gen !== loadGen) return;
         total += recs.length;
@@ -21083,7 +21144,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var s = stores[i];
       var kind = kindOf(s.name);
       setStatus($('bjkaLoad'), '読み込み中... (' + (i + 1) + '/' + stores.length + '店)');
-      var p = recCache[s.key] ? Promise.resolve(recCache[s.key]) : getRecords(s.key).then(function (r) { recCache[s.key] = r; return r; });
+      var _c1 = _kaRec(s.key);
+      var p = _c1 ? Promise.resolve(_c1) : getRecords(s.key).then(function (r) { return _kaRecPut(s.key, r); });
       p.then(function (recs) {
         if (gen !== loadGen) return;
         var latest = '';
@@ -21536,7 +21598,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     btn.disabled = true;
     setStatus($('bjkaGenSt'), '作成中...');
     ensureExcelJS().then(function (EJ) {
-      var records = recCache[st.key] || [];
+      var records = _kaRec(st.key) || (typeof _bjCacheHane === 'function' && typeof DB_CACHE !== 'undefined' && DB_CACHE[st.key] ? _kaRecPut(st.key, _bjCacheHane(st.key)) : []);
       var scCustom = Array.isArray((storeCols[h.base] || {})[kind]) && (storeCols[h.base] || {})[kind].length > 0;
       var layout = KACore.computeLayout(kind, effCols(kind, h.base));
       var byDate = KACore.aggregateByDate(records, kind, assign);
@@ -21684,7 +21746,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         (function nextKind(j) {
           if (j >= 1) { Promise.resolve().then(next); return; }   // setTimeoutは非表示タブで絞られるので使わない
           var kind = job.kind, st = job.st;
-          var pr = recCache[st.key] ? Promise.resolve(recCache[st.key]) : getRecords(st.key).then(function (r) { recCache[st.key] = r; return r; });
+          var _c2 = _kaRec(st.key);
+          var pr = _c2 ? Promise.resolve(_c2) : getRecords(st.key).then(function (r) { return _kaRecPut(st.key, r); });
           pr.then(function (records) {
             var byDate = KACore.aggregateByDate(records, kind, assign[kind]);
             var hasData = Object.keys(byDate).some(function (d) { return d >= from && d <= to; });
