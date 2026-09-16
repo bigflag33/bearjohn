@@ -1887,7 +1887,7 @@ const USER_LABEL = 'ダイナムさん専用';               // 例: '田中さ�
 const USER_ID = 'dynam';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260916-093314';
+const BJ_VERSION = '20260916-111724';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -18074,14 +18074,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       // 導入年月が「分かる」条件: その初出日を出した店の、店自身のデータ開始+7日より後に現れたこと。
       // 店のデータ開始と同時に居る機種は「前から有ったかもしれない」ので不明扱い(後から参加した店の
       // 過去データ回収で、到着月が導入月に化けるのを防ぐ。2026-09-10 レビュー指摘の修正)
-      a2.introKnown=false;
-      if(a2.first && a2.fsBy){
+      // 2026-09-16 改良: 審査を「初出が一番早い店」だけでなく全店に広げる。
+      // 後から参加した店(データ開始と同時にその機種が居る店=マルハン2店など)が最速初出を独占すると、
+      // 本物の9月新台(リコリコ・タコスロ等)まで不明扱いになった(同日ユーザー報告)。
+      // 合格条件は従来と同じ(店のデータ開始+7日より後に初出・直前30日にその店のデータあり)で、
+      // 合格した店の中で一番早い初出日を導入日(introFirst)にする。合格店ゼロなら従来どおり「—」。
+      // r.first(法人データでの素の初出)は月セルの入力可否判定に使うため従来のまま残す。
+      a2.introKnown=false; a2.introFirst='';
+      if(a2.fsBy){
         for(var sk in a2.fsBy){
-          if(a2.fsBy[sk]!==a2.first || !storeFirst[sk] || a2.first<=_bjbAddDays(storeFirst[sk],7)) continue;
+          var f0=a2.fsBy[sk];
+          if(!f0 || !storeFirst[sk] || f0<=_bjbAddDays(storeFirst[sk],7)) continue;
+          if(a2.introFirst && f0>=a2.introFirst) continue;   // もっと早い合格が既にある
           // その店のデータが初出の直前30日内に存在すること(休止・取込漏れの再開月を導入月と誤認しない)
-          var ds2=storeDates[sk]||{}, lo2=_bjbAddDays(a2.first,-30), near2=false;
-          for(var dd2 in ds2){ if(dd2<a2.first && dd2>=lo2){ near2=true; break; } }
-          if(near2){ a2.introKnown=true; break; }
+          var ds2=storeDates[sk]||{}, lo2=_bjbAddDays(f0,-30), near2=false;
+          for(var dd2 in ds2){ if(dd2<f0 && dd2>=lo2){ near2=true; break; } }
+          if(near2){ a2.introKnown=true; a2.introFirst=f0; }
         }
       }
       delete a2.fsBy;
@@ -18353,9 +18361,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   // データ開始月から居る機種は導入時期が分からないので「—」。直近8週間以内の初出は「新台」バッジ。
   function _bjtIntroInfo(r){
     var st=_bjtStat||{};
-    if(!r.first || !r.introKnown) return {label:'—', isNew:false};
-    var fm=r.first.slice(0,7);
-    var isNew=!!(st.last && r.first>=_bjbAddDays(st.last,-55));
+    if(!r.introFirst || !r.introKnown) return {label:'—', isNew:false};
+    var fm=r.introFirst.slice(0,7);
+    var isNew=!!(st.last && r.introFirst>=_bjbAddDays(st.last,-55));
     return {label:(+fm.slice(0,4))+'/'+String(+fm.slice(5,7)).padStart(2,'0'), isNew:isNew};
   }
   window._bjtToggleIntroSort=function(){ _bjtSortNew=!_bjtSortNew; _bjtRender(); };
@@ -18370,7 +18378,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }).sort(function(x,y){
       if(!_bjtSortNew) return 0;   // 既定は元の並び(直近30日アウト順)のまま
       // 導入不明(「—」表示)の機種は日付で比べず末尾へ(到着日で新台より上に浮かないように)
-      var xf=(x.introKnown&&x.first)||'', yf=(y.introKnown&&y.first)||'';
+      var xf=(x.introKnown&&x.introFirst)||'', yf=(y.introKnown&&y.introFirst)||'';
       return yf.localeCompare(xf) || y.o30-x.o30;
     });
   }
