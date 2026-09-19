@@ -1887,7 +1887,7 @@ const USER_LABEL = 'エム・アイ・ディ ジャパンさん専用';         
 const USER_ID = 'mid_japan';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260919-095530';
+const BJ_VERSION = '20260919-122159';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -1941,6 +1941,112 @@ const STORAGE_KEY = _NS + 'bi_added_data_legacy';
   document.addEventListener('visibilitychange', function(){
     if (document.visibilityState === 'visible' && Date.now() - last > 5 * 60 * 1000) check();   // タブに戻った時（5分に1回まで）
   });
+})();
+
+// ── データ更新の通知（2026-09-19 GO）──────────────────────────
+// 配信データ（{user}_data_月.json）の更新時刻を1時間ごとに軽く見に行き（HEAD＝中身は落とさない）、
+// いま画面が読み込んだ時より新しければ「新しいデータ」バーを出す。勝手にはリロードしない。
+// ・読み込み時の目印は loadRemoteData が window._bjRemoteMeta に控える（adminやローカル版では無い＝何もしない）
+// ・月が替わって新しい月のファイルが出来たときも「新しいデータ」扱い
+// ・「あとで」はその回の更新だけ黙らせる（さらに次の更新が来たらまた出す）
+// ・版の更新バー（bjVerBar）が出ているときは出さない（版を更新すればデータも最新になるため）
+(function(){
+  var on = false;
+  try { on = /^https?:$/.test(location.protocol); } catch (e) { on = false; }
+  if (!on) return;
+  var lastChk = 0, dismissedLm = '__none__', dismissedMonth = '';
+  function bar(show){
+    var el = document.getElementById('bjDataBar');
+    if (!show) { if (el) el.style.display = 'none'; return; }
+    if (!el) {
+      el = document.createElement('div'); el.id = 'bjDataBar';
+      el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;display:flex;align-items:center;'
+        + 'justify-content:center;gap:14px;flex-wrap:wrap;padding:10px 16px;'
+        + 'background:var(--card,#fff);color:var(--text,#1a2a33);border-top:2px solid var(--accent,#0098d4);'
+        + 'box-shadow:0 -2px 12px rgba(0,0,0,.12);font-size:13px;';
+      el.innerHTML = '<span>新しいデータが届いています。再読み込みすると最新の数字になります。</span>'
+        + '<button type="button" id="bjDataGo" style="padding:6px 18px;border:0;border-radius:4px;'
+        + 'background:var(--accent,#0098d4);color:#fff;font-size:13px;cursor:pointer;">再読み込み</button>'
+        + '<button type="button" id="bjDataLater" style="padding:6px 12px;border:1px solid var(--border,#c8d4da);'
+        + 'border-radius:4px;background:var(--card,#fff);color:var(--text2,#667);font-size:12.5px;cursor:pointer;">あとで</button>';
+      document.body.appendChild(el);
+      document.getElementById('bjDataGo').addEventListener('click', function(){ try { location.reload(); } catch (e) {} });
+      document.getElementById('bjDataLater').addEventListener('click', function(){
+        dismissedLm = el.dataset.lm || '__none__'; dismissedMonth = el.dataset.mon || '';
+        bar(false);
+      });
+    }
+    el.style.display = 'flex';
+  }
+  function showBar(mon, lm){
+    bar(true);
+    var el = document.getElementById('bjDataBar');
+    if (el) { el.dataset.mon = mon; el.dataset.lm = lm || ''; }
+  }
+  function ymNow(){ var d = new Date(); return d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0'); }
+  function check(){
+    try {
+      lastChk = Date.now();
+      var M = window._bjRemoteMeta;
+      if (!M || !M.month) return;
+      var vb = document.getElementById('bjVerBar');
+      if (vb && vb.style.display !== 'none') return;
+      var cur = ymNow();
+      function lmCheck(){
+        fetch(M.base + USER_ID + '_data_' + M.month + '.json?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+          .then(function(r){
+            if (!r.ok) return;
+            var lm = r.headers.get('last-modified') || '';
+            if (lm && M.lm && lm !== dismissedLm && new Date(lm).getTime() > new Date(M.lm).getTime() + 1000) showBar(M.month, lm);
+          }).catch(function(){});
+      }
+      if (cur !== M.month && cur !== dismissedMonth) {
+        fetch(M.base + USER_ID + '_data_' + cur + '.json?t=' + Date.now(), { method: 'HEAD', cache: 'no-store' })
+          .then(function(r){ if (r.ok) showBar(cur, ''); else lmCheck(); })
+          .catch(function(){ lmCheck(); });
+        return;
+      }
+      lmCheck();
+    } catch (e) {}
+  }
+  setTimeout(check, 10 * 60 * 1000);                 // 開いて10分後に1回
+  setInterval(check, 60 * 60 * 1000);                // 以後は1時間ごと
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible' && Date.now() - lastChk > 5 * 60 * 1000) check();   // タブに戻った時（5分に1回まで）
+  });
+})();
+
+// ── 設定の取り込み失敗の見張り（2026-09-19 GO・「反証Bが乗っていない」事件の再発防止）──
+// 単価・レートの箱はログイン直後に1回取りに行くだけで、失敗しても無言だった（＝古い控えのまま計算していた）。
+// 取り込みが成功するまで1分ごとに取り直し、3分続けて取れないときは上部に帯を出して正直に伝える。
+// 成功した瞬間（_bjtPull内で _bjtBoxOk が立つ）に帯は消え、画面は bjTuneBump で最新の設定に描き直される。
+(function(){
+  var on = false;
+  try { on = /^https?:$/.test(location.protocol); } catch (e) { on = false; }
+  if (!on) return;
+  var tries = 0;
+  function warn(show){
+    var el = document.getElementById('bjBoxWarn');
+    if (!show) { if (el) el.style.display = 'none'; return; }
+    if (!el) {
+      el = document.createElement('div'); el.id = 'bjBoxWarn';
+      el.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99997;text-align:center;'
+        + 'padding:6px 14px;background:#7c2d12;color:#fff;font-size:12.5px;';
+      el.textContent = '設定サーバに接続できていません。単価・レートが古いまま表示されている可能性があります（自動で取り直し中）';
+      document.body.appendChild(el);
+    }
+    el.style.display = 'block';
+  }
+  setInterval(function(){
+    try {
+      if (window._bjtBoxOk) { warn(false); return; }
+      var api = window._bjtSettingsApi;
+      if (!api || !api.enabled()) return;             // ローカル版(file://)・未ログイン・対象外の法人は見張らない
+      tries++;
+      if (tries >= 3) warn(true);
+      if (window._bjtSyncNow) window._bjtSyncNow();   // 取り直し（成功すれば _bjtBoxOk が立つ）
+    } catch (e) {}
+  }, 60 * 1000);
 })();
 
 // ╔══════════════════════════════════════════════════════════════╗
@@ -2920,7 +3026,11 @@ async function loadRemoteData() {
       for (const m of [ym(now), ym(prevM)]) {
         try {
           const r = await fetch(`${base}${USER_ID}_data_${m}.json?t=${Date.now()}`);
-          if (r.ok) { head = await r.json(); headMonth = m; dataBase = base; break outer; }
+          if (r.ok) {
+            // データ更新通知用の目印: いま読んだファイルの更新時刻・月・取得元(2026-09-19)
+            try { window._bjRemoteMeta = { lm: r.headers.get('last-modified') || '', month: m, base: base }; } catch (e) {}
+            head = await r.json(); headMonth = m; dataBase = base; break outer;
+          }
         } catch (e) {}
       }
     }
@@ -17973,6 +18083,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     return _bjtCall('settings',{method:'GET'})
       .then(function(r){ if(!r.ok) throw new Error('get '+r.status); return r.json(); })
       .then(function(j){
+        // 見張り(bjBoxWarn)用: 設定サーバから読めた印。立った瞬間に警告帯も消す(2026-09-19)
+        window._bjtBoxOk=true;
+        try{ var _bw=document.getElementById('bjBoxWarn'); if(_bw) _bw.style.display='none'; }catch(e){}
         // 読み込んでいる間にこのPCで保存されたら、その種別の返事は捨てる（保存を消さないため）。単価と新台価格は別々に判定
         var useT=(rev===_bjtRev), useP=(revP===_bjtRevP), useS=(revS===_bjtRevS);
         // 交換率マスタ(kind='rates')はBIに編集UIが無い=消える保存が無いので、rev判定に関係なく毎回採用してよい
