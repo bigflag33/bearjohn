@@ -1887,7 +1887,7 @@ const USER_LABEL = '北上文化さん専用';               // 例: '田中さ�
 const USER_ID = 'kitakami';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260918-191746';
+const BJ_VERSION = '20260919-095530';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -3538,12 +3538,32 @@ function parseOneFile(file) {
         const firstData = rows.find((r, i) => i > 0 && r && r[0]);
         const isMonthly = firstData && isDateValue(firstData[0]);
 
-        // パチンコ判定：ヘッダー行に「アウト」または「差玉」があれば4円P形式
+        // パチンコ判定（2026-09-19 強化）: ①見出しに「アウト」か「差玉」 ②ファイル名に _4P/（4P）/4円P
+        //   ③機種名の大半がP/e始まり(パチンコ機種) のどれかで4円パチンコ扱い。
+        //   ②③は、フォーマッタがスロットと同じ見出し(差枚/BB/RB/G数/IN枚数)で4Pを出していた事故
+        //   (マルハン新守山駅前の4Pが20スロ店に統合されかけた)の再発防止。見出しだけを見るのはやめた。
         const headerRow = rows[0] || [];
-        const isPachinko = headerRow.some(h => {
-          const v = String(h || '').trim();
-          return v === 'アウト' || v === '差玉';
-        });
+        const hdrIdx = {};
+        headerRow.forEach((h, i) => { const v = String(h || '').trim(); if (v && hdrIdx[v] === undefined) hdrIdx[v] = i; });
+        const pachiByHeader = hdrIdx['アウト'] !== undefined || hdrIdx['差玉'] !== undefined;
+        const pachiByName = /_4[円]?[Pp](?:[_\s(（.]|$)|（4P）|\(4P\)/.test(file.name);
+        let pLike = 0, sLike = 0;
+        {
+          const fd0 = rows.find((r, i) => i > 0 && r && r[0]);
+          const c0 = (fd0 && isDateValue(fd0[0])) ? 1 : 0;   // 月次形式は日付列ぶん右へ
+          for (let i = 1; i < rows.length; i++) {
+            const r = rows[i]; if (!r || !r[0]) continue;
+            const nm = String(r[c0 + 2] || r[c0 + 1] || '').trim();
+            if (!nm) continue;
+            if (/^(P|e)/.test(nm) && !/^(Pachi|e-)/i.test(nm)) pLike++;          // P海物語 / PA / PF / eエイティシックス
+            else if (/^(L|S|スマスロ|パチスロ)/.test(nm)) sLike++;                  // L北斗 / S沖ドキ / スマスロ〜
+          }
+        }
+        const pachiByModel = pLike >= 5 && pLike > sLike * 3;
+        const isPachinko = pachiByHeader || pachiByName || pachiByModel;
+        const pachiReason = pachiByHeader ? '見出し(アウト/差玉)' : pachiByName ? 'ファイル名の4P' : pachiByModel ? '機種名(P/e始まり)' : '';
+        // 見出し名で列を引く（無ければ従来の列位置）。r=行, names=見出し候補, pos=従来位置
+        const H = (r, names, pos) => { for (const n of names) if (hdrIdx[n] !== undefined) return Number(r[hdrIdx[n]]) || 0; return Number(r[pos]) || 0; };
 
         const newRecords = [];
         const addedDatesSet = new Set();
@@ -3580,20 +3600,25 @@ function parseOneFile(file) {
           const modelName    = nameOfficial || nameSite;
 
           if (isPachinko) {
-            // 4円パチンコ形式: 差玉(+3), 大当り(+4), 初当り(+5), 回転数(+6), アウト(+7), 台売上(+8), 台粗利(+9)
+            // 4円パチンコ形式（pision形式: 差玉(+3), 大当り(+4), 初当り(+5), 回転数(+6), アウト(+7), 台売上(+8), 台粗利(+9)）
+            // 列は見出し名で引く。スロット型見出しの4Pファイル(差枚/BB=初当り/RB=確変/G数/IN枚数)も受ける:
+            //   大当り(総当り) = 初当り + 確変、初当り = BB。
+            const slotStyle = hdrIdx['大当り'] === undefined && hdrIdx['BB'] !== undefined;
+            const hatsu  = slotStyle ? H(r, ['BB'], col + 4) : H(r, ['初当り', '初当たり'], col + 5);
+            const oatari = slotStyle ? hatsu + H(r, ['RB'], col + 5) : H(r, ['大当り', '大当たり'], col + 4);
             newRecords.push({
               date,
               '台番':       num,
               '機種名':     modelName,
               '機種名正式': nameOfficial,
-              '差枚':       Number(r[col + 3]) || 0,  // 差玉
-              'BB':         Number(r[col + 4]) || 0,  // 大当り
-              'RB':         Number(r[col + 5]) || 0,  // 初当り
+              '差枚':       H(r, ['差玉', '差枚'], col + 3),     // 差玉
+              'BB':         oatari,                               // 大当り
+              'RB':         hatsu,                                // 初当り
               'ART':        0,
-              'G数':        Number(r[col + 6]) || 0,  // 回転数
-              'IN枚数':     Number(r[col + 7]) || 0,  // アウト（表示時は「アウト」ラベル）
-              '台売上':     Number(r[col + 8]) || 0,
-              '台粗利':     Number(r[col + 9]) || 0,
+              'G数':        H(r, ['回転数', 'G数'], col + 6),     // 回転数
+              'IN枚数':     H(r, ['アウト', 'IN枚数'], col + 7),  // アウト（表示時は「アウト」ラベル）
+              '台売上':     H(r, ['台売上'], col + 8),
+              '台粗利':     H(r, ['台粗利'], col + 9),
             });
           } else {
             newRecords.push({
@@ -3622,7 +3647,8 @@ function parseOneFile(file) {
           records: newRecords,
           name: file.name,
           isMonthly,
-          isPachinko
+          isPachinko,
+          pachiReason
         });
       } catch(err) {
         reject({ name: file.name, error: err.message });
@@ -3694,6 +3720,8 @@ async function handleUpload(event) {
   const files = Array.from(event.target.files);
   event.target.value = '';
   if (!files.length) return;
+  // この操作より前からあった店舗（新規店舗の確認と、空のまま残った新規店舗の掃除に使う）
+  const _preIds = new Set(getStores().map(s => s.id));
 
   if (files.length > 1) showMsg(`${files.length}ファイルを処理中...`, 'ok');
 
@@ -3749,7 +3777,7 @@ async function handleUpload(event) {
 
     for (const result of results) {
       if (result.status === 'fulfilled') {
-        const { addedDates: aDates, count, records, name, isMonthly, isPachinko } = result.value;
+        const { addedDates: aDates, count, records, name, isMonthly, isPachinko, pachiReason } = result.value;
         if (count === 0) {
           errors.push(`${name}: データなし`);
         } else {
@@ -3758,7 +3786,7 @@ async function handleUpload(event) {
           if (isPachinko && !store.name.match(/（4P）|4円P/)) {
             tStore = findOrCreateStore(store.name + '（4P）');
           }
-          if (!targetMap[tStore.id]) targetMap[tStore.id] = { store: tStore, records: [], dates: [] };
+          if (!targetMap[tStore.id]) targetMap[tStore.id] = { store: tStore, records: [], dates: [], reason: pachiReason || '' };
           targetMap[tStore.id].records.push(...records);
           if (isMonthly && aDates && aDates.length) {
             targetMap[tStore.id].dates.push(`${aDates[0].slice(5)}〜${aDates[aDates.length-1].slice(5)}(${aDates.length}日)`);
@@ -3768,6 +3796,25 @@ async function handleUpload(event) {
         }
       } else {
         errors.push(`${result.reason.name}: ${result.reason.error}`);
+      }
+    }
+
+    // ── 新しい店舗ができるときは1回だけ確認（2026-09-19）: 店名・部門・期間・台数を見せて「本当にアップしてOKか」 ──
+    //   （店名の取り違えや、部門違いの店への統合を、書き込む前に人の目で止めるため）
+    const newTargets = Object.values(targetMap).filter(t => !_preIds.has(t.store.id) && t.records.length > 0);
+    if (newTargets.length > 0) {
+      const lines = newTargets.map(t => {
+        const isP = /（4P）/.test(t.store.name);
+        const ds = [...new Set(t.records.map(r => r.date))].sort();
+        const span = ds.length ? (ds.length === 1 ? ds[0] : `${ds[0]}〜${ds[ds.length - 1]}`) : '—';
+        return `・${t.store.name}\n   部門: ${isP ? '4円パチンコ' : '20円スロット'}${t.reason ? `（${t.reason}で判定）` : ''}\n   期間: ${span}（${ds.length}日）・${t.records.length}台分`;
+      });
+      const ok = window.confirm(
+        `次の店舗は登録がないため、新規の店舗として作ります。\n\n${lines.join('\n')}\n\n` +
+        `店名と部門はこれで合っていますか？ 本当にアップしてOKですか？\n` +
+        `（キャンセルするとこのファイルは取り込まず、店舗も作りません）`);
+      if (!ok) {
+        for (const t of newTargets) { delete targetMap[t.store.id]; errors.push(`${t.store.name}: 新規店舗の作成をキャンセルしました`); }
       }
     }
 
@@ -3834,8 +3881,17 @@ async function handleUpload(event) {
     }
   }
 
-  // 自動判定で別店舗だった場合は切り替え
-  const detectedStores = [...new Set(Object.values(storeGroups).map(g => g.store.id))];
+  // この操作で作られたのに1件も入らなかった店舗（確認でキャンセル／4Pへ振り替えて空のまま残った元の店名）は消す
+  {
+    const stores = getStores();
+    const keep = stores.filter(s => _preIds.has(s.id) || (DB_CACHE[s.key] && DB_CACHE[s.key].length > 0));
+    if (keep.length !== stores.length) { saveStores(keep); buildStoreSelect(); }
+  }
+
+  // 自動判定で別店舗だった場合は切り替え（消した店舗には切り替えない。4Pへ振り替えたときは振替先へ）
+  const validIds = new Set(getStores().map(s => s.id));
+  let detectedStores = [...new Set(Object.values(storeGroups).map(g => g.store.id))].filter(id => validIds.has(id));
+  if (summaries.length === 1 && lastStore && validIds.has(lastStore.id)) detectedStores = [lastStore.id];
   if (detectedStores.length === 1 && detectedStores[0] !== _activeStore().id) {
     switchStore(detectedStores[0]);
   } else {
@@ -4117,9 +4173,9 @@ function init() {
   }
 
   applyFilter();
-  // ピンポイント分析の日付を最新日で初期化
-  const _initAllD = [...new Set(loadAllData().map(d=>d.date))].sort();
-  if (_initAllD.length) document.getElementById('pinDateInput').value = _initAllD[_initAllD.length-1];
+  // 注意: ここにピンポイント分析の日付初期化(pinDateInput)を書いてはいけない。
+  // 要素はタブ化の起動処理(pin-section-wrapper削除)で消えており、書き込むと init 全体が
+  // ここで転んで後続(設定サーバ同期など)を道連れにする(2026-09-19に3ヶ月ぶん発覚・撤去)。
 }
 
 // (旧「新台セッティング日を除外」機能は2026-09-16撤去。_bjCleanRecordsが初稼働前のゼロ行を読み込み時に自動除外する)
@@ -13507,6 +13563,7 @@ function setDayView(mode) {
 }
 
 function renderDayCharts() {
+  if (!document.getElementById('dayProfitSalesChart')) return;   // タブ引っ越し前・テーマ初期化中などキャンバス不在の呼び出しは静かに何もしない(2026-09-19 コンソールの騒音対策)
   // 日別集計
   const agg = {};
   filtered.forEach(d => {
@@ -13661,7 +13718,8 @@ async function checkAuth() {
     await initDB();
     await _buildBenchmarkFromCache();
     await loadRemoteData();
-    init();
+    // 描画のどこかで転んでも設定サーバ同期は必ず走らせる（2026-09-19: init末尾の消し忘れ行が3ヶ月間ここを道連れにした事故の再発防止）
+    try { init(); } catch(e) { console.error('[init]', e); }
     try{ if(window._bjtSyncNow) window._bjtSyncNow(); }catch(e){}   // 機種別チューニング：設定サーバから取り込む（失敗しても画面は動く）
     try{ _bjKessonOkSync(); }catch(e){}   // 欠損帯の店休OK印もログイン直後に同期(見張りintervalを待たない)
   } else {
@@ -13724,9 +13782,15 @@ window.addEventListener('DOMContentLoaded', () => {
     // 旧形式('1')はパスワード無しで通す（暗号化前のセッション互換）。新形式はパスワードそのものが入っている
     window._bjPw = (_sv === '1') ? '' : _sv;
     document.getElementById('authOverlay').style.display = 'none';
-    initDB().then(_buildBenchmarkFromCache).then(loadRemoteData).then(init).then(_checkAdminDataEmpty)
-      .then(() => { try{ if(window._bjtSyncNow) window._bjtSyncNow(); }catch(e){} try{ _bjKessonOkSync(); }catch(e){} })   // 機種別チューニング＋店休OK印：設定サーバから取り込む
-      .catch(e => { console.error('[initDB]', e); init(); });
+    initDB().then(_buildBenchmarkFromCache).then(loadRemoteData)
+      .catch(e => { console.error('[initDB]', e); })   // データ読み込みの失敗はここで受け止め、下の描画・同期は必ず実行する
+      .then(() => {
+        // 描画のどこかで転んでも設定サーバ同期は必ず走らせる（2026-09-19: init末尾の消し忘れ行が3ヶ月間同期を道連れにした事故の再発防止）
+        try { init(); } catch(e) { console.error('[init]', e); }
+        try { _checkAdminDataEmpty(); } catch(e) {}
+        try{ if(window._bjtSyncNow) window._bjtSyncNow(); }catch(e){}   // 機種別チューニング：設定サーバから取り込む
+        try{ _bjKessonOkSync(); }catch(e){}   // 欠損帯の店休OK印も同期
+      });
   } else {
     // authOverlayを表示したままにする（init()は呼ばない）
     setTimeout(() => document.getElementById('authInput').focus(), 100);
@@ -18020,6 +18084,22 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
 
   window._bjtSyncNow=function(){ try{ return _bjtPull(); }catch(e){ return Promise.resolve(); } };
+  // ── 取り込みの見張り(2026-09-19) ──
+  // 開いた直後の取り込みが未実行・失敗のままなら60秒ごとに自動でやり直す(最大60回=1時間)。
+  // 成功(ok)したら何もしない。file://や提供外法人も何もしない(_bjtApiEnabled)。
+  // 失敗が続く間は_bjtNoticeの帯が出続ける=黙って古い設定で見せない(店休OK印の見張りと同じ思想)。
+  (function(){
+    var tries=0;
+    setInterval(function(){
+      try{
+        if(_bjtSyncState==='ok') return;
+        if(!_bjtApiEnabled()) return;
+        if(tries>=60) return;
+        tries++;
+        _bjtPull();
+      }catch(e){}
+    }, 60000);
+  })();
   // ── 他機能(稼働粗利表の振り分け等)への窓口: 同じ「法人ごとの箱」を kind 別に読み書きする(2026-09-03) ──
   //    法人はサーバ側で入場券から決まる＝クライアントは法人IDを送らない。file://(admin)や配信対象外の法人では enabled=false
   window._bjtSettingsApi={
