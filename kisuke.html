@@ -1887,7 +1887,7 @@ const USER_LABEL = 'キスケ株式会社さん専用';               // 例: '�
 const USER_ID = 'kisuke';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20260919-122159';
+const BJ_VERSION = '20260921-144849';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -10417,7 +10417,7 @@ function _renderCalendarMonth(ym, filteredDates) {
 
     if (hasData && inFiltered) {
       cell.className = 'cal-cell active';
-      const dayColor = dow===0?'#ff6b6b':dow===6?'#60a5fa':'#e8eaf6';
+      const dayColor = dow===0?'#ff6b6b':dow===6?'#60a5fa':'var(--text)';   // 平日は固定色でなくテーマの文字色(明テーマで白飛びしていた 2026-09-21修正)
       const profitColor = metric.profit >= 0 ? 'green' : 'red';
       const profitRate = metric.sales !== 0 ? (metric.profit / metric.sales * 100).toFixed(1) : '0.0';
       const rateColor = parseFloat(profitRate) >= 0 ? 'green' : 'red';
@@ -10431,7 +10431,7 @@ function _renderCalendarMonth(ym, filteredDates) {
       `;
     } else {
       cell.className = 'cal-cell';
-      const dayColor = dow===0?'#ff6b6b':dow===6?'#60a5fa':'#555';
+      const dayColor = dow===0?'#ff6b6b':dow===6?'#60a5fa':'var(--text2)';
       const opacity = !hasData ? 'opacity:.4;' : '';
       cell.innerHTML = `<div class="cal-date" style="color:${dayColor};${opacity}">${cur.getDate()}日</div>`;
     }
