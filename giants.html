@@ -1880,11 +1880,11 @@ const MODELS_SORTED = ["SマイジャグラーVKD", "SアイムジャグラーEX
 // ║  ★ 配布設定 ― この3行だけ編集して各担当者に渡してください ★  ║
 // ╚══════════════════════════════════════════════════════════════╝
 // 見られる店舗名をここに列挙。空 [] なら全店舗OK（管理者用）
-const STORE_WHITELIST = ["ジャンボマックス777出雲", "業界ベンチマーク"];          // 例: ['店舗A', '店舗B']
+const STORE_WHITELIST = ["パーラーコンパル留萌", "留萌ひまわり", "パーラーコンパル留萌（4P）", "留萌ひまわり（4P）", "業界ベンチマーク"];          // 例: ['店舗A', '店舗B']
 // このファイルを使う人の名前（ヘッダーに表示）
-const USER_LABEL = '丸三さん専用';               // 例: '田中さん専用'
+const USER_LABEL = 'ジャイアンツさん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
-const USER_ID = 'marusan';             // 例: 'hakuwa' / 'aviva'
+const USER_ID = 'giants';             // 例: 'hakuwa' / 'aviva'
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
 const BJ_VERSION = '20261004-080558';
@@ -13810,7 +13810,7 @@ function renderDayCharts() {
 
 
 // ─── 認証 ───
-const PW_HASH = '25d16ce43aea252491a216193f55178ad94c9b920aa2329ca0c14975726f747b';
+const PW_HASH = 'a00cb5e623f7798755a93e2451d19d235a3a882c6b2f8d0a28a678fee963737e';
 const AUTH_KEY = 'bi_auth_bearjon';  // サイト共通（ユーザー別にしない）
 
 async function sha256(str) {
