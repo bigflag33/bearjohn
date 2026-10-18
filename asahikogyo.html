@@ -897,10 +897,14 @@
     </button>
     <div class="header-date-range" id="dataRange"></div>
     <span id="uploadMsg" class="upload-msg-inline"></span>
-    <label for="fileInput" class="upload-fab" style="cursor:pointer;">
+    <label for="fileInput" class="upload-fab" id="excelAddLabel" style="cursor:pointer;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Excelを追加
     </label>
+    <a id="manualUploadLink" class="upload-fab" href="#" target="_blank" rel="noopener" style="display:none;cursor:pointer;text-decoration:none;" title="手作業で取り込む店舗のデータ(台ごとの日次ファイル)を送る画面を開きます">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      手作業データアップ
+    </a>
     <input type="file" id="fileInput" accept=".xlsx,.xls" multiple style="display:none" onchange="handleUpload(event)">
     <div id="adminMenuWrap" style="display:none;position:relative;">
       <button onclick="toggleAdminMenu()" style="background:linear-gradient(135deg,#475569,#334155);color:#fff;border:none;border-radius:10px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">
@@ -1885,9 +1889,10 @@ const STORE_WHITELIST = ["メトロガーデン", "業界ベンチマーク"];  
 const USER_LABEL = '朝日興業さん専用';               // 例: '田中さん専用'
 // ユーザーID（データ分離用・半角英数字）← 必ず各担当者で異なる値にすること
 const USER_ID = 'asahikogyo';             // 例: 'hakuwa' / 'aviva'
+const BJ_MANUAL_UPLOAD_URL = 'https://formatter.bearjohn.com/c/yFyLgKuzIQEjNJ_u3ex0w-WH/';     // 法人ページ: 手作業データアップ(フォーマッタ専用URL)。generate_users.py が差し替え。空なら従来のExcelを追加
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20261004-080558';
+const BJ_VERSION = '20261018-162408';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -4275,6 +4280,12 @@ function init() {
     const badge = document.getElementById('userLabelBadge');
     if (badge) { badge.textContent = '' + USER_LABEL; badge.style.display = ''; }
   }
+  // 法人ページ: 「Excelを追加」(そのPCにしか入らない)の代わりに、手作業データアップ(フォーマッタ専用URL)への入口を出す(2026-10-18)
+  if (USER_ID !== 'admin' && typeof BJ_MANUAL_UPLOAD_URL === 'string' && /^https:\/\//.test(BJ_MANUAL_UPLOAD_URL)) {
+    const lk = document.getElementById('manualUploadLink'); const ex = document.getElementById('excelAddLabel');
+    if (lk) { lk.href = BJ_MANUAL_UPLOAD_URL; lk.style.display = ''; }
+    if (ex) ex.style.display = 'none';
+  }
   // ── ホワイトリストが設定されている場合、対象外の既存店舗を非表示ガード ──
   if (STORE_WHITELIST.length > 0) {
     const addBtn = document.querySelector('.store-add-btn');
@@ -4463,8 +4474,8 @@ function getActiveStore() {
 // ── 店舗の表示順(コンコルドさんの会議資料の並び・2026-09-14ユーザー指定) ──
 // スロとパチでZENT刈谷の位置だけ違う。最後に本巣・ベガビック・島、その後ろに自店2店。
 // この一覧に無い店(他法人のページ等)は従来の並びのまま(順位999999で安定ソート)。
-var BJ_STORE_ORDER_SLOT = ['サンパレス','ZENT刈谷','プレイランドキャッスル高浜','キクヤ春日井','プレイランドキャッスル春日井','マルハン新守山駅前','KEIZ尾張旭','ZENT稲沢','キクヤ穂積','キクヤ一宮','ZENT木曽川','メガガイア一宮','ラッキープラザ名古屋西インター七宝','プレイランドキャッスル大垣','ZENT豊田本店','リブレ遊援館','ZENT梅坪','ABC刈谷','ZENT住吉','コスモジャパン大府','KEIZ港','ZENT扶桑','マルハン小牧','プレイランドキャッスル熱田','KEIZ大高','ZENT555','ABC豊川','Zing大樹寺','ZENT岡崎インター','サンシャインKYORAKU南','ZENT長久手','プレイランドキャッスル天白','玉越東郷','グランワールドカップ本巣','ベガビック1200岐阜六条','キクヤ島','メガコンコルド春日井','メガコンコルド豊田インター','メガコンコルド1155日進長久手',"ニラク郡山大町","ニラク郡山並木","ニラク福島太平寺","ニラク福島瀬上","ニラク平","16MGMいわき泉","16MGM勿来･錦","ダイエー町北町","Super D'STATION高崎本店","Super D'STATION前橋大利根","パーラーコンパル留萌","留萌ひまわり"];
-var BJ_STORE_ORDER_PACHI = ['サンパレス','プレイランドキャッスル高浜','キクヤ春日井','プレイランドキャッスル春日井','マルハン新守山駅前','KEIZ尾張旭','ZENT稲沢','キクヤ穂積','キクヤ一宮','ZENT木曽川','メガガイア一宮','ラッキープラザ名古屋西インター七宝','プレイランドキャッスル大垣','ZENT豊田本店','リブレ遊援館','ZENT梅坪','ABC刈谷','ZENT刈谷','ZENT住吉','コスモジャパン大府','KEIZ港','ZENT扶桑','マルハン小牧','プレイランドキャッスル熱田','KEIZ大高','ABC豊川','Zing大樹寺','ZENT岡崎インター','サンシャインKYORAKU南','ZENT長久手','プレイランドキャッスル天白','玉越東郷','グランワールドカップ本巣','ベガビック1200岐阜六条','キクヤ島','メガコンコルド春日井','メガコンコルド豊田インター','メガコンコルド1155日進長久手',"ニラク郡山大町","ニラク郡山並木","ニラク福島太平寺","ニラク福島瀬上","ニラク平","16MGMいわき泉","16MGM勿来･錦","ダイエー町北町","Super D'STATION高崎本店","Super D'STATION前橋大利根","パーラーコンパル留萌","留萌ひまわり"];
+var BJ_STORE_ORDER_SLOT = ['サンパレス','ZENT刈谷','プレイランドキャッスル高浜','キクヤ春日井','プレイランドキャッスル春日井','マルハン新守山駅前','KEIZ尾張旭','ZENT稲沢','キクヤ穂積','キクヤ一宮','ZENT木曽川','メガガイア一宮','ラッキープラザ名古屋西インター七宝','プレイランドキャッスル大垣','ZENT豊田本店','リブレ遊援館','ZENT梅坪','ABC刈谷','ZENT住吉','コスモジャパン大府','KEIZ港','ZENT扶桑','マルハン小牧','プレイランドキャッスル熱田','KEIZ大高','ZENT555','ABC豊川','Zing大樹寺','ZENT岡崎インター','サンシャインKYORAKU南','ZENT長久手','プレイランドキャッスル天白','玉越東郷','グランワールドカップ本巣','ベガビック1200岐阜六条','キクヤ島','メガコンコルド春日井','メガコンコルド豊田インター','メガコンコルド1155日進長久手',"ニラク郡山大町","ニラク郡山並木","ニラク福島太平寺","ニラク福島瀬上","ニラク平","16MGMいわき泉","16MGM勿来･錦","ダイエー町北町","Super D'STATION高崎本店","Super D'STATION前橋大利根","パーラーコンパル留萌","留萌ひまわり","ビックつばめ郡山店","ビックつばめ高崎店","ビックつばめ会津若松店","ビックつばめ平店","ビックつばめ小名浜西店","ビックつばめ錦店","ビックつばめ白河店","ビックつばめ須賀川店","ビックつばめ矢野目店"];
+var BJ_STORE_ORDER_PACHI = ['サンパレス','プレイランドキャッスル高浜','キクヤ春日井','プレイランドキャッスル春日井','マルハン新守山駅前','KEIZ尾張旭','ZENT稲沢','キクヤ穂積','キクヤ一宮','ZENT木曽川','メガガイア一宮','ラッキープラザ名古屋西インター七宝','プレイランドキャッスル大垣','ZENT豊田本店','リブレ遊援館','ZENT梅坪','ABC刈谷','ZENT刈谷','ZENT住吉','コスモジャパン大府','KEIZ港','ZENT扶桑','マルハン小牧','プレイランドキャッスル熱田','KEIZ大高','ABC豊川','Zing大樹寺','ZENT岡崎インター','サンシャインKYORAKU南','ZENT長久手','プレイランドキャッスル天白','玉越東郷','グランワールドカップ本巣','ベガビック1200岐阜六条','キクヤ島','メガコンコルド春日井','メガコンコルド豊田インター','メガコンコルド1155日進長久手',"ニラク郡山大町","ニラク郡山並木","ニラク福島太平寺","ニラク福島瀬上","ニラク平","16MGMいわき泉","16MGM勿来･錦","ダイエー町北町","Super D'STATION高崎本店","Super D'STATION前橋大利根","パーラーコンパル留萌","留萌ひまわり","ビックつばめ郡山店","ビックつばめ高崎店","ビックつばめ会津若松店","ビックつばめ平店","ビックつばめ小名浜西店","ビックつばめ錦店","ビックつばめ白河店","ビックつばめ須賀川店","ビックつばめ矢野目店"];
 function bjStoreOrderIdx(name, kind) {
   var base = String(name || '').replace(/（4P）$/, '');
   var arr = (kind === 'pachi') ? BJ_STORE_ORDER_PACHI : BJ_STORE_ORDER_SLOT;
