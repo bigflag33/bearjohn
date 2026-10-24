@@ -1892,7 +1892,7 @@ const USER_ID = 'marusan';             // 例: 'hakuwa' / 'aviva'
 const BJ_MANUAL_UPLOAD_URL = 'https://formatter.bearjohn.com/c/2HBOg9PnSvtj8K3pKRuu08kJ/';     // 法人ページ: 手作業データアップ(フォーマッタ専用URL)。generate_users.py が差し替え。空なら従来のExcelを追加
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20261024-125528';
+const BJ_VERSION = '20261024-133125';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -4520,6 +4520,7 @@ function _inLabel(short) {
 }
 // 枚 or 発 の単位を返す（アウト値の表示単位）
 function _inUnit() { return _isPachinkoStore() ? '発' : '枚'; }
+function _bjbU()   { return _isPachinkoStore() ? '玉' : '枚'; }   // 朝礼・週報の文中の単位(パチンコ店=玉)。2026-10-24
 // アウト/IN枚数 値を適切な単位でフォーマット
 function _fmtInVal(v) { return Math.round(v).toLocaleString() + _inUnit(); }
 // ジャグラー or 海物語 キーワード
@@ -16280,7 +16281,6 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   // ═══ AIの朝礼（競合偵察レポート・ルールベース v2）═══
   // 設計：①ヘッドライン＝その日一番のニュース（出玉面優先）②ご注進＝厳選2〜3件（機種別突出・増減台・新台・撤去・勝率）
   // ③今日の構え＋一手 ④タイムマシン（過去日の朝礼を再現・未来情報は使わない） ⑤数字は全部実データ計算＝発明しない
-  function _bjbU(){ return (typeof _isPachinkoStore==='function' && _isPachinkoStore()) ? '玉' : '枚'; }   // 朝礼の単位: パチンコ店は玉・スロット店は枚 (2026-10-24)
   var _bjbRetry=0,_bjbMemo=null,_bjbMemoKey='',_bjbDate=null,_bjbTypedKey='';   // _bjbDate=null → 今日。_bjbTypedKey＝最後にタイプライター演出した「店舗×日付」キー（同じ間は演出しない）
   function _bjbTodayStr(){ var n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
   function _bjbFmtD(ds){ return ds.slice(5).replace('-','/'); }
@@ -17014,7 +17014,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function _bjwkYen(v){ return v<0?_man(-v)+'の赤字':_man(v); }
   function _bjwkDeltaOut(cur, prev){ if(!prev||prev<=0)return null; var d=cur-prev;
     if(Math.abs(d)<1)return '横ばい';
-    return Math.abs(Math.round(d)).toLocaleString()+'枚'+(d>=0?'増':'減')+'・'+_bjwkPct(d/prev*100); }
+    return Math.abs(Math.round(d)).toLocaleString()+''+_bjbU()+''+(d>=0?'増':'減')+'・'+_bjwkPct(d/prev*100); }
   function _bjwkDeltaYen(cur, prev){ if(prev==null)return null; var d=cur-prev;
     if(Math.abs(d)<1000)return 'ほぼ横ばい';
     var s=_man(Math.abs(d))+'の'+(d>=0?'増加':'減少');
@@ -17031,7 +17031,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var _dO=C.prev?_bjwkDeltaOut(cur.outPT,C.prev.outPT):null;
     var _dP=C.prev?_bjwkDeltaYen(cur.profPerDay,C.prev.profPerDay):null;
     var p1=_pk(['おはようございます。','週明けの整理です。','先週のまとめです。'])+_bjwkFmtW(W)+'の'+sName+'は、'
-      +'台あたりアウトが週平均<b>'+Math.round(cur.outPT).toLocaleString()+'枚</b>'+(_dO?'（前週から'+_dO+'）':'')
+      +'台あたりアウトが週平均<b>'+Math.round(cur.outPT).toLocaleString()+''+_bjbU()+'</b>'+(_dO?'（前週から'+_dO+'）':'')
       +'、店の粗利は日あたり<b>'+_bjwkYen(cur.profPerDay)+'</b>'+(_dP?'（前週から'+_dP+'）':'')+'。'
       +'型で言えば<b>'+kataTxt[C.kata]+'</b>一週間でした。'
       +(cur.rate!=null?'出玉率は'+cur.rate.toFixed(1)+'%'+(C.dRate!=null?'（前週比'+(C.dRate>=0?'+':'')+C.dRate.toFixed(1)+'pt）':'')+'。':'')
@@ -17048,12 +17048,12 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     H.push(['ものさし（先月同週・前年同週）', p2]);
     // ③ ベースと山
     if(C.spCur&&C.spCur.base!=null){
-      var p3='平日のベース稼働（土日祝・特定日を除く）は台あたり<b>'+Math.round(C.spCur.base).toLocaleString()+'枚</b>';
+      var p3='平日のベース稼働（土日祝・特定日を除く）は台あたり<b>'+Math.round(C.spCur.base).toLocaleString()+''+_bjbU()+'</b>';
       if(C.spPrev&&C.spPrev.base)p3+='（前週から'+_bjwkDeltaOut(C.spCur.base,C.spPrev.base)+'）';
-      if(C.spCur.yama!=null){ p3+='、山場（土日祝・特定日）は<b>'+Math.round(C.spCur.yama).toLocaleString()+'枚</b>';
+      if(C.spCur.yama!=null){ p3+='、山場（土日祝・特定日）は<b>'+Math.round(C.spCur.yama).toLocaleString()+''+_bjbU()+'</b>';
         if(C.spPrev&&C.spPrev.yama)p3+='（同'+_bjwkDeltaOut(C.spCur.yama,C.spPrev.yama)+'）'; }
       p3+='。'+_pk(['ベースは店の体力、山は集客力です。','ベースが痩せずに山が伸びるのが理想の形です。','山だけ崩れる週は競合のイベントに客を取られたサインです。']);
-      if(C.peak)p3+=' 週内のピークは'+_bjbFmtD(C.peak.date)+'（'+'日月火水木金土'[C.peak.dow]+'）の'+Math.round(C.peak.outPT).toLocaleString()+'枚でした。';
+      if(C.peak)p3+=' 週内のピークは'+_bjbFmtD(C.peak.date)+'（'+'日月火水木金土'[C.peak.dow]+'）の'+Math.round(C.peak.outPT).toLocaleString()+''+_bjbU()+'でした。';
       H.push(['ベースと山', p3]);
     }
     // ④ メリハリ収支（#05: 月〜日の日次グラフつき・特定日は通信簿セグへ独立）
@@ -17066,10 +17066,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var p4b='';
     if(C.toku.length){
       p4b=C.toku.map(function(t){
-        var line=_bjbFmtD(t.date)+'（'+'日月火水木金土'[t.dow]+'）<b>'+t.label+'</b> → アウト<b>'+Math.round(t.outPT).toLocaleString()+'枚</b>';
+        var line=_bjbFmtD(t.date)+'（'+'日月火水木金土'[t.dow]+'）<b>'+t.label+'</b> → アウト<b>'+Math.round(t.outPT).toLocaleString()+''+_bjbU()+'</b>';
         var g=null;
         if(t.avgOut&&t.avgProf!=null){
-          line+='（過去'+t.past+'回平均'+Math.round(t.avgOut).toLocaleString()+'枚と比べ'+_bjwkDeltaOut(t.outPT,t.avgOut)+'）・店粗利'+_bjwkYen(Math.round(t.prof))+'（同平均'+_bjwkYen(Math.round(t.avgProf))+'）';
+          line+='（過去'+t.past+'回平均'+Math.round(t.avgOut).toLocaleString()+''+_bjbU()+'と比べ'+_bjwkDeltaOut(t.outPT,t.avgOut)+'）・店粗利'+_bjwkYen(Math.round(t.prof))+'（同平均'+_bjwkYen(Math.round(t.avgProf))+'）';
           var orr=t.outPT/t.avgOut, pdf=t.prof-t.avgProf, thr=Math.max(30000,Math.abs(t.avgProf)*0.15);
           if(orr>=1.08&&pdf>=thr)g='集めながら取れた満点の特定日';
           else if(orr>=1.08&&pdf<=-thr)g='出して集めた投資日';
@@ -17110,7 +17110,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(fcMiss.length){
         fcMiss.sort(function(a,b){return Math.abs(b.err)-Math.abs(a.err);});
         pFc+='<br>振り返りたい営業日<br>'+fcMiss.slice(0,3).map(function(x){
-          return '・<b>'+_bjbFmtD(x.date)+'（'+'日月火水木金土'[x.dow]+'）</b> 予想'+Math.round(x.exp).toLocaleString()+'枚 → 実績'+Math.round(x.act).toLocaleString()+'枚（'+(x.err>=0?'+':'')+(x.err*100).toFixed(0)+'%'+(x.err>=0?'の上振れ':'の下振れ')+'）';
+          return '・<b>'+_bjbFmtD(x.date)+'（'+'日月火水木金土'[x.dow]+'）</b> 予想'+Math.round(x.exp).toLocaleString()+''+_bjbU()+' → 実績'+Math.round(x.act).toLocaleString()+''+_bjbU()+'（'+(x.err>=0?'+':'')+(x.err*100).toFixed(0)+'%'+(x.err>=0?'の上振れ':'の下振れ')+'）';
         }).join('<br>');
         pFc+='<br>'+_pk(['上振れの日は「何が効いたか」、下振れの日は「どこに客を取られたか」を振り返ると次に活きます。','大きく外れた日には、競合のイベントか自店の仕掛けの答えが隠れています。','外れる向きが同じ週は、店のベース自体が動き始めたサインです。']);
       } else pFc+='<br>大きく外した営業日はありませんでした。予想どおりに動いた一週間です。';
@@ -17125,7 +17125,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         return '<tr'+((cur&&wks.length>1)?' style="background:rgba(0,152,212,.07);font-weight:700;"':'')+'>'
           +'<td>'+(i===0?n.name:'')+'</td><td>'+(i===0?_bjbFmtD(n.first):'')+'</td>'
           +'<td>'+Math.round(w.taiAvg)+'台</td><td>'+(w.k===1?'初週':'第'+w.k+'週目')+'</td>'
-          +'<td>'+(wait?'検査待ち':Math.round(w.outPT).toLocaleString()+'枚')+'</td>'
+          +'<td>'+(wait?'検査待ち':Math.round(w.outPT).toLocaleString()+''+_bjbU()+'')+'</td>'
           +'<td>'+((!wait&&w.rate!=null)?w.rate.toFixed(1)+'%':'-')+'</td>'
           +'<td>'+(!wait?_bjwkYen(Math.round(w.profPT))+'/日':'-')+'</td></tr>';
       }).join('');
@@ -17142,10 +17142,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var s='・アウト ';
       if(e.pre){
         var pc=e.pre.outPT>0?((e.post.outPT-e.pre.outPT)/e.pre.outPT*100):null;
-        s+='前'+Math.round(e.pre.outPT).toLocaleString()+'枚 → 後'+Math.round(e.post.outPT).toLocaleString()+'枚'+(pc!=null?('（'+(pc>=0?'+':'')+pc.toFixed(0)+'%）'):'');
+        s+='前'+Math.round(e.pre.outPT).toLocaleString()+''+_bjbU()+' → 後'+Math.round(e.post.outPT).toLocaleString()+''+_bjbU()+''+(pc!=null?('（'+(pc>=0?'+':'')+pc.toFixed(0)+'%）'):'');
         s+='・台粗利 前'+_bjwkYen(Math.round(e.pre.profPT))+' → 後'+_bjwkYen(Math.round(e.post.profPT))+'/日';
       } else {
-        s+='後'+Math.round(e.post.outPT).toLocaleString()+'枚・台粗利 後'+_bjwkYen(Math.round(e.post.profPT))+'/日（変化前のデータなし）';
+        s+='後'+Math.round(e.post.outPT).toLocaleString()+''+_bjbU()+'・台粗利 後'+_bjwkYen(Math.round(e.post.profPT))+'/日（変化前のデータなし）';
       }
       if(e.post.nd<3)s+='（変化後'+e.post.nd+'日分の暫定）';
       return s; }
@@ -17156,9 +17156,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     function _eqCell(e){ if(!e.post)return ['-','-'];
       var oa, pa;
       if(e.pre){ var pc2=e.pre.outPT>0?((e.post.outPT-e.pre.outPT)/e.pre.outPT*100):null;
-        oa=Math.round(e.pre.outPT).toLocaleString()+' → '+Math.round(e.post.outPT).toLocaleString()+'枚'+(pc2!=null?('（'+(pc2>=0?'+':'')+pc2.toFixed(0)+'%）'):'');
+        oa=Math.round(e.pre.outPT).toLocaleString()+' → '+Math.round(e.post.outPT).toLocaleString()+''+_bjbU()+''+(pc2!=null?('（'+(pc2>=0?'+':'')+pc2.toFixed(0)+'%）'):'');
         pa=_bjwkYen(Math.round(e.pre.profPT))+' → '+_bjwkYen(Math.round(e.post.profPT))+'/日';
-      } else { oa='－ → '+Math.round(e.post.outPT).toLocaleString()+'枚'; pa='－ → '+_bjwkYen(Math.round(e.post.profPT))+'/日'; }
+      } else { oa='－ → '+Math.round(e.post.outPT).toLocaleString()+''+_bjbU()+''; pa='－ → '+_bjwkYen(Math.round(e.post.profPT))+'/日'; }
       if(e.post.nd<3)oa+='<span class="bjwk-note">（後'+e.post.nd+'日分）</span>';
       return [oa,pa]; }
     var p6e;
@@ -17175,7 +17175,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var pSer='';
     if(C.series&&C.series.length){
       pSer=C.series.map(function(s){
-        var line='<b>'+s.label+'</b>（'+(s.note?s.note+'・':'')+Math.round(s.cur.tai)+'台）→ アウト<b>'+Math.round(s.cur.outPT).toLocaleString()+'枚</b>';
+        var line='<b>'+s.label+'</b>（'+(s.note?s.note+'・':'')+Math.round(s.cur.tai)+'台）→ アウト<b>'+Math.round(s.cur.outPT).toLocaleString()+''+_bjbU()+'</b>';
         if(s.prev&&s.prev.outPT)line+='（前週から'+_bjwkDeltaOut(s.cur.outPT,s.prev.outPT)+'）';
         if(s.cur.rate!=null){ line+='・出玉率'+s.cur.rate.toFixed(1)+'%';
           if(s.prev&&s.prev.rate!=null)line+='（'+((s.cur.rate-s.prev.rate)>=0?'+':'')+(s.cur.rate-s.prev.rate).toFixed(1)+'pt）'; }
@@ -17197,10 +17197,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(C.deep.hasPrev)pSer+='<br>店内の日次粗利は前週から'+(C.deep.dPr>=0?_man(C.deep.dPr)+'の増加':_man(-C.deep.dPr)+'の減少')+'。中身を機種で分解すると：';
       pSer+='<br>'+C.deep.rows.map(function(r){ var c=r.c, p=r.p;
         var line='<b>'+r.name+'</b>（'+Math.round(c.taiAvg)+'台）→ ';
-        if(p){ line+='アウト'+Math.round(p.outPT).toLocaleString()+'→'+Math.round(c.outPT).toLocaleString()+'枚';
+        if(p){ line+='アウト'+Math.round(p.outPT).toLocaleString()+'→'+Math.round(c.outPT).toLocaleString()+''+_bjbU()+'';
           if(p.rate!=null&&c.rate!=null)line+='・出玉率'+p.rate.toFixed(1)+'%→'+c.rate.toFixed(1)+'%';
           line+='・台粗利'+_bjwkYen(Math.round(p.profPT))+'→'+_bjwkYen(Math.round(c.profPT))+'/日'; }
-        else line+='アウト'+Math.round(c.outPT).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(c.profPT))+'/日（前週データなし）';
+        else line+='アウト'+Math.round(c.outPT).toLocaleString()+''+_bjbU()+'・台粗利'+_bjwkYen(Math.round(c.profPT))+'/日（前週データなし）';
         return line; }).join('<br>');
       if(C.deep.rows.length&&C.deep.rows[0].p){ var _r0=C.deep.rows[0], _d0=(_r0.c.prof/(_r0.c.nd||1))-(_r0.p.prof/(_r0.p.nd||1));
         pSer+='<br>動きの主役は<b>'+_r0.name+'</b>（店内の日次粗利を'+(_d0>=0?_man(_d0)+'押し上げ':_man(-_d0)+'押し下げ')+'）です。'; }
@@ -17208,8 +17208,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     H.push(['シリーズ別の週間動向', pSer]);
     // ⑧ 機種の週間動向（#03ダイジェスト行・#06数値併記＋アウト急増急減＋死に台ゲート）
     var _kl=[];
-    function _mrow(m){ return '<b>'+m.name+'</b>（出玉率'+m.pRate.toFixed(1)+'%→'+m.rate.toFixed(1)+'%・'+Math.round(m.taiAvg)+'台・アウト'+Math.round(m.outPT).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(m.profPT))+'/日）'; }
-    function _srow(m){ return '<b>'+m.name+'</b>（'+Math.round(m.pOut).toLocaleString()+'→'+Math.round(m.cOut).toLocaleString()+'枚・'+_bjwkPct(m.dPct)+'・'+Math.round(m.taiAvg)+'台・台粗利'+_bjwkYen(Math.round(m.profPT))+'/日）'; }
+    function _mrow(m){ return '<b>'+m.name+'</b>（出玉率'+m.pRate.toFixed(1)+'%→'+m.rate.toFixed(1)+'%・'+Math.round(m.taiAvg)+'台・アウト'+Math.round(m.outPT).toLocaleString()+''+_bjbU()+'・台粗利'+_bjwkYen(Math.round(m.profPT))+'/日）'; }
+    function _srow(m){ return '<b>'+m.name+'</b>（'+Math.round(m.pOut).toLocaleString()+'→'+Math.round(m.cOut).toLocaleString()+''+_bjbU()+'・'+_bjwkPct(m.dPct)+'・'+Math.round(m.taiAvg)+'台・台粗利'+_bjwkYen(Math.round(m.profPT))+'/日）'; }
     if(C.tight.length)_kl.push('<b>締め方向</b><br>'+C.tight.map(function(m){return '・'+_mrow(m);}).join('<br>'));
     if(C.loose.length)_kl.push('<b>開け方向</b><br>'+C.loose.map(function(m){return '・'+_mrow(m);}).join('<br>'));
     if(C.surge.length)_kl.push('<b>アウト急増</b><br>'+C.surge.map(function(m){return '・'+_srow(m);}).join('<br>'));
@@ -17220,7 +17220,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // ⑨ 機種マップ（#10: 4象限の別途テキスト。A/B/C/D・影響の大きい機種優先）
     var pQ='';
     if(C.quad&&C.quad.length){
-      function _qrow(q){ return '<b>'+q.name+'</b>（出玉率'+q.pRate.toFixed(1)+'%→'+q.cRate.toFixed(1)+'%・アウト'+Math.round(q.pOut).toLocaleString()+'→'+Math.round(q.cOut).toLocaleString()+'枚・台粗利'+_bjwkYen(Math.round(q.pProf))+'→'+_bjwkYen(Math.round(q.cProf))+'/日）'; }
+      function _qrow(q){ return '<b>'+q.name+'</b>（出玉率'+q.pRate.toFixed(1)+'%→'+q.cRate.toFixed(1)+'%・アウト'+Math.round(q.pOut).toLocaleString()+'→'+Math.round(q.cOut).toLocaleString()+''+_bjbU()+'・台粗利'+_bjwkYen(Math.round(q.pProf))+'→'+_bjwkYen(Math.round(q.cProf))+'/日）'; }
       function _qpick(f){ return C.quad.filter(f).sort(function(a,b){return b.impact-a.impact;}).slice(0,2); }
       var _qa=_qpick(function(q){return q.dr>=1&&q.dPct>=8;});
       var _qb=_qpick(function(q){return q.dr>=1&&q.dPct<=-8;});
@@ -17416,10 +17416,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var _dP2=C.prev?_bjwkDeltaYen(cur.profPerDay,C.prev.profPerDay):null;
     var _pkToku=C.toku.filter(function(t){return t.date===C.peak.date;})[0];
     var kpis='<div class="bjwk-kpis">'
-      +_kpi('台あたりアウト', Math.round(cur.outPT).toLocaleString(), '枚/日', _dO2?'前週から'+_dO2:'前週データなし', (C.dOut!=null&&C.dOut<0)?'dn':'up')
+      +_kpi('台あたりアウト', Math.round(cur.outPT).toLocaleString(), ''+_bjbU()+'/日', _dO2?'前週から'+_dO2:'前週データなし', (C.dOut!=null&&C.dOut<0)?'dn':'up')
       +_kpi('店の粗利', _bjwkYen(cur.profPerDay), '/日', _dP2?'前週から'+_dP2:'前週データなし', (C.dProfY!=null&&C.dProfY<0)?'dn':'up')
       +_kpi('出玉率', cur.rate!=null?cur.rate.toFixed(1):'-', '%', C.dRate!=null?('前週比'+(C.dRate>=0?'+':'')+C.dRate.toFixed(1)+'pt'):'—', '')
-      +_kpi('週内ピーク', Math.round(C.peak.outPT).toLocaleString(), '枚', _bjbFmtD(C.peak.date)+'（'+dowJ[C.peak.dow]+'）'+(_pkToku?'・'+_bjEsc(_pkToku.label):''), '')
+      +_kpi('週内ピーク', Math.round(C.peak.outPT).toLocaleString(), ''+_bjbU()+'', _bjbFmtD(C.peak.date)+'（'+dowJ[C.peak.dow]+'）'+(_pkToku?'・'+_bjEsc(_pkToku.label):''), '')
       +'</div>';
     var band=(C.nWeeksYear>=4)?('<div class="bjwk-band">'+C.yr+'年に入ってからの'+C.nWeeksYear+'週の中で：アウト <b>'+C.rankOut+'位</b> ／ 利益 <b>'+C.rankProf+'位</b></div>'):'';
     var CH={1:'<div class="bjwk-charts"><canvas id="bjwkCh1" width="372" height="220"></canvas><canvas id="bjwkCh2" width="372" height="220"></canvas></div>',
@@ -17438,18 +17438,18 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(C.prev){ la.push(['前週','('+_bjbFmtD(C.PW.mon)+'-'+_bjbFmtD(C.PW.sun)+')']); da.push(Math.round(C.prev.outPT)); dp.push(+(C.prev.profPerDay/10000).toFixed(1)); }
       la.push(['今週','('+_bjbFmtD(C.W.mon)+'-'+_bjbFmtD(C.W.sun)+')']); da.push(Math.round(cur.outPT)); dp.push(+(cur.profPerDay/10000).toFixed(1));
       var pal=la.map(function(_,i){ return i===la.length-1?'#1e5fa8':'#b9d3ee'; });
-      _bjwkBar('bjwkCh1', la, [{data:da, backgroundColor:pal, borderRadius:4}], {title:'台あたりアウト（枚/日）', fmt:function(v){return v.toLocaleString();}});
+      _bjwkBar('bjwkCh1', la, [{data:da, backgroundColor:pal, borderRadius:4}], {title:'台あたりアウト（'+_bjbU()+'/日）', fmt:function(v){return v.toLocaleString();}});
       _bjwkBar('bjwkCh2', la, [{data:dp, backgroundColor:pal, borderRadius:4}], {title:'店の粗利（万円/日）', fmt:function(v){return v.toLocaleString();}});
       if(C.spCur&&C.spCur.base!=null){
         _bjwkBar('bjwkCh3', [['ベース稼働','(平日)'],['山場','(土日祝・特定日)']], [
           {label:'前週', data:[C.spPrev&&C.spPrev.base!=null?Math.round(C.spPrev.base):null, C.spPrev&&C.spPrev.yama!=null?Math.round(C.spPrev.yama):null], backgroundColor:'#b9d3ee', borderRadius:4},
           {label:'今週', data:[Math.round(C.spCur.base), C.spCur.yama!=null?Math.round(C.spCur.yama):null], backgroundColor:'#1e5fa8', borderRadius:4}
-        ], {title:'ベースと山：台あたりアウト（枚/日）', legend:true, fmt:function(v){return v.toLocaleString();}});
+        ], {title:'ベースと山：台あたりアウト（'+_bjbU()+'/日）', legend:true, fmt:function(v){return v.toLocaleString();}});
       }
       // メリハリ収支の日次グラフ（#05: アウト棒＝山の日を濃く・店粗利は右軸の線）
       if(C.cur.days&&C.cur.days.length){
         _bjwkBar('bjwkCh4', C.cur.days.map(function(d){return [_bjbFmtD(d.date),'('+dowJ[d.dow]+')'];}), [
-          {label:'台あたりアウト（枚）', data:C.cur.days.map(function(d){return Math.round(d.outPT);}), backgroundColor:C.cur.days.map(function(d){return d.yama?'#1e5fa8':'#b9d3ee';}), borderRadius:4, order:2},
+          {label:'台あたりアウト（'+_bjbU()+'）', data:C.cur.days.map(function(d){return Math.round(d.outPT);}), backgroundColor:C.cur.days.map(function(d){return d.yama?'#1e5fa8':'#b9d3ee';}), borderRadius:4, order:2},
           {type:'line', label:'店粗利（万円）', data:C.cur.days.map(function(d){return +(d.prof/10000).toFixed(1);}), borderColor:'#c2410c', backgroundColor:'#c2410c', pointRadius:2.5, borderWidth:2, tension:0.25, yAxisID:'y1', order:1}
         ], {title:'日次のメリハリ：アウト（棒・濃い色＝山場）と店粗利（線）', legend:true, y2:true, lineVals:true, lineFmt:function(v){return Math.round(v)+'万';}, fmt:function(v){return v.toLocaleString();}});
       }
@@ -17459,7 +17459,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         _bjwkBar('bjwkCh5', _sl, [
           {label:'前週', data:C.series.map(function(s){return s.prev?Math.round(s.prev.outPT):null;}), backgroundColor:'#b9d3ee', borderRadius:4},
           {label:'今週', data:C.series.map(function(s){return Math.round(s.cur.outPT);}), backgroundColor:'#1e5fa8', borderRadius:4}
-        ], {title:'シリーズ別：台あたりアウト（枚/日）', legend:true, fmt:function(v){return v.toLocaleString();}});
+        ], {title:'シリーズ別：台あたりアウト（'+_bjbU()+'/日）', legend:true, fmt:function(v){return v.toLocaleString();}});
         _bjwkBar('bjwkCh5b', _sl, [
           {label:'前週', data:C.series.map(function(s){return s.prev?Math.round(s.prev.profPT):null;}), backgroundColor:'#f2d8bd', borderRadius:4},
           {label:'今週', data:C.series.map(function(s){return Math.round(s.cur.profPT);}), backgroundColor:'#c2410c', borderRadius:4}
@@ -17574,7 +17574,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           +'<div style="overflow-x:auto;"><table class="bjwr-tbl"><thead><tr><th>週</th><th>主だった機種</th><th>機種数</th><th>台数</th><th>アウトアップ機種数</th><th>総アウト/日（前 → 後）</th></tr></thead><tbody>';
         h+=weeks.map(function(wk,i){ var c=wk.cat[kd], mN=Object.keys(c.m).length;
           var io2='-';
-          if(c.preN&&c.pre>0){ io2=_fk(c.pre)+'枚 → '+_fk(c.post)+'枚（'+_pcS(c.pre,c.post)+'）'; }
+          if(c.preN&&c.pre>0){ io2=_fk(c.pre)+''+_bjbU()+' → '+_fk(c.post)+''+_bjbU()+'（'+_pcS(c.pre,c.post)+'）'; }
           return '<tr'+(i===weeks.length-1?' class="bjwr-cur"':'')+'><td>'+_wLab(wk)+'（'+_bjbFmtD(wk.mon)+'〜）</td>'
             +'<td class="bjwr-mn">'+(mN?_names(c.evs,2):'-')+'</td>'
             +'<td>'+(mN||'-')+'</td><td>'+(c.units||'-')+'</td><td>'+(Object.keys(c.up).length||'-')+'</td><td>'+io2+'</td></tr>'; }).join('');
@@ -17588,7 +17588,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
         var topM=Object.keys(unitByM).sort(function(a,b){return unitByM[b]-unitByM[a];}).slice(0,2);
         var sumNames=topM.map(function(m){return '<b>'+_bjEsc(m)+'</b>（'+unitByM[m]+'台）';}).join('、');
         var extra=Object.keys(tm).length-topM.length; if(extra>0)sumNames+='　ほか'+extra+'機種';
-        var sumIo='-'; if(tp>0)sumIo=_fk(tp)+'枚 → '+_fk(tq)+'枚（'+_pcS(tp,tq)+'）';
+        var sumIo='-'; if(tp>0)sumIo=_fk(tp)+''+_bjbU()+' → '+_fk(tq)+''+_bjbU()+'（'+_pcS(tp,tq)+'）';
         h+='<tr class="bjwr-sum"><td>12週合計</td><td class="bjwr-mn">'+sumNames+'</td>'
           +'<td>'+Object.keys(tm).length+'</td><td>'+tu+'</td><td>'+(Object.keys(tup).length||'-')+'</td><td>'+sumIo+'</td></tr>';
         return h+'</tbody></table></div>';
@@ -17611,7 +17611,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
               if(nm.length<2)nm.push('<b>'+_bjEsc(e.mn)+'</b>（'+(e.kind==='移動'?(e.units+'台'):(e.from+'台→'+e.to+'台'))+'）'); });
             var ex=Object.keys(seen).length-nm.length;
             var t='<b style="color:'+COL[kd]+';">'+kd+'</b>：'+mN+'機種・'+c.units+'台 → '+nm.join('、')+(ex>0?'　ほか'+ex+'機種':'')+'。';
-            if(c.preN&&c.pre>0)t+='総アウトは日あたり'+_fk(c.pre)+'枚 → <b>'+_fk(c.post)+'枚（'+_pcS(c.pre,c.post)+'）</b>。';
+            if(c.preN&&c.pre>0)t+='総アウトは日あたり'+_fk(c.pre)+''+_bjbU()+' → <b>'+_fk(c.post)+''+_bjbU()+'（'+_pcS(c.pre,c.post)+'）</b>。';
             t+='台あたりで上がったのは'+Object.keys(c.up).length+'機種。';
             s1.push(t);
           });
@@ -17730,7 +17730,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
       if(!recs.length){ host.innerHTML=''; return; }
       var isP=(typeof _isPachinkoStore==='function')?!!_isPachinkoStore():false;
-      var mc=(typeof _manConfig==='function')?_manConfig():{t1:10000,t2:9000,t3:8000,l1:'万枚突破',l2:'9,000枚突破',l3:'8,000枚突破'};
+      var mc=(typeof _manConfig==='function')?_manConfig():{t1:10000,t2:9000,t3:8000,l1:'万枚突破',l2:'9,000'+_bjbU()+'突破',l3:'8,000'+_bjbU()+'突破'};
       // 台番×日（万枚判定）
       var taiDay={}, dateSet={};
       for(var i=0;i<recs.length;i++){ var r=recs[i], d=r.date; if(!d)continue; dateSet[d]=1;
@@ -19836,9 +19836,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     }
     if(q==='期間内の万枚突破'){
       var mm=Object.keys(F.m).filter(function(k){return F.m[k].manmai>0;}).sort(function(a,b){return F.m[b].manmai-F.m[a].manmai;}).slice(0,10);
-      if(!mm.length) return ['この期間に <b>万枚突破（差枚10,000枚以上）</b> は記録されていません。'];
+      if(!mm.length) return ['この期間に <b>万枚突破（差枚10,000'+_bjbU()+'以上）</b> は記録されていません。'];
       return ['期間内の万枚突破をチェックします。',
-        '<div class="bjc-sec">万枚突破（差枚10,000枚以上）</div>'+mm.map(function(k){return _li('<span class="bj-hl-g">'+_bjClean(k)+'</span>','<b>'+F.m[k].manmai+'回</b>','bjc-val');}).join('')];
+        '<div class="bjc-sec">万枚突破（差枚10,000'+_bjbU()+'以上）</div>'+mm.map(function(k){return _li('<span class="bj-hl-g">'+_bjClean(k)+'</span>','<b>'+F.m[k].manmai+'回</b>','bjc-val');}).join('')];
     }
     if(q==='アウトが上昇傾向の機種は？'){
       var t=_trendF(F); if(!t) return ['期間が短く傾向を出せません（4日以上のデータが必要です）。'];
