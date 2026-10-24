@@ -1892,7 +1892,7 @@ const USER_ID = 'seiki';             // 例: 'hakuwa' / 'aviva'
 const BJ_MANUAL_UPLOAD_URL = 'https://formatter.bearjohn.com/c/fJGGMsCV17PBCxocAy4fDW9a/';     // 法人ページ: 手作業データアップ(フォーマッタ専用URL)。generate_users.py が差し替え。空なら従来のExcelを追加
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20261018-162408';
+const BJ_VERSION = '20261024-125528';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -16280,6 +16280,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   // ═══ AIの朝礼（競合偵察レポート・ルールベース v2）═══
   // 設計：①ヘッドライン＝その日一番のニュース（出玉面優先）②ご注進＝厳選2〜3件（機種別突出・増減台・新台・撤去・勝率）
   // ③今日の構え＋一手 ④タイムマシン（過去日の朝礼を再現・未来情報は使わない） ⑤数字は全部実データ計算＝発明しない
+  function _bjbU(){ return (typeof _isPachinkoStore==='function' && _isPachinkoStore()) ? '玉' : '枚'; }   // 朝礼の単位: パチンコ店は玉・スロット店は枚 (2026-10-24)
   var _bjbRetry=0,_bjbMemo=null,_bjbMemoKey='',_bjbDate=null,_bjbTypedKey='';   // _bjbDate=null → 今日。_bjbTypedKey＝最後にタイプライター演出した「店舗×日付」キー（同じ間は演出しない）
   function _bjbTodayStr(){ var n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
   function _bjbFmtD(ds){ return ds.slice(5).replace('-','/'); }
@@ -16454,8 +16455,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
             var devOut=Math.round((oLd/oBase-1)*100), mult=oLd/oBase;
             if(devOut>=OUT_SPIKE){   // その機種が普段より大きく跳ねた＝確認しに行く価値がある
               var jump=(mult>=2)
-                ? ('普段'+Math.round(oBase).toLocaleString()+'枚→'+Math.round(oLd).toLocaleString()+'枚（'+mult.toFixed(1)+'倍）')
-                : ('アウトが普段より＋'+devOut+'%（'+Math.round(oLd).toLocaleString()+'枚）');
+                ? ('普段'+Math.round(oBase).toLocaleString()+''+_bjbU()+'→'+Math.round(oLd).toLocaleString()+''+_bjbU()+'（'+mult.toFixed(1)+'倍）')
+                : ('アウトが普段より＋'+devOut+'%（'+Math.round(oLd).toLocaleString()+''+_bjbU()+'）');
               var payNote=(devPay!=null&&devPay>=PAY_SPIKE)?('・出玉率も＋'+devPay.toFixed(1)+'pt（'+pRate.toFixed(1)+'%）＝放出'):'';
               add(55+Math.min(40,devOut/3), jump+payNote, '高稼働');
             }
@@ -16531,14 +16532,14 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var outHigh=(outDev!=null&&outDev>=outThr)||(devStore!=null&&devStore>=30);
     var axis = outHigh?'out' : (bleedTrig&&pLd<pMean)?'bleed' : profitHigh?'profit' : 'flat';
     function _pl(){ return (ldRate!=null?'利益率'+ldRate.toFixed(1)+'%'+(rateAvgAll!=null?'（普段'+rateAvgAll.toFixed(1)+'%）':''):''); }
-    function _topOut(){ return outLeaders.slice(0,3).filter(function(m){return m.outTotal>0;}).map(function(m){return _bjEsc(m.mn)+'（'+Math.round(m.outAvg).toLocaleString()+'枚）';}).join('・'); }
+    function _topOut(){ return outLeaders.slice(0,3).filter(function(m){return m.outTotal>0;}).map(function(m){return _bjEsc(m.mn)+'（'+Math.round(m.outAvg).toLocaleString()+''+_bjbU()+'）';}).join('・'); }
     function _riserTxt(){ if(!risers.length)return''; return risers.slice(0,2).map(function(m){var mu=1+m.dev/100; return _bjEsc(m.mn)+'（'+(mu>=2?mu.toFixed(1)+'倍':'＋'+m.dev+'%')+'）';}).join('・'); }
     // 軸ごとに storeHead(店全体サマリ) / mach(機種詳細) / axisVerdict(総評) を用意
     var axisVerdict, storeHead='', mach='';
     if(axis==='out'){
       axisVerdict=_pick(['アウトが大きく伸びた一日でした。','客が大きく動いた一日でした。']);
       var bw=(pLd>0)?('利益率は'+(ldRate!=null?ldRate.toFixed(1)+'%':'—')+(rateAvgAll!=null?'（普段'+rateAvgAll.toFixed(1)+'%）':'')+'で黒字＝出さずに伸ばした好調日です'):('一方で'+_pl()+'＝出して伸ばした、放出寄りの伸びです');
-      storeHead='店全体のアウトが'+(outDev!=null?'平常より＋'+outDev+'%':'大きく伸び')+'（'+Math.round(lastV).toLocaleString()+'枚／普段'+Math.round(stats.mean).toLocaleString()+'枚）。'+bw+'。';
+      storeHead='店全体のアウトが'+(outDev!=null?'平常より＋'+outDev+'%':'大きく伸び')+'（'+Math.round(lastV).toLocaleString()+''+_bjbU()+'／普段'+Math.round(stats.mean).toLocaleString()+''+_bjbU()+'）。'+bw+'。';
       mach=(_topOut()?'アウトを稼いだ主役は'+_topOut()+'。':'')+(risers.length?'中でも普段比で大きく伸ばしたのは'+_riserTxt()+'。':'');
     } else if(axis==='bleed'){
       axisVerdict=ldHighDay?('本来は利益を確保したい'+ldDowName+'に出していた、気になる一日でした。'):('普段より大きく出した一日でした。');
@@ -16551,9 +16552,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       // 利益率だけでなく「客足（アウト）が普段より上/下/同じ」も必ず添える
       var _av=Math.round(lastV).toLocaleString(), _mv=Math.round(stats.mean).toLocaleString(), keep='';
       if(outDev!=null){
-        if(Math.abs(outDev)<15) keep='客足は普段どおり（アウト'+_av+'枚≒平常'+_mv+'枚）を保ちつつ、';
-        else if(outDev>0) keep='客足も普段より伸ばしつつ（アウト＋'+outDev+'%・'+_av+'枚／平常'+_mv+'枚）、';
-        else keep='客足は普段より少なめ（アウト'+outDev+'%・'+_av+'枚／平常'+_mv+'枚）ながら、';
+        if(Math.abs(outDev)<15) keep='客足は普段どおり（アウト'+_av+''+_bjbU()+'≒平常'+_mv+''+_bjbU()+'）を保ちつつ、';
+        else if(outDev>0) keep='客足も普段より伸ばしつつ（アウト＋'+outDev+'%・'+_av+''+_bjbU()+'／平常'+_mv+''+_bjbU()+'）、';
+        else keep='客足は普段より少なめ（アウト'+outDev+'%・'+_av+''+_bjbU()+'／平常'+_mv+''+_bjbU()+'）ながら、';
       }
       storeHead=keep+_pl()+'まで利益率を上げ、しっかり回収しました。';
       mach=(earners.length?'回収の主役は'+_causeList(earners.slice(0,3),'＋')+'。':'')+(bleeders.length?'一方で'+_causeList(bleeders,'−')+'は出していたものの、全体では大きく利益を確保しています。':'');
@@ -16589,7 +16590,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
           v2='いつものこの日よりアウト＋'+od+'%と大きく伸びました'; vs='特定日に客がよく伸びた一日でした。';
         } else { v2='ほぼいつものこの日通りでした'; vs='特定日として例年並みの一日でした。'; tokuDir='normal'; }
       } else { v2='過去の同じ日が少なく比較は参考値です'; vs='特定日にあたる一日でした。'; tokuDir='normal'; }
-      tokuLead='この日は'+lab+'でおそらく特定日。アウトは'+Math.round(ldOut).toLocaleString()+'枚で、'+v2+'。';
+      tokuLead='この日は'+lab+'でおそらく特定日。アウトは'+Math.round(ldOut).toLocaleString()+''+_bjbU()+'で、'+v2+'。';
       tokuVerdict=vs;
       // 全体利益のブリッジ：機種利益の話に移る前に「店全体の利益」を挟む（全体アウト→全体利益→機種利益の流れ）
       if(sameTk.length>=2 && (tokuDir==='release'||tokuDir==='miss'||tokuDir==='keep')){
@@ -16663,7 +16664,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(expY>0&&lastV>0){
         var devY=Math.round((lastV/expY-1)*100), aY=Math.abs(devY);
         var gY=aY<=10?'ほぼ見立て通りでした':(devY>0?(aY<=30?'見立てよりやや上振れました':'見立てを大きく上回りました'):(aY<=30?'見立てよりやや下振れました':'見立てを大きく下回りました'));
-        ansPara='昨日の朝礼の答え合わせ：アウトの見立て'+Math.round(expY).toLocaleString()+'枚に対し、実績は'+Math.round(lastV).toLocaleString()+'枚（'+(devY>=0?'+':'')+devY+'%）。'+gY+'。';
+        ansPara='昨日の朝礼の答え合わせ：アウトの見立て'+Math.round(expY).toLocaleString()+''+_bjbU()+'に対し、実績は'+Math.round(lastV).toLocaleString()+''+_bjbU()+'（'+(devY>=0?'+':'')+devY+'%）。'+gY+'。';
       }
     }
     // ── 本文（1つの長文・段落・タイプライター）──
@@ -16696,7 +16697,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // 注目の新台（初日〜3日目）：実際に動いた（アウト>0）中で1台平均アウトが最大の1機種を深掘り。全部アウト0＝検査待ち
     var newSpotPara='', _spot=null, _newInWin=equipNew.filter(function(e){return e.age<=3;});
     _newInWin.forEach(function(e){ var o=M.byMD[e.mn]&&M.byMD[e.mn][ld]; if(!o||!o.c||o.in<=0)return; var oa=o.in/o.c; if(!_spot||oa>_spot.oa)_spot={mn:e.mn,age:e.age,oa:oa,pa:o.p/o.c}; });
-    if(_spot){ newSpotPara='注目の新台は'+_bjEsc(_spot.mn)+'。\nアウト '+Math.round(_spot.oa).toLocaleString()+'枚（'+_spot.age+'日目）\n台粗利 '+Math.round(_spot.pa).toLocaleString()+'円（'+_spot.age+'日目）\n続きは本機能にてご確認ください。'; }
+    if(_spot){ newSpotPara='注目の新台は'+_bjEsc(_spot.mn)+'。\nアウト '+Math.round(_spot.oa).toLocaleString()+''+_bjbU()+'（'+_spot.age+'日目）\n台粗利 '+Math.round(_spot.pa).toLocaleString()+'円（'+_spot.age+'日目）\n続きは本機能にてご確認ください。'; }
     else if(_newInWin.length){ newSpotPara='導入された新台はまだアウトが立っておらず、検査待ち等でこれから本格稼働とみられます。'; }
     var paras=[p1,p2]; if(equipPara) paras.push(_raw(equipPara)); if(newSpotPara) paras.push(_raw(newSpotPara)); if(ansPara) paras.push(ansPara); paras.push(p3);
     var plain=paras.join('\n\n');
@@ -16721,10 +16722,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     var _dOutY=(_eLd>0)?_bjwkDeltaOut(_yOut,_eLd):null;
     var _dPrY=_bjwkDeltaYen(_yProf,_pAvg);
     var kpis='<div class="bjwk-kpis">'
-      +_bk('台あたりアウト（'+_bjbFmtD(ld)+'）', Math.round(_yOut).toLocaleString(), '枚', _dOutY?('普段のこの日と比べ'+_dOutY):'—', (_eLd&&_yOut<_eLd)?'dn':'up')
+      +_bk('台あたりアウト（'+_bjbFmtD(ld)+'）', Math.round(_yOut).toLocaleString(), ''+_bjbU()+'', _dOutY?('普段のこの日と比べ'+_dOutY):'—', (_eLd&&_yOut<_eLd)?'dn':'up')
       +_bk('店の粗利（'+_bjbFmtD(ld)+'）', _bjwkYen(Math.round(_yProf)), '', _dPrY?('普段と比べ'+_dPrY):'—', (_yProf<_pAvg)?'dn':'up')
       +_bk('出玉率（'+_bjbFmtD(ld)+'）', _yRate!=null?_yRate.toFixed(1):'-', '%', (_rAvg!=null&&_yRate!=null)?('直近2週平均比'+((_yRate-_rAvg)>=0?'+':'')+(_yRate-_rAvg).toFixed(1)+'pt'):'—', '')
-      +_bk('予測の的中度（直近30日）', hit!=null?('約'+hit):'—', hit!=null?'%':'', '昨日: 予測'+Math.round(_eLd).toLocaleString()+'枚 → 実績'+Math.round(_yOut).toLocaleString()+'枚', '')
+      +_bk('予測の的中度（直近30日）', hit!=null?('約'+hit):'—', hit!=null?'%':'', '昨日: 予測'+Math.round(_eLd).toLocaleString()+''+_bjbU()+' → 実績'+Math.round(_yOut).toLocaleString()+''+_bjbU()+'', '')
       +'</div>';
     var monBand=(_bjwkD(target).getDay()===1)?'<div class="bjwk-band">週が明けました。先週全体のまとめは「AIの週報 β」タブでどうぞ。</div>':'';
     var cards='';
