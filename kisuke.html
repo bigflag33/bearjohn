@@ -1892,7 +1892,7 @@ const USER_ID = 'kisuke';             // 例: 'hakuwa' / 'aviva'
 const BJ_MANUAL_UPLOAD_URL = 'https://formatter.bearjohn.com/c/xs3s3CHifQVuhJ32qiUjd9cx/';     // 法人ページ: 手作業データアップ(フォーマッタ専用URL)。generate_users.py が差し替え。空なら従来のExcelを追加
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20261027-042824';
+const BJ_VERSION = '20261102-070020';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -13822,7 +13822,7 @@ function renderDayCharts() {
 
 
 // ─── 認証 ───
-const PW_HASH = '2fefb2950fd6031aa42036bb4dd93d5ad05c4f7d47e8399e5a74b83adbf96568';
+const PW_HASH = 'd0f66318ecf3fb93251d5f082a08b86c7f397de641c9bc34c4ab0d0d6fa14f2a';
 const AUTH_KEY = 'bi_auth_bearjon';  // サイト共通（ユーザー別にしない）
 
 async function sha256(str) {
