@@ -1892,7 +1892,7 @@ const USER_ID = 'nexus';             // 例: 'hakuwa' / 'aviva'
 const BJ_MANUAL_UPLOAD_URL = 'https://formatter.bearjohn.com/c/1SVv10pPYYRj-qdZTIUTqw6J/';     // 法人ページ: 手作業データアップ(フォーマッタ専用URL)。generate_users.py が差し替え。空なら従来のExcelを追加
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20261104-114102';
+const BJ_VERSION = '20261105-083657';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -15687,6 +15687,23 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjwk-sheet .bjwr-tbl{ font-size:11px; margin:8px 0 2px; }
   .bjwk-sheet .bjwr-tbl th,.bjwk-sheet .bjwr-tbl td{ color:#1e293b; border-color:#d8e0ea; padding:4px 5px; }
   .bjwk-zwrap{ overflow-x:auto; }
+  .bjwk-sheet .bjwr-names{ width:100%; margin-top:12px; }
+  .bjwk-sheet .bjwr-names td{ text-align:left; white-space:normal; vertical-align:top; line-height:1.65; }
+  .bjwk-sheet .bjwr-names th:last-child{ text-align:left; }
+  .bjwk-sheet .bjwr-names td:first-child{ white-space:nowrap; }
+  .bjwk-sheet .bjwr-names .bjwr-cur td{ font-weight:400; }
+  .bjwk-sheet .bjwr-names .bjwr-cur td:first-child{ font-weight:700; }
+  .bjwr-new{ color:#b3261e; font-weight:800; }
+  .bjwr-multi{ font-weight:800; }
+  .bjwr-bnew{ display:inline-block; color:#fff; background:#b3261e; border:1px solid #b3261e; border-radius:3px; font-size:9.5px; font-weight:800; line-height:1.25; padding:0 3px; margin-right:3px; text-indent:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .bjwr-legend{ font-weight:400; font-size:10.5px; color:#475569; margin-left:6px; }
+  .bjwr-nm{ padding-left:92px; text-indent:-92px; }
+  .bjwr-mcap{ font-size:11.5px; font-weight:700; color:#173a7a; text-align:left; padding:0 0 4px; }
+  .bjwk-sheet .bjwr-matrix{ width:100%; margin-top:14px; }
+  .bjwk-sheet .bjwr-matrix td:first-child{ white-space:normal; }
+  .bjwk-sheet .bjwr-matrix td{ padding-top:2px; padding-bottom:2px; }
+  .bjwk-sheet .bjwr-matrix .bjwr-mt{ font-weight:800; }
+  .bjwr-lv{ display:inline-block; width:88px; margin-right:4px; text-indent:0; font-weight:700; color:#173a7a; font-size:10.5px; }
   .bjwk-charts{ display:flex; gap:14px; flex-wrap:wrap; margin:8px 0 6px; }
   .bjwk-foot{ margin:18px 18px 0; font-size:10px; color:#94a3b8; border-top:1px solid #e2e8f0; padding-top:8px; }
   @media print{
@@ -15700,6 +15717,10 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     #bjwkSheet .bjwk-charts canvas{ flex:0 1 auto; min-width:0; max-width:100% !important; height:auto !important; }
     #bjwkSheet .bjwr-tbl{ width:100%; font-size:9.5px; break-inside:avoid; }
     #bjwkSheet .bjwr-tbl th, #bjwkSheet .bjwr-tbl td{ padding:3px; }
+    #bjwkSheet .bjwr-names{ break-inside:auto; }
+    #bjwkSheet .bjwr-names tr{ break-inside:avoid; }
+    #bjwkSheet .bjwr-matrix{ break-inside:auto; break-before:page; }
+    #bjwkSheet .bjwr-matrix tr{ break-inside:avoid; }
     @page{ size:A4; margin:10mm; }
   }
   .bjp-dates{ font-size:12.5px; color:var(--text2); background:rgba(0,152,212,.06); border:1px solid rgba(0,152,212,.18); border-radius:9px; padding:9px 13px; margin:2px 0 10px; }
@@ -17419,8 +17440,8 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     if(Z){
       var _zNote='<br><span class="bjwk-note">※直近'+Z.weeks.length+'週（月〜日）の推移です。'
         +(Z.isP?'':'全台系＝3台以上の機種で、全台がIN2万枚以上かつ出玉率100%以上（105%はその内数）。')
-        +'WIN機種＝3台以上・店舗平均IN枚数以上の台のみで、差枚プラス台の割合。出現率＝件数÷（その週の台数×営業日数）。詳しくはレポートタブの「全台系・万枚」をご覧ください。</span>';
-      var _zTbl='<div class="bjwk-zwrap"><table class="bjwr-tbl"><thead>'+Z.thead+'</thead><tbody>'+Z.trows+'</tbody></table></div>';
+        +'WIN機種＝3台以上・店舗平均IN枚数以上の台のみで、差枚プラス台の割合。出現率＝件数÷（その週の台数×営業日数）。×2は同じ週に2日。同じ機種は一番高い区分にだけ載せています。WIN65〜74%は過去の週は5機種までです。データの始まりから4週は「新」を付けません。詳しくはレポートタブの「全台系・万枚」をご覧ください。</span>';
+      var _zTbl=_bjwrWeeklyTables(Z);
       H.splice(H.length-1, 0, [(Z.isP?Z.mc.l1.replace('突破','')+'・WIN機種':'全台系・万枚')+'（直近'+Z.weeks.length+'週の推移）', Z.lines.join('<br>')+_zNote, _zTbl]);
       _zIdx=H.length-2;
     }
@@ -17799,6 +17820,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       var rate=W/elig.length*100;
       if(rate>=65)winEv.push({d:g.d, mn:g.mn, rate:rate});
     });
+    // 機種ごとの、全台系かWINに初めてなった日（週報の「新登場」の印に使う）
+    var firstSeen={};
+    zenEv.concat(winEv).forEach(function(e){ if(!firstSeen[e.mn]||e.d<firstSeen[e.mn])firstSeen[e.mn]=e.d; });
     // 直近の「日曜まで閉じた」週から最大12週（週報と同じ木曜ルールの週番号）
     var lastD=dates[dates.length-1], lastMon=_bjwkMonday(lastD);
     var endMon=opts.endMon||((lastD>=_bjwkAddD(lastMon,6))?lastMon:_bjwkAddD(lastMon,-7));
@@ -17819,9 +17843,9 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       wk.p1=den?m1/den*100:0; wk.p2=den?m2/den*100:0; wk.p3=den?m3/den*100:0;
       wk.z105=[]; wk.z100=[];
       zenEv.forEach(function(z){ if(z.d<wk.mon||z.d>wk.sun)return; wk.z100.push(z); if(z.k===105)wk.z105.push(z); });
-      wk.w100=0; wk.w75=0; wk.w65=0; wk.winM={}; wk.winAll={};
+      wk.w100=0; wk.w75=0; wk.w65=0; wk.winM={}; wk.winAll={}; wk.winEv=[];
       winEv.forEach(function(w){ if(w.d<wk.mon||w.d>wk.sun)return;
-        wk.w65++; wk.winAll[w.mn]=(wk.winAll[w.mn]||0)+1;
+        wk.w65++; wk.winAll[w.mn]=(wk.winAll[w.mn]||0)+1; wk.winEv.push(w);
         if(w.rate>=75)wk.w75++; if(w.rate>=100){ wk.w100++; wk.winM[w.mn]=(wk.winM[w.mn]||0)+1; } });
     });
     var cur=weeks[weeks.length-1], prevW=weeks.slice(0,-1);
@@ -17892,7 +17916,69 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       }
       if(came.length&&gone.length)lines.push('→ 勝たせどころ（勝率で見せる機種）の入れ替わりが起きています。');
     }
-    return {isP:isP, mc:mc, weeks:weeks, cur:cur, thead:thead, trows:trows, lines:lines};
+    return {isP:isP, mc:mc, weeks:weeks, cur:cur, thead:thead, trows:trows, lines:lines, firstSeen:firstSeen, dataFrom:dates[0]};
+  }
+  // 週報の表: 件数の表(万枚・9,000枚・8,000枚の列なし)＋週ごとの機種の表。WIN65〜74%は過去の週は多い順に5機種まで・直近週は全部
+  function _bjwrWeeklyTables(Z){
+    var isP=Z.isP, mc=Z.mc, weeks=Z.weeks, last=weeks.length-1;
+    function lab(wk){ return parseInt(wk.W.month.slice(5),10)+'月第'+wk.W.idx+'週（'+_bjbFmtD(wk.mon)+'〜）'; }
+    var h1='<tr><th>週</th>'+(isP?'':'<th>全台系105%</th><th>全台系100%</th>')+'<th>WIN100%</th><th>WIN75%以上</th><th>WIN65%以上</th><th>'+mc.l1.replace('突破','')+'出現率</th></tr>';
+    var r1=weeks.map(function(wk,i){ return '<tr'+(i===last?' class="bjwr-cur"':'')+'><td>'+lab(wk)+'</td>'
+      +(isP?'':'<td>'+(wk.z105.length||'-')+'</td><td>'+(wk.z100.length||'-')+'</td>')
+      +'<td>'+(wk.w100||'-')+'</td><td>'+(wk.w75||'-')+'</td><td>'+(wk.w65||'-')+'</td>'
+      +'<td>'+(wk.man1?wk.p1.toFixed(2)+'%':'-')+'</td></tr>'; }).join('');
+    var judgeFrom=_bjwkAddD(Z.dataFrom,28);   // データの始まりから4週は「新登場」を判定しない（全部が新しく見えてしまうため）
+    var r2=weeks.map(function(wk,i){ var L=[], days={};
+      function addDay(e){ (days[e.mn]=days[e.mn]||{})[e.d]=1; }
+      if(!isP)wk.z100.forEach(addDay);
+      wk.winEv.forEach(addDay);
+      function nDays(m){ return Object.keys(days[m]||{}).length; }
+      function isNew(m){ var f=Z.firstSeen[m]; return wk.mon>=judgeFrom && !!f && f>=wk.mon && f<=wk.sun; }
+      function show(m, tail){
+        var nw=isNew(m), mu=nDays(m)>=2, cls=(nw?'bjwr-new ':'')+(mu?'bjwr-multi':'');
+        return (nw?'<span class="bjwr-bnew">新</span>':'')+(cls?'<span class="'+cls.trim()+'">'+_bjEsc(m)+tail+'</span>':_bjEsc(m)+tail);
+      }
+      function rank(m){ return isNew(m)?2:(nDays(m)>=2?1:0); }
+      function order(a,b){ return (rank(b)-rank(a))||(nDays(b)-nDays(a))||(a<b?-1:1); }
+      function tail(m){ return nDays(m)>=2?'×'+nDays(m):''; }
+      function plain(m){ return show(m,tail(m)); }
+      // 同じ機種は週に1回だけ、一番高い区分に載せる（全台系→WIN100%→WIN75〜99%→WIN65〜74%）
+      var zen={}, best={};
+      if(!isP)wk.z100.forEach(function(z){ (zen[z.mn]=zen[z.mn]||[]).push(z); });
+      wk.winEv.forEach(function(e){ if(!zen[e.mn]&&(best[e.mn]==null||e.rate>best[e.mn]))best[e.mn]=e.rate; });
+      var zk=Object.keys(zen).sort(order);
+      if(zk.length)L.push(['全台系', zk.map(function(m){
+        var when=zen[m].slice().sort(function(a,b){ return a.d<b.d?-1:(a.d>b.d?1:0); }).map(function(z){ return _bjbFmtD(z.d)+'・'+z.k+'%'; }).join('、');
+        return show(m,'（'+when+'）'+tail(m)); }).join('、')]);
+      function tierList(lo,hi){ return Object.keys(best).filter(function(m){ return best[m]>=lo&&best[m]<hi; }).sort(order); }
+      var t100=tierList(100,Infinity), t75=tierList(75,100), t65=tierList(0,75);
+      if(t100.length)L.push(['WIN100%', t100.map(plain).join('、')]);
+      if(t75.length)L.push(['WIN75〜99%', t75.map(plain).join('、')]);
+      if(t65.length){ var hiN=t65.filter(function(m){ return rank(m)>0; }), rest=t65.filter(function(m){ return rank(m)===0; });
+        var keep=(i===last)?rest.length:Math.max(0,5-hiN.length), more=rest.length-keep;
+        L.push(['WIN65〜74%', hiN.concat(rest.slice(0,keep)).map(plain).join('、')+(more>0?' ほか'+more+'機種':'')]); }
+      return '<tr'+(i===last?' class="bjwr-cur"':'')+'><td>'+lab(wk)+'</td><td>'
+        +(L.length?L.map(function(x){ return '<div class="bjwr-nm"><span class="bjwr-lv">'+x[0]+'</span>'+x[1]+'</div>'; }).join(''):'該当なし')+'</td></tr>'; }).join('');
+    // 機種ごとの回数（この表の週ぜんぶ）。同じ日は一番高い区分に1回だけ数える
+    var COLS=isP?[['WIN100%',3],['WIN75〜99%',2],['WIN65〜74%',1]]:[['全台系105%',5],['全台系100〜104%',4],['WIN100%',3],['WIN75〜99%',2],['WIN65〜74%',1]];
+    var dayBest={};
+    function mark(mn,d,band){ var o=dayBest[mn]=dayBest[mn]||{}; if(!o[d]||band>o[d])o[d]=band; }
+    weeks.forEach(function(wk){
+      if(!isP)wk.z100.forEach(function(z){ mark(z.mn,z.d,z.k===105?5:4); });
+      wk.winEv.forEach(function(e){ mark(e.mn,e.d,e.rate>=100?3:(e.rate>=75?2:1)); }); });
+    var mrows=Object.keys(dayBest).map(function(mn){ var c={}, ds=Object.keys(dayBest[mn]);
+      ds.forEach(function(d){ var b=dayBest[mn][d]; c[b]=(c[b]||0)+1; });
+      var score=0; COLS.forEach(function(x){ score=score*100+(c[x[1]]||0); });
+      return {mn:mn, c:c, total:ds.length, score:score}; });
+    mrows.sort(function(a,b){ return (b.total-a.total)||(b.score-a.score)||(a.mn<b.mn?-1:1); });
+    var mh='<tr><th>機種（直近'+weeks.length+'週）</th>'+COLS.map(function(x){ return '<th>'+x[0]+'</th>'; }).join('')+'<th>合計</th></tr>';
+    var mb=mrows.map(function(r){
+      var f=Z.firstSeen[r.mn], nw=!!f&&f>=judgeFrom&&f>=weeks[0].mon;
+      return '<tr><td>'+(nw?'<span class="bjwr-bnew">新</span>':'')+_bjEsc(r.mn)+'</td>'
+        +COLS.map(function(x){ return '<td>'+(r.c[x[1]]||'')+'</td>'; }).join('')+'<td class="bjwr-mt">'+r.total+'</td></tr>'; }).join('');
+    return '<div class="bjwk-zwrap"><table class="bjwr-tbl"><thead>'+h1+'</thead><tbody>'+r1+'</tbody></table></div>'
+      +'<table class="bjwr-tbl bjwr-names"><thead><tr><th>週</th><th>どの機種か　<span class="bjwr-legend"><span class="bjwr-bnew">新</span>初めて全台系かWINになった機種　<b>太字</b> 同じ週に2日以上</span></th></tr></thead><tbody>'+r2+'</tbody></table>'
+      +'<table class="bjwr-tbl bjwr-matrix"><caption class="bjwr-mcap">機種ごとの回数。同じ日は一番高い区分に1回だけ数えています。</caption><thead>'+mh+'</thead><tbody>'+mb+'</tbody></table>';
   }
   function _bjwrCharts(Z, id1, id2, id3){
     var isP=Z.isP, mc=Z.mc, weeks=Z.weeks;
