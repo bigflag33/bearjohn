@@ -1892,7 +1892,7 @@ const USER_ID = 'hakuwa';             // 例: 'hakuwa' / 'aviva'
 const BJ_MANUAL_UPLOAD_URL = 'https://formatter.bearjohn.com/c/4ZpbKAhqk5fo9j4rR39wiDPg/';     // 法人ページ: 手作業データアップ(フォーマッタ専用URL)。generate_users.py が差し替え。空なら従来のExcelを追加
 // このファイルの版番号。generate_users.py が dist 生成時に日時へ差し替え、
 // 同じ日時を dist/version.json にも書く（更新通知の照合用）。マスターは 'dev' のまま
-const BJ_VERSION = '20261105-083657';
+const BJ_VERSION = '20261105-163732';
 // ──────────────────────────────────────────────────────────────
 
 // ストレージキーをUSER_IDで名前空間分離
@@ -15687,6 +15687,37 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   .bjwk-sheet .bjwr-tbl{ font-size:11px; margin:8px 0 2px; }
   .bjwk-sheet .bjwr-tbl th,.bjwk-sheet .bjwr-tbl td{ color:#1e293b; border-color:#d8e0ea; padding:4px 5px; }
   .bjwk-zwrap{ overflow-x:auto; }
+  /* オススメ機種 */
+  .bjo-form{ background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px 18px; margin:0 0 14px; max-width:824px; }
+  .bjo-h{ font-size:15px; font-weight:800; color:var(--text); }
+  .bjo-help{ font-size:12px; color:var(--text2); margin:4px 0 10px; }
+  .bjo-row{ display:flex; gap:12px; align-items:flex-start; margin:8px 0; font-size:13px; color:var(--text); }
+  .bjo-row > span{ width:5em; flex:none; font-weight:700; padding-top:6px; }
+  .bjo-row input[type=date], .bjo-row input[type=text]{ font:inherit; padding:6px 10px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); }
+  .bjo-pick{ flex:1; min-width:0; }
+  .bjo-pick input[type=text]{ width:100%; box-sizing:border-box; }
+  .bjo-acts{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0; font-size:12px; color:var(--text2); }
+  .bjo-acts button{ font:inherit; font-size:12px; font-weight:700; padding:4px 10px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); cursor:pointer; }
+  .bjo-list{ max-height:260px; overflow:auto; border:1px solid var(--border); border-radius:8px; padding:4px 8px; }
+  .bjo-list label{ display:block; padding:3px 0; font-size:13px; color:var(--text); cursor:pointer; }
+  .bjo-list small{ color:var(--text2); margin-left:6px; }
+  .bjo-go{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:12px; }
+  .bjo-run{ font:inherit; font-size:13px; font-weight:800; color:#fff; background:#0098d4; border:0; border-radius:9px; padding:9px 18px; cursor:pointer; }
+  .bjo-msg{ font-size:12.5px; font-weight:700; color:#b3261e; }
+  .bjwk-sheet .bjo-tbl{ width:100%; font-size:12px; margin:6px 0 2px; }
+  .bjwk-sheet .bjo-tbl thead th{ text-align:center; line-height:1.4; }
+  .bjwk-sheet .bjo-tbl th:first-child{ text-align:left; }
+  .bjwk-sheet .bjo-tbl .bjo-cur{ font-weight:800; background:#f4f7fb; }
+  .bjo-up{ color:#0f7a4f; } .bjo-dn{ color:#b3261e; }
+  .bjo-none{ color:#94a3b8; }
+  .bjo-st{ font-size:11.5px; font-weight:800; color:#334155; margin:6px 0 2px; }
+  .bjo-line{ font-size:11px; color:#475569; line-height:1.6; margin-top:3px; }
+  .bjo-leg{ font-size:10.5px; color:#475569; margin:2px 0 2px; display:flex; flex-wrap:wrap; gap:4px 14px; }
+  .bjo-leg i{ display:inline-block; width:11px; height:11px; border-radius:2px; vertical-align:-1px; margin-right:4px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .bjo-trk{ margin:0; }
+  .bjo-trk canvas{ display:block; }
+  #bjoSheet .bjwk-charts{ flex-wrap:nowrap; }
+  #bjoSheet canvas{ flex:0 1 auto; min-width:0; max-width:100%; height:auto; }
   .bjwk-sheet .bjwr-names{ width:100%; margin-top:12px; }
   .bjwk-sheet .bjwr-names td{ text-align:left; white-space:normal; vertical-align:top; line-height:1.65; }
   .bjwk-sheet .bjwr-names th:last-child{ text-align:left; }
@@ -15710,7 +15741,13 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     body *{ visibility:hidden; }
     body:not([data-bjroom="briefing"]) #bjwkSheet, body:not([data-bjroom="briefing"]) #bjwkSheet *{ visibility:visible; }
     body[data-bjroom="briefing"] #bjbSheet, body[data-bjroom="briefing"] #bjbSheet *{ visibility:visible; }
-    #bjwkSheet, #bjbSheet{ position:absolute; left:0; top:0; width:100%; max-width:none; border:none; border-radius:0; }
+    body[data-bjroom="osusume"] #bjoSheet, body[data-bjroom="osusume"] #bjoSheet *{ visibility:visible; }
+    #bjwkSheet, #bjbSheet, #bjoSheet{ position:absolute; left:0; top:0; width:100%; max-width:none; border:none; border-radius:0; }
+    #bjoSheet .bjwk-hero{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #bjoSheet .bjwk-charts{ flex-wrap:nowrap; }
+    #bjoSheet .bjwk-charts canvas{ flex:0 1 auto; min-width:0; max-width:100% !important; height:auto !important; }
+    #bjoSheet .bjo-tbl{ font-size:10px; }
+    #bjoSheet .bjo-tbl th, #bjoSheet .bjo-tbl td{ padding:3px; }
     .bjwk-sec, .bjb2-cards{ break-inside:avoid; }
     .bjwk-zwrap{ overflow:visible; }
     #bjwkSheet .bjwk-charts{ flex-wrap:nowrap; }
@@ -15999,6 +16036,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   // AIの朝礼は開発中＝管理者(admin/ローカル)でのみ表示。法人ページ(USER_ID≠admin)には出さない＝未完成を配信しても見えない
   ROOMS.push(['briefing','AIの朝礼 β']);   // 2026/07/03 台帳#19の改修完了をもって法人ページにも開放（旧: admin限定）
   ROOMS.push(['weekly','AIの週報 β']);   // 2026/07/17 台帳#07までの磨き込みをもって法人ページにも開放（旧: admin限定）
+  ROOMS.push(['osusume','オススメ機種 β']);   // 2026/11/05 期間と機種を選んで効果を見る（登録はしない）
   // 機種別チューニング（コイン単価の補正）2026/07/28
   // 試験運用中はセントラル（コンコルドさん）と管理者のみ。問題なければここに法人を足して横展開する。
   // ここに載っていない法人では機能そのものを動かさない（設定の読み込みも行わない）＝数字は従来どおり。
@@ -16041,6 +16079,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
       if(room==='payout'){ if(window._bjPayoutDirty){ _bjpRetry=0; try{ _bjpRender(); }catch(e){ console.error('payout', e); } } }   // 出玉配分の答合せ：遅延描画
       if(room==='briefing'){ _bjbRetry=0; try{ _bjbRender(); }catch(e){ console.error('briefing', e); } }   // AIの朝礼：開くたび生成（メモ化済みで軽い）
       if(room==='weekly'){ _bjwkRetry=0; try{ _bjwkRender(); }catch(e){ console.error('weekly', e); } }   // AIの週報：開くたび生成
+      if(room==='osusume'){ try{ _bjoOpen(); }catch(e){ console.error('osusume', e); } }   // オススメ機種：開くたび機種の一覧を今の店で作り直す
       if(room==='tune'){ _bjtRetry=0; try{ _bjtSyncDeptToStore(); _bjtRender(); }catch(e){ console.error('tune', e); } }   // 機種別チューニング：開くたび表示中の店の部門に合わせて集計
     };
     if(needHeavy){ _bjShowLoading(); setTimeout(function(){ try{ work(); } finally { _bjHideLoading(); } }, 60); }   // 60ms＝オーバーレイ描画を待ってから重い処理（rAFは裏タブで止まるため不使用）
@@ -17534,6 +17573,458 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   }
 
 
+
+  // ===== オススメ機種の効果（2026-11-05 髙橋さんの案。同日「グラフを多めに」で図を増量）=====
+  // 期間と機種を選ぶと、先週対比・先月対比と店全体を並べたレポートをその場で出す（登録はしない）。
+  // 比べる期間は曜日をそろえる: 期間の日数以上で一番近い7の倍数だけ前（先週対比）、28の倍数だけ前（先月対比）。
+  // 数字は機種別集計と同じ関数（_aggSummaryRow / buildModelRows）。出玉率は (Σアウト+Σ差枚)/Σアウト。
+  // 図はこの区画専用の _bjoMk で描く（週報の _bjwkBar には触らない）。新しい区分・指数・判定は作らない。
+  var _bjoSel={}, _bjoListNames=[], _bjoShown=false, _bjoCharts=[];
+  var _bjoCol={navy:'#173a7a',b1:'#1e5fa8',b2:'#8fb4dc',b3:'#dbe5f0',or:'#c2410c',grid:'#eef2f7',tx:'#475569',mut:'#94a3b8',band:'#eef3f9',zero:'#64748b',ink:'#334155',gray:'#cbd5e1'};
+  var _bjoDOW='日月火水木金土', _bjoPER=['mo','wk','cur'], _bjoPERL={mo:'先月対比',wk:'先週対比',cur:'オススメ期間'}, _bjoPERC={mo:'#dbe5f0',wk:'#8fb4dc',cur:'#1e5fa8'};
+  function _bjoDays(a,b){ return Math.round((_bjwkD(b)-_bjwkD(a))/86400000)+1; }
+  function _bjoRange(rg){ return _bjbFmtD(rg.from)+'〜'+_bjbFmtD(rg.to); }
+  function _bjoDw(ds){ return _bjoDOW[_bjwkD(ds).getDay()]; }
+  function _bjoIsKyu(ds){ var dw=_bjwkD(ds).getDay(); return dw===0||dw===6||isHoliday(ds); }
+  function _bjoMan(v){ var a=Math.abs(v), s=v<0?'-':''; if(a>=1e6)return s+Math.round(a/1e4)+'万'; if(a>=1e4)return s+(a/1e4).toFixed(1).replace(/\.0$/,'')+'万'; return s+Math.round(a).toLocaleString(); }
+  function _bjoShort(s,k){ s=String(s); return s.length>k?s.slice(0,k)+'…':s; }
+  function _bjoPct(c,b){ return (b&&b>0)?((c-b)/b*100):null; }
+  function _bjoSign(v,dig){ return (v>=0?'+':'')+v.toFixed(dig==null?1:dig); }
+  function _bjoCls(v){ return v>0?'bjo-up':(v<0?'bjo-dn':''); }
+  function _bjoNice(v){ if(v<=0)return 1; var m=Math.pow(10,Math.floor(Math.log10(v))), r=v/m; return (r<=1?1:r<=2?2:r<=2.5?2.5:r<=5?5:10)*m; }
+  function _bjoMetrics(recs){
+    if(!recs.length)return null;
+    var s=_aggSummaryRow(recs), inn=0, df=0, pr=0;
+    for(var i=0;i<recs.length;i++){ inn+=recs[i]['IN枚数']||0; df+=recs[i]['差枚']||0; pr+=recs[i]['台粗利']||0; }
+    return { days:s.days, tai:s.avgMachines, rows:recs.length, inn:inn, df:df, pr:pr, outDay:inn/s.days, outPT:s.avgIn, rate:inn>0?(inn+df)/inn*100:null, profPT:s.avgProfit, profDay:s.profit/s.days };
+  }
+  // ── 計算（画面に触らない）──
+  function _bjoCompute(recs, from, to, names){
+    var first='', last='';
+    for(var i=0;i<recs.length;i++){ var d0=recs[i].date; if(!d0)continue; if(!first||d0<first)first=d0; if(d0>last)last=d0; }
+    if(!last)return {err:'この店舗にデータがありません。'};
+    if(from>last)return {err:'選んだ期間のデータはまだありません（データは'+_bjbFmtD(last)+'までです）。'};
+    var end=to>last?last:to, n=_bjoDays(from,end);
+    var wk=Math.ceil(n/7)*7, mo=Math.ceil(n/28)*28;
+    if(mo===wk)mo+=28;   // 22〜28日の期間は先週対比も4週前になるので、先月対比はさらに4週前
+    var R={ cur:{from:from,to:end}, wk:{from:_bjwkAddD(from,-wk),to:_bjwkAddD(end,-wk)}, mo:{from:_bjwkAddD(from,-mo),to:_bjwkAddD(end,-mo)} };
+    var set={}; names.forEach(function(m){ set[m]=1; });
+    _bjoPER.forEach(function(k){ R[k].sel=[]; R[k].all=[]; });
+    var byDay={}, md={}, firstSeen={};
+    for(var j=0;j<recs.length;j++){ var r=recs[j], d=r.date; if(!d)continue;
+      var mn=r['機種名'], hit=!!set[mn], inn=r['IN枚数']||0, df=r['差枚']||0, pr=r['台粗利']||0;
+      var o=byDay[d]||(byDay[d]={sIn:0,sC:0,sDf:0,sPr:0,aIn:0,aC:0,aDf:0,aPr:0});
+      o.aIn+=inn; o.aC++; o.aDf+=df; o.aPr+=pr;
+      if(hit){ o.sIn+=inn; o.sC++; o.sDf+=df; o.sPr+=pr;
+        var mo_=md[mn]||(md[mn]={}), x=mo_[d]||(mo_[d]={inn:0,c:0}); x.inn+=inn; x.c++;
+        if(!firstSeen[mn]||d<firstSeen[mn])firstSeen[mn]=d; }
+      for(var q=0;q<3;q++){ var k=_bjoPER[q]; if(d>=R[k].from&&d<=R[k].to){ R[k].all.push(r); if(hit)R[k].sel.push(r); } }
+    }
+    _bjoPER.forEach(function(k){ var w=R[k], kyu=0;
+      for(var ds=w.from; ds<=w.to; ds=_bjwkAddD(ds,1)){ if(_bjoIsKyu(ds))kyu++; }
+      w.kyu=kyu; w.nAll=_bjoDays(w.from,w.to); w.S=_bjoMetrics(w.sel); w.A=_bjoMetrics(w.all);
+      w.PM={}; buildModelRows(w.all).forEach(function(m){ m.rate=m.inmai>0?(m.inmai+m.diff)/m.inmai*100:null; w.PM[m.name]=m; });
+      w.nos={}; w.nosOK=true;
+      w.sel.forEach(function(r){ var no=r['台番']; if(no==null||no==='')w.nosOK=false; var key=r['機種名']+'|'+no; var u=w.nos[key]||(w.nos[key]={m:r['機種名'],no:no,inn:0,c:0}); u.inn+=r['IN枚数']||0; u.c++; });
+      delete w.sel; delete w.all; });
+    var isAll=!!(R.cur.S&&R.cur.A&&R.cur.S.rows>=R.cur.A.rows*0.95);
+    return { R:R, n:n, wkShift:wk, moShift:mo, first:first, last:last, end:end, cut:to>last, toReq:to, byDay:byDay, names:names, md:md, firstSeen:firstSeen, isAll:isAll };
+  }
+  function _bjoSumDays(C,f,t){ var o={sIn:0,sC:0,sDf:0,sPr:0,aIn:0,aC:0,aDf:0,aPr:0,nd:0,hol:0}; for(var d=f; d<=t; d=_bjwkAddD(d,1)){ var x=C.byDay[d]; if(x&&x.aC){ o.nd++; o.sIn+=x.sIn; o.sC+=x.sC; o.sDf+=x.sDf; o.sPr+=x.sPr; o.aIn+=x.aIn; o.aC+=x.aC; o.aDf+=x.aDf; o.aPr+=x.aPr; } if(isHoliday(d))o.hol++; } return o; }
+  // 7日ごとの区切り（開始前8つ〜終了後8つ。データの範囲に収まる区切りだけ）
+  function _bjoBins(C){
+    var n=C.n, L=n<7?n:7, from=C.R.cur.from, bins=[], iMax=Math.ceil(n/7)-1+8;
+    for(var i=-8;i<=iMax;i++){ var f=_bjwkAddD(from,7*i), t=_bjwkAddD(f,L-1);
+      if(f<C.first||t>C.last)continue;
+      var b=_bjoSumDays(C,f,t); b.f=f; b.t=t; b.i=i; b.hollow=b.nd<L;
+      var inc=0; for(var d=f; d<=t; d=_bjwkAddD(d,1)){ if(d>=from&&d<=C.end)inc++; } b.inCur=inc>L/2; b.before=t<from; b.after=!b.inCur&&t>C.end;
+      bins.push(b); }
+    return bins;
+  }
+  // 「店全体との差」を過去の週でも同じ計算で（k=0 は表と一致）
+  function _bjoGapPast(C){
+    var out=[]; for(var k=0;k<=12;k++){ var cf=_bjwkAddD(C.R.cur.from,-7*k), ct=_bjwkAddD(C.end,-7*k), bf=_bjwkAddD(cf,-C.wkShift), bt=_bjwkAddD(ct,-C.wkShift);
+      if(bf<C.first)break; var a=_bjoSumDays(C,cf,ct), b=_bjoSumDays(C,bf,bt);
+      var v=null; if(a.sC&&b.sC&&a.aC&&b.aC){ var sg=_bjoPct(a.sIn/a.sC,b.sIn/b.sC), ag=_bjoPct(a.aIn/a.aC,b.aIn/b.aC); if(sg!=null&&ag!=null)v=sg-ag; }
+      out.push({k:k,f:cf,t:ct,v:v}); }
+    return out;
+  }
+  // 平日と土日祝に分ける（比べた期間の表の「土日祝」と同じ分け方）
+  function _bjoSplit(C,w){ var r={yo:{sIn:0,sC:0,aIn:0,aC:0,days:0,n:0},kyu:{sIn:0,sC:0,aIn:0,aC:0,days:0,n:0}};
+    for(var d=w.from; d<=w.to; d=_bjwkAddD(d,1)){ var g=_bjoIsKyu(d)?r.kyu:r.yo; g.n++; var o=C.byDay[d]; if(o&&o.aC){ g.aIn+=o.aIn; g.aC+=o.aC; g.sIn+=o.sIn; g.sC+=o.sC; if(o.sC)g.days++; } }
+    return r; }
+  // 同じ曜日で重ねる（n≤28は日別・n≥29は7日ごと）
+  function _bjoOverlay(C,fld,cnt){
+    var n=C.n, blk=n>28?7:1, L=Math.ceil(n/blk), labs=[], v={cur:[],wk:[],mo:[]}, hol={cur:[],wk:[],mo:[]}, miss={wk:[],mo:[]}, sh={cur:0,wk:C.wkShift,mo:C.moShift};
+    for(var i=0;i<L;i++){ var d0=_bjwkAddD(C.R.cur.from,i*blk), de=_bjwkAddD(C.R.cur.from,Math.min(n,(i+1)*blk)-1);
+      labs.push(blk===1?[_bjbFmtD(d0),'('+_bjoDw(d0)+')']:[_bjbFmtD(d0)+'〜']);
+      _bjoPER.forEach(function(k){ var a=0,c=0,h=false,any=false; for(var dd=_bjwkAddD(d0,-sh[k]); dd<=_bjwkAddD(de,-sh[k]); dd=_bjwkAddD(dd,1)){ var o=C.byDay[dd]; if(o&&o[cnt]){ a+=o[fld]; c+=o[cnt]; any=true; } if(isHoliday(dd))h=true; }
+        v[k].push(c?a/c:null); if(h)hol[k].push(i); if(k!=='cur'&&blk===1&&!any){ var oc=C.byDay[d0]; if(oc&&oc[cnt])miss[k].push({d:d0,b:_bjwkAddD(d0,-sh[k])}); } }); }
+    return {labs:labs,v:v,hol:hol,miss:miss,blk:blk};
+  }
+  // ── 図の共通部品（この区画専用）──
+  var _bjoPlugins=[
+    {id:'bjoBand', beforeDatasetsDraw:function(c,_,o){ o=o||{}; if(!o.spans||!o.spans.length)return; var x=c.scales.x,a=c.chartArea,ctx=c.ctx; var hb=c.data.labels.length>1?Math.abs(x.getPixelForValue(1)-x.getPixelForValue(0))/2:(a.right-a.left)/2; ctx.save(); o.spans.forEach(function(sp){ ctx.fillStyle=sp.color||_bjoCol.band; var x0=x.getPixelForValue(sp.i0)-hb, x1=x.getPixelForValue(sp.i1)+hb; ctx.fillRect(x0,a.top,x1-x0,a.bottom-a.top); }); ctx.restore(); }},
+    {id:'bjoLine', afterDatasetsDraw:function(c,_,o){ o=o||{}; if(!o.lines)return; var ctx=c.ctx,a=c.chartArea; ctx.save(); o.lines.forEach(function(l){ ctx.strokeStyle=l.color||_bjoCol.zero; ctx.lineWidth=l.w||1; ctx.beginPath(); var p;
+        if(l.axis==='x'){ p=c.scales.x.getPixelForValue(l.v); if(p<a.left||p>a.right)return; ctx.moveTo(p,a.top); ctx.lineTo(p,a.bottom); } else { p=c.scales.y.getPixelForValue(l.v); if(p<a.top||p>a.bottom)return; ctx.moveTo(a.left,p); ctx.lineTo(a.right,p); }
+        ctx.stroke(); if(l.text){ ctx.font='9.5px sans-serif'; ctx.fillStyle=l.tc||_bjoCol.zero; if(l.axis==='x'){ ctx.textAlign='left'; ctx.fillText(l.text,p+3,a.top+9); } else { ctx.textAlign='right'; ctx.fillText(l.text,a.right-2,p-3); } } }); ctx.restore(); }},
+    {id:'bjoVal', afterDatasetsDraw:function(c,_,o){ o=o||{}; if(!o.fmt)return; var ctx=c.ctx; ctx.save(); ctx.font='bold 10px sans-serif';
+        c.data.datasets.forEach(function(ds,di){ if(ds._noval)return; var raw=ds._true||ds.data, meta=c.getDatasetMeta(di);
+          meta.data.forEach(function(b,i){ var v=raw[i]; if(v==null)return; var t=o.fmt(v,ds,i); if(!t)return; ctx.fillStyle=_bjoCol.ink;
+            if(c.options.indexAxis==='y'){ ctx.textAlign=v>=0?'left':'right'; ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(t,b.x+(v>=0?4:-4),b.y+3.5); ctx.fillText(t,b.x+(v>=0?4:-4),b.y+3.5); }
+            else if(ds.type==='line'){ ctx.textAlign='center';
+              if(o.top){ ctx.fillStyle=ds.borderColor||_bjoCol.or; var y=c.chartArea.top-15; ctx.fillText(t,b.x,y); if(i===0||o.topLabelAt===i){ ctx.font='9.5px sans-serif'; ctx.textAlign='right'; ctx.fillText(o.topLabel||'店全体',c.chartArea.left-3,y); ctx.font='bold 10px sans-serif'; } }
+              else { var yy=Math.max(c.chartArea.top+9,b.y-6); ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(t,b.x,yy); ctx.fillText(t,b.x,yy); } }
+            else { ctx.textAlign='center'; var base=ds.base!=null?ds.base:0, yy2=v<base?b.y+12:b.y-4; ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(t,b.x,yy2); ctx.fillText(t,b.x,yy2); } }); });
+        ctx.restore(); }},
+    {id:'bjoNone', afterDatasetsDraw:function(c,_,o){ o=o||{}; if(!o.text||!o.idx||!o.idx.length)return; var ctx=c.ctx,x=c.scales.x,a=c.chartArea; ctx.save(); ctx.font='10px sans-serif'; ctx.fillStyle=_bjoCol.mut; ctx.textAlign='center'; o.idx.forEach(function(i){ ctx.fillText(o.text,x.getPixelForValue(i),(a.top+a.bottom)/2); }); ctx.restore(); }},
+    {id:'bjoMark', afterDraw:function(c,_,o){ o=o||{}; if(!o.idx||!o.idx.length)return; var ctx=c.ctx,x=c.scales.x,a=c.chartArea; ctx.save(); ctx.fillStyle=_bjoCol.zero; o.idx.forEach(function(i){ var p=x.getPixelForValue(i); ctx.fillRect(p-1.5,a.bottom+1,3,2.5); }); ctx.restore(); }},
+    {id:'bjoSeg', afterDatasetsDraw:function(c,_,o){ o=o||{}; if(!o.segs)return; var ctx=c.ctx,x=c.scales.x,y=c.scales.y,a=c.chartArea; var hb=c.data.labels.length>1?Math.abs(x.getPixelForValue(1)-x.getPixelForValue(0))/2:4; ctx.save();
+        o.segs.forEach(function(s){ if(s.v==null)return; var py=y.getPixelForValue(s.v); if(py<a.top||py>a.bottom)return; var x0=x.getPixelForValue(s.i0)-hb+1, x1=x.getPixelForValue(s.i1)+hb-1; ctx.strokeStyle=s.color||_bjoCol.navy; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(x0,py); ctx.lineTo(x1,py); ctx.stroke();
+          if(s.text){ ctx.font='bold 9.5px sans-serif'; ctx.fillStyle=s.color||_bjoCol.navy; ctx.textAlign='center'; var ty=Math.max(a.top+9,py-4), tw=ctx.measureText(s.text).width, cx=Math.max(a.left+tw/2+2,Math.min(a.right-tw/2-2,(x0+x1)/2)); x0=cx-tw/2; x1=cx+tw/2; ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(s.text,(x0+x1)/2,ty); ctx.fillText(s.text,(x0+x1)/2,ty); } }); ctx.restore(); }},
+    {id:'bjoTxt', afterDatasetsDraw:function(c,_,o){ o=o||{}; if(!o.items)return; var ctx=c.ctx; ctx.save(); o.items.forEach(function(it){ var meta=c.getDatasetMeta(it.di||0), p=meta&&meta.data[it.i]; if(!p||(p.skip))return; ctx.font=(it.bold?'bold ':'')+(it.size||9)+'px sans-serif'; ctx.fillStyle=it.color||_bjoCol.ink; ctx.textAlign=it.align||'center'; var yy=p.y+(it.dy!=null?it.dy:-7); if(yy<c.chartArea.top+8)yy=p.y+12; ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(it.text,p.x+(it.dx||0),yy); ctx.fillText(it.text,p.x+(it.dx||0),yy); }); ctx.restore(); }}
+  ];
+  function _bjoMk(id,type,labels,ds,o){ o=o||{}; var el=document.getElementById(id); if(!el||typeof Chart==='undefined')return null;
+    function merge(base,ext){ if(!ext)return base; Object.keys(ext).forEach(function(k){ if(k==='ticks'&&ext.ticks)base.ticks=Object.assign({},base.ticks,ext.ticks); else if(k==='title'&&ext.title)base.title=Object.assign({display:true,font:{size:9.5},color:_bjoCol.zero,padding:0},ext.title); else base[k]=ext[k]; }); return base; }
+    var sx,sy;
+    if(o.horiz){ sx={ticks:{font:{size:9.5},color:_bjoCol.mut},grid:{color:_bjoCol.grid},border:{display:false}}; sy={ticks:{font:{size:10},color:_bjoCol.tx,autoSkip:false},grid:{display:false},border:{display:false}}; }
+    else { sx={ticks:{font:{size:10},color:_bjoCol.tx,maxRotation:0,autoSkip:false},grid:{display:false},offset:true}; sy={ticks:{font:{size:9.5},color:_bjoCol.mut},grid:{color:_bjoCol.grid},border:{display:false}}; }
+    merge(sx,o.x); merge(sy,o.y);
+    if(o.yw)sy.afterFit=function(a){ a.width=o.yw; };
+    var pl={ legend:o.legend?{display:true,position:'top',align:'end',labels:{boxWidth:o.lbw||12,boxHeight:o.lbh||10,font:{size:10},color:_bjoCol.tx}}:{display:false},
+      title:o.title?{display:true,text:o.title,align:'start',font:{size:11,weight:'bold'},color:_bjoCol.ink,padding:{top:2,bottom:o.tpb!=null?o.tpb:6}}:{display:false}, tooltip:{enabled:false} };
+    if(o.pl)Object.keys(o.pl).forEach(function(k){ pl[k]=o.pl[k]; });
+    var ch=new Chart(el.getContext('2d'),{ type:type, data:{labels:labels,datasets:ds}, plugins:_bjoPlugins,
+      options:{ responsive:false, animation:false, devicePixelRatio:2, indexAxis:o.horiz?'y':'x', layout:{padding:o.pad||{top:4,right:8}}, scales:{x:sx,y:sy}, plugins:pl } });
+    _bjoCharts.push(ch); return ch;
+  }
+  function _bjoDestroy(){ _bjoCharts.forEach(function(c){ try{ c.destroy(); }catch(e){} }); _bjoCharts=[]; }
+  function _bjoCv(id,w,h){ return '<canvas id="'+id+'" width="'+w+'" height="'+h+'"></canvas>'; }
+  function _bjoRow(cvs,st){ return '<div class="bjwk-charts bjo-row"'+(st?' style="'+st+'"':'')+'>'+cvs.join('')+'</div>'; }
+  function _bjoTrk(id,w,h){ return '<div class="bjo-trk">'+_bjoCv(id,w,h)+'</div>'; }
+  function _bjoLeg(items){ return '<div class="bjo-leg">'+items.map(function(it){ return '<span><i style="background:'+it[0]+'"></i>'+it[1]+'</span>'; }).join('')+'</div>'; }
+  function _bjoSec(ttl, st, body, note){ return '<div class="bjwk-sec">'+(ttl?'<div class="bjwk-ttl">'+ttl+'</div>':'')+(st?'<div class="bjo-st">'+st+'</div>':'')+body+(note?'<div class="bjo-line">'+note+'</div>':'')+'</div>'; }
+  // ── 表 ──
+  function _bjoRowsDef(){
+    var U=_bjbU();
+    return [
+      {l:'データのある日', v:function(m){ return m.days+'日'; }},
+      {l:'台数（1日平均）', v:function(m){ return m.tai.toFixed(1)+'台'; }, d:function(c,b){ var x=c.tai-b.tai; return {t:(Math.abs(x)<0.05?'±0':_bjoSign(x))+'台'}; }},
+      {l:'総アウト（1日あたり）', v:function(m){ return Math.round(m.outDay).toLocaleString()+U; }, d:function(c,b){ var x=c.outDay-b.outDay, p=_bjoPct(c.outDay,b.outDay); return {t:(x>=0?'+':'')+Math.round(x).toLocaleString()+U+(p!=null?'・'+_bjoSign(p)+'%':''), c:x}; }},
+      {l:'台あたりアウト', v:function(m){ return Math.round(m.outPT).toLocaleString()+U; }, d:function(c,b){ var x=c.outPT-b.outPT, p=_bjoPct(c.outPT,b.outPT); return {t:(x>=0?'+':'')+Math.round(x).toLocaleString()+U+(p!=null?'・'+_bjoSign(p)+'%':''), c:x}; }},
+      {l:'出玉率', v:function(m){ return m.rate!=null?m.rate.toFixed(1)+'%':'-'; }, d:function(c,b){ return (c.rate!=null&&b.rate!=null)?{t:_bjoSign(c.rate-b.rate)+'pt'}:{t:'-'}; }},
+      {l:'台粗利', v:function(m){ return Math.round(m.profPT).toLocaleString()+'円'; }, d:function(c,b){ var x=c.profPT-b.profPT; return {t:(x>=0?'+':'')+Math.round(x).toLocaleString()+'円', c:x}; }},
+      {l:'粗利（1日あたり）', v:function(m){ return _man(m.profDay); }, d:function(c,b){ var x=c.profDay-b.profDay; return {t:(x>=0?'+':'')+_man(x), c:x}; }}
+    ];
+  }
+  function _bjoTable(C, key){
+    var R=C.R, c=R.cur[key], wk=R.wk[key], mo=R.mo[key];
+    if(!c)return '<div class="bjwk-p">この期間のデータがありません。</div>';
+    var h='<table class="bjwr-tbl bjo-tbl"><thead><tr><th rowspan="2">項目</th><th rowspan="2">オススメ期間<br>'+_bjoRange(R.cur)+'</th>'
+      +'<th colspan="2">先週対比<br>'+_bjoRange(R.wk)+'</th><th colspan="2">先月対比<br>'+_bjoRange(R.mo)+'</th></tr>'
+      +'<tr><th>値</th><th>差</th><th>値</th><th>差</th></tr></thead><tbody>';
+    function pair(rw, base){
+      if(!base)return '<td class="bjo-none">比較なし</td><td class="bjo-none"></td>';
+      var dd=rw.d?rw.d(c,base):{t:''};
+      return '<td>'+rw.v(base)+'</td><td class="'+(dd.c!=null?_bjoCls(dd.c):'')+'">'+dd.t+'</td>';
+    }
+    _bjoRowsDef().forEach(function(rw){ h+='<tr><td>'+rw.l+'</td><td class="bjo-cur">'+rw.v(c)+'</td>'+pair(rw,wk)+pair(rw,mo)+'</tr>'; });
+    return h+'</tbody></table>';
+  }
+  // ── レポート本文（図の置き場だけ作り、描画は _bjoDrawAll）──
+  function _bjoReportHtml(C, sName){
+    var R=C.R, U=_bjbU(), P=C.plan={};
+    function gr(w,key){ var b=w[key], c=R.cur[key]; return (b&&c)?_bjoPct(c.outPT,b.outPT):null; }
+    function cell(v){ return v==null?'<td class="bjo-none">比較なし</td>':'<td class="'+_bjoCls(v)+'">'+_bjoSign(v)+'%</td>'; }
+    function gap(a,b){ return (a==null||b==null)?'<td class="bjo-none">比較なし</td>':'<td class="'+_bjoCls(a-b)+'"><b>'+_bjoSign(a-b)+'pt</b></td>'; }
+    var sW=gr(R.wk,'S'), sM=gr(R.mo,'S'), aW=gr(R.wk,'A'), aM=gr(R.mo,'A');
+    var hasW=!!R.wk.S, hasM=!!R.mo.S, hasCmp=hasW||hasM, n=C.n, nm=C.names.length;
+    var hero='<div class="bjwk-hero"><div class="bjwk-hero-l"><span class="bjwk-hero-en">RECOMMENDED MODELS</span>'
+      +'<span class="bjwk-hero-t">オススメ機種の効果</span><span class="bjwk-hero-s">'+_bjEsc(sName)+'　'+_bjoRange(R.cur)+'（'+n+'日間）</span></div></div>';
+    var top='<div class="bjwk-sec"><div class="bjwk-ttl">台あたりアウトの伸び</div><table class="bjwr-tbl bjo-tbl"><thead><tr><th></th><th>先週対比</th><th>先月対比</th></tr></thead><tbody>'
+      +'<tr><td>選んだ機種</td>'+cell(sW)+cell(sM)+'</tr><tr><td>店全体</td>'+cell(aW)+cell(aM)+'</tr>'
+      +'<tr class="bjwr-cur"><td>店全体との差</td>'+gap(sW,aW)+gap(sM,aM)+'</tr></tbody></table></div>';
+    var nmTxt=C.isAll?('店の全機種（'+nm+'機種）'):(nm>12?(C.names.slice(0,12).map(_bjEsc).join('、')+'　ほか'+(nm-12)+'機種'):C.names.map(_bjEsc).join('、'));
+    var names='<div class="bjwk-sec"><div class="bjwk-ttl">選んだ機種</div><div class="bjwk-p">'+nmTxt+'</div></div>';
+    function prow(lab,w){ return '<tr><td>'+lab+'</td><td>'+_bjbFmtD(w.from)+'（'+_bjoDw(w.from)+'）〜'+_bjbFmtD(w.to)+'（'+_bjoDw(w.to)+'）</td><td>'+(w.A?w.A.days:0)+'日</td><td>'+w.kyu+'日</td></tr>'; }
+    var per='<div class="bjwk-sec"><div class="bjwk-ttl">比べた期間（曜日をそろえています）</div><table class="bjwr-tbl bjo-tbl"><thead><tr><th></th><th>期間</th><th>データのある日</th><th>土日祝</th></tr></thead><tbody>'
+      +prow('オススメ期間',R.cur)+prow('先週対比',R.wk)+prow('先月対比',R.mo)+'</tbody></table>';
+    var notes=[];
+    notes.push(n+'日間なので、先週対比は'+(C.wkShift/7)+'週前、先月対比は'+(C.moShift/7)+'週前の同じ曜日の期間です。');
+    if(C.cut)notes.push('終了日は'+_bjbFmtD(C.toReq)+'ですが、データが'+_bjbFmtD(C.last)+'までなので、'+_bjoRange(R.cur)+'で比べています。');
+    var missD=[]; for(var d=R.cur.from; d<=R.cur.to; d=_bjwkAddD(d,1)){ var o=C.byDay[d]; if(!o||!o.aC)missD.push(_bjbFmtD(d)+'('+_bjoDw(d)+')'); }
+    if(missD.length)notes.push('データの無い日: '+missD.slice(0,5).join('、')+(missD.length>5?' ほか'+(missD.length-5)+'日':''));
+    ['wk','mo'].forEach(function(k){ var w=R[k]; if(w.A&&w.A.days<w.nAll)notes.push(_bjoPERL[k]+'は'+w.nAll+'日のうちデータが'+w.A.days+'日です。'); });
+    if(R.cur.kyu!==R.wk.kyu||R.cur.kyu!==R.mo.kyu)notes.push('土日祝の日数が期間で違います。祝日までは曜日でそろえられないためです。');
+    if(R.cur.S&&((R.wk.S&&Math.abs(R.cur.S.tai-R.wk.S.tai)>=0.5)||(R.mo.S&&Math.abs(R.cur.S.tai-R.mo.S.tai)>=0.5)))notes.push('選んだ機種の台数が変わっています。総アウトは台数でも増減するので、台あたりアウトでご覧ください。');
+    if(!hasW||!hasM)notes.push('比べる期間に選んだ機種のデータが無いところは「比較なし」と出しています。');
+    per+='<div class="bjwk-note" style="margin-top:6px;">'+notes.join('<br>')+'</div></div>';
+    var H=[hero,top,names,per];
+    // ── 期間全体の動き ──
+    if(hasCmp){
+      var lines=[]; ['wk','mo'].forEach(function(k){ var b=R[k].S, c=R.cur.S; if(!b||!c)return; var p1=_bjoPct(c.outDay,b.outDay), p2=_bjoPct(c.tai,b.tai), p3=_bjoPct(c.outPT,b.outPT);
+        lines.push(_bjoPERL[k]+'　総アウト '+(p1!=null?_bjoSign(p1)+'%':'-')+'（台数 '+(p2!=null?_bjoSign(p2)+'%':'-')+'、台あたりアウト '+(p3!=null?_bjoSign(p3)+'%':'-')+'）'); });
+      P.c1=true; H.push(_bjoSec('期間全体の動き','総アウト・台数・台あたりアウト（選んだ機種）',_bjoRow([_bjoCv('bjoC1a',252,160),_bjoCv('bjoC1b',252,160),_bjoCv('bjoC1c',252,160)]),lines.join('<br>')+(C.isAll?'':'<br>総アウト＝台数×台あたりアウト。台あたりアウトの図のオレンジは店全体です。')));
+      var sp=_bjoSplit(C,R.cur);
+      if(sp.yo.days>0&&sp.kyu.days>0){ P.c2=true; H.push(_bjoSec('','平日と土日祝に分けた台あたりアウト（選んだ機種）',_bjoRow([_bjoCv('bjoC2a',386,200),_bjoCv('bjoC2b',386,200)]),'土日祝＝土曜・日曜・祝日。特定日は分けていません。'+(C.isAll?'':'オレンジは店全体です。'))); }
+    }
+    // ── 日ごとの動き ──
+    if(n>=2&&hasCmp){ P.c3=true; var ov=_bjoOverlay(C,'sIn','sC'); var ms=[], whole=[]; ['wk','mo'].forEach(function(k){ if(!R[k].A){ whole.push(_bjoPERL[k]+'の期間（'+_bjoRange(R[k])+'）にはデータがありません。'); return; } ov.miss[k].forEach(function(x){ ms.push(_bjbFmtD(x.d)+'('+_bjoDw(x.d)+')は比べる相手（'+_bjbFmtD(x.b)+'）のデータがありません'); }); });
+      var mTxt=whole.join('')+(ms.length?(ms.slice(0,3).join('。')+(ms.length>3?'。ほか'+(ms.length-3)+'日':'')+'。線はそこで切れています。'):'');
+      H.push(_bjoSec('日ごとの動き',(n>28?'同じ曜日で重ねた台あたりアウト（7日ごと）':'同じ曜日で重ねた台あたりアウト'),C.isAll?_bjoRow([_bjoCv('bjoC3b',786,200)]):_bjoRow([_bjoCv('bjoC3a',386,200),_bjoCv('bjoC3b',386,200)]),(ov.hol.cur.length||ov.hol.wk.length||ov.hol.mo.length?'「祝」は祝日の点です。':'')+mTxt)); }
+    var dl=[]; for(var dd=(R.mo.from>C.first?R.mo.from:C.first); dd<=C.end; dd=_bjwkAddD(dd,1))dl.push(dd); C.dl=dl;
+    var taiVals={}; dl.forEach(function(d){ var o=C.byDay[d]; if(o&&o.sC)taiVals[o.sC]=1; }); var taiKeys=Object.keys(taiVals);
+    P.c4=true; P.c4b=!C.isAll; P.c4c=taiKeys.length>=2;
+    var trk=_bjoTrk('bjoC4a',786,150+(P.c4b||P.c4c?0:30))+(P.c4b?_bjoTrk('bjoC4b',786,100+(P.c4c?0:30)):'')+(P.c4c?_bjoTrk('bjoC4c',786,90):'');
+    var legItems=[[_bjoCol.b1,'オススメ期間'],[_bjoCol.b2,'比べた期間'],[_bjoCol.b3,'比べていない日']]; if(!C.isAll)legItems.push([_bjoCol.or,'店全体']);
+    H.push(_bjoSec(n>=2&&hasCmp?'':'日ごとの動き','日別の台あたりアウト'+(P.c4b?'・店全体との差':'')+(P.c4c?'・台数':''),_bjoLeg(legItems)+trk,(P.c4c?'':'この範囲の台数は'+(taiKeys[0]||0)+'台で変わりません。')+'軸の下の小さな印は土日祝です。'));
+    if(n>=14){ P.c5=true; H.push(_bjoSec('','曜日ごとの台あたりアウト（選んだ機種）',_bjoRow([_bjoCv('bjoC5',786,200)]),'祝日は曜日から外して「祝」にまとめています。'+(C.isAll?'':'オレンジは店全体（オススメ期間）です。'))); }
+    // ── 出玉率と台粗利 ──
+    if(n<=28){ P.c6=true; H.push(_bjoSec('出玉率と台粗利','日別の出玉率と台粗利',_bjoLeg(C.isAll?[[_bjoCol.b1,'選んだ機種']]:[[_bjoCol.b1,'選んだ機種'],[_bjoCol.or,'店全体']])+_bjoTrk('bjoC6a',786,110)+_bjoTrk('bjoC6b',786,130),(R.cur.S&&R.cur.S.tai<3?'台数が少ないので1日の値は大きく振れます。':'')+'台粗利の棒の色は日別の図と同じです。')); }
+    // ── 開始前から終了後まで ──
+    var bins=_bjoBins(C); C.bins=bins;
+    if(bins.length>=3){ P.c7=true; var b7=[]; if(n%7!==0)b7.push('7日ずつの値なので、期間全体の値とは少し違います。'); if(!bins.some(function(b){return b.after;}))b7.push('終了後のデータはまだありません。'); if(bins.filter(function(b){return b.before;}).length<2)b7.push('開始前のデータが少ないです。'); if(bins.some(function(b){return b.hollow;}))b7.push('白抜きの点はデータの欠けた区切りです。');
+      H.push(_bjoSec('開始前から終了後まで','7日ごとの流れ（台あたりアウト・出玉率・台粗利）',_bjoLeg(C.isAll?[[_bjoCol.b1,'選んだ機種']]:[[_bjoCol.b1,'選んだ機種'],[_bjoCol.or,'店全体']])+_bjoTrk('bjoC7a',786,120)+_bjoTrk('bjoC7b',786,95)+_bjoTrk('bjoC7c',786,130),'背景の帯がオススメ期間です。'+b7.join(''))); }
+    if(!C.isAll){ var sh8=[]; _bjoPER.slice().reverse().forEach(function(k){ var S=R[k].S, A=R[k].A; sh8.push(_bjoPERL[k]+' '+(S&&A?('アウト比率 '+(S.inn/A.inn*100).toFixed(1)+'%・設置比率 '+(S.rows/A.rows*100).toFixed(1)+'%'):'比較なし')); });
+      if(bins.length>=3){ P.c8=true; H.push(_bjoSec(bins.length>=3?'':'開始前から終了後まで','アウト比率と設置比率（7日ごと）',_bjoRow([_bjoCv('bjoC8',786,170)]),sh8.join('　')+'<br>アウト比率＝選んだ機種のアウト÷店全体のアウト、設置比率＝台数÷店全体の台数。')); }
+      else H.push(_bjoSec('','アウト比率と設置比率','',sh8.join('　')+'<br>アウト比率＝選んだ機種のアウト÷店全体のアウト、設置比率＝台数÷店全体の台数。'));
+      var gp=_bjoGapPast(C); C.gapPast=gp; if(hasW&&gp.filter(function(g){return g.k>0&&g.v!=null;}).length>=3){ P.c9=true; H.push(_bjoSec('','店全体との差を過去の週でも同じ計算で（先週対比）',_bjoRow([_bjoCv('bjoC9',786,170)]),'一番右がオススメ期間（先頭の表の「店全体との差」と同じ値）。左はその7日ずつ前の期間を同じ計算で出したものです。'+(n>=8?'となりの棒と日が一部重なります。':''))); } }
+    // ── 機種ごとの動き ──
+    if(nm>=2&&!C.isAll||nm>=2&&C.isAll){
+      var order=C.names.slice().sort(function(a,b){ var A=R.cur.PM[a], B=R.cur.PM[b]; return ((B?B.inmai/B.days:0)-(A?A.inmai/A.days:0))||(a<b?-1:1); }); C.order=order;
+      var m10=order.slice(0,15), rows10=m10.length+(C.isAll?0:1), H10=28*rows10+58;
+      if(hasCmp){ P.c10=true; P.m10=m10; var cv10=[]; if(hasW)cv10.push(_bjoCv('bjoC10a',334,H10)); if(hasM)cv10.push(_bjoCv('bjoC10b',hasW?226:334,H10)); cv10.push(_bjoCv('bjoC10c',cv10.length?226:334,H10));
+        H.push(_bjoSec('機種ごとの動き','機種ごとの台あたりアウトの伸びと台粗利の差',_bjoRow(cv10),'<span id="bjoC10note">'+(nm>15?'総アウトの多い順に15機種。ほか'+(nm-15)+'機種は省略。':'')+(n===1?'1日どうしの比較です。':'')+'%の棒は±60%で打ち切り、値は本当の数字です。</span>')); }
+      if(bins.length>=3&&!C.isAll){ var m11=order.slice(0,6); P.c11=m11; var cols=(m11.length===2||m11.length===4)?2:3, w11=cols===2?386:252, h11=cols===2?130:120, rows11=[]; for(var i=0;i<m11.length;i+=cols){ var rr=[]; for(var j=i;j<Math.min(i+cols,m11.length);j++)rr.push(_bjoCv('bjoC11_'+j,w11,h11)); rows11.push(_bjoRow(rr,'margin:0 0 4px')); }
+        H.push(_bjoSec(P.c10?'':'機種ごとの動き','機種ごとの台あたりアウトの流れ（7日ごと）',rows11.join(''),'青＝その機種、オレンジ＝店全体、帯＝オススメ期間。'+(nm>6?'総アウトの多い順に6機種。ほか'+(nm-6)+'機種は省略。':''))); }
+    }
+    if(n>=3&&hasCmp){ var cv12=[]; if(hasW)cv12.push(_bjoCv('bjoC12a',386,270)); if(hasM)cv12.push(_bjoCv('bjoC12b',386,270)); P.c12=true;
+      H.push(_bjoSec((nm>=2?'':'機種ごとの動き'),'機種マップ（店の全機種の中での位置）',_bjoRow(cv12),'グレーの点は店のほかの機種（両方の期間で3台以上）。'+(C.isAll?'青い点は店の全機種です。':'青い点が選んだ機種、オレンジのひし形が店全体です。')+'横＝出玉率の変化、縦＝台あたりアウトの変化。')); }
+    if(n>=2&&hasCmp){ P.c13=hasW?'wk':'mo'; var kk=P.c13, A0=R.cur.A, B0=R[kk].A, dm={}, allM=Object.keys(R.cur.PM).concat(Object.keys(R[kk].PM));
+      allM.forEach(function(m){ if(dm[m]!=null)return; var c=R.cur.PM[m], b=R[kk].PM[m]; var v=(c?c.inmai/A0.days:0)-(b?b.inmai/B0.days:0); dm[m]={v:v,c:c,b:b}; });
+      var selSet={}; C.names.forEach(function(m){ selSet[m]=1; });
+      var ups=Object.keys(dm).filter(function(m){return dm[m].v>0&&!selSet[m];}).sort(function(a,b){return dm[b].v-dm[a].v;}).slice(0,5), dns=Object.keys(dm).filter(function(m){return dm[m].v<0&&!selSet[m];}).sort(function(a,b){return dm[a].v-dm[b].v;}).slice(0,5);
+      var sels=C.isAll?[]:C.names.slice().sort(function(a,b){return Math.abs(dm[b]?dm[b].v:0)-Math.abs(dm[a]?dm[a].v:0);}).slice(0,5).filter(function(m){return dm[m];});
+      var rows13=ups.concat(dns,sels); rows13=rows13.filter(function(m,i){return rows13.indexOf(m)===i;}).sort(function(a,b){return dm[b].v-dm[a].v;}); C.rows13=rows13; C.dm=dm;
+      if(rows13.length){ H.push(_bjoSec((nm>=2||n>=3)?'':'機種ごとの動き','同じ時期に増えた機種・減った機種（総アウト・1日あたり・'+_bjoPERL[kk]+'）',_bjoRow([_bjoCv('bjoC13',786,30*rows13.length+50)]),'増えた上位5機種・減った上位5機種'+(C.isAll?'':'と選んだ機種（濃い青）')+'。2行目は台数と台あたりアウトの伸び。全機種を足すと店全体の増減になります。')); } }
+    var units=Object.keys(R.cur.nos).length;
+    if(n>=3&&units>0&&units<=40&&R.cur.nosOK){ P.c14=true; H.push(_bjoSec('','台番ごとの台あたりアウト（選んだ機種）',_bjoRow([_bjoCv('bjoC14',786,200)]),'棒＝オススメ期間、点＝'+(hasW?'先週対比':'先月対比')+'、オレンジの線＝店全体（オススメ期間）。台番の順で、島の並びとは限りません。')); }
+    H.push('<div class="bjwk-sec"><div class="bjwk-ttl">選んだ機種の数字</div>'+_bjoTable(C,'S')+'</div>');
+    H.push('<div class="bjwk-sec"><div class="bjwk-ttl">店全体の数字</div>'+_bjoTable(C,'A')+'</div>');
+    H.push('<div class="bjwk-foot">根拠：店舗データ '+_bjbFmtD(C.first)+'〜'+_bjbFmtD(C.last)+'／数字の計算は機種別集計と同じです／BEAR JOHN オススメ機種の効果</div>');
+    return H.join('');
+  }
+  // ── 図を描く（図ごとに try/catch。1枚の失敗で残りを止めない）──
+  function _bjoDrawAll(C){
+    _bjoDestroy();
+    var P=C.plan||{}, R=C.R, U=_bjbU(), n=C.n;
+    var fmtN=function(v){ return Math.round(v).toLocaleString(); }, manT=function(v){ return _bjoMan(v); };
+    function perLabs(key){ return _bjoPER.map(function(k){ var w=R[k]; return [_bjoPERL[k], (w[key]?w[key].days+'日':'日なし')]; }); }
+    function trio(id,title,fS,fA,fmt,o){ o=o||{}; var sd=_bjoPER.map(function(k){ return R[k].S?fS(R[k].S):null; }), none=sd.map(function(v,i){ return v==null?i:-1; }).filter(function(i){ return i>=0; });
+      var ds=[{label:'選んだ機種',data:sd,backgroundColor:_bjoPER.map(function(k){return _bjoPERC[k];}),borderRadius:3,maxBarThickness:44,order:2}];
+      if(fA&&!C.isAll)ds.push({type:'line',label:'店全体',data:_bjoPER.map(function(k){ return R[k].A?fA(R[k].A):null; }),borderColor:_bjoCol.or,backgroundColor:_bjoCol.or,borderWidth:1.5,pointRadius:2.5,order:1});
+      var y=Object.assign({beginAtZero:true,grace:'14%',ticks:{callback:manT,maxTicksLimit:5}},o.y||{});
+      _bjoMk(id,'bar',perLabs('S'),ds,{title:title,yw:40,tpb:(fA&&!C.isAll)?24:6,pad:{top:0,right:4},y:y,pl:{bjoVal:{fmt:fmt,top:true},bjoNone:{text:'比較なし',idx:none},bjoLine:o.lines?{lines:o.lines}:{}}}); }
+    function run(name,f){ try{ f(); }catch(e){ console.error('osusume chart '+name,e); } }
+    if(P.c1)run('c1',function(){
+      trio('bjoC1a','総アウト（1日あたり）',function(m){return m.outDay;},null,fmtN);
+      trio('bjoC1b','台数（1日平均）',function(m){return m.tai;},null,function(v){return v.toFixed(1)+'台';},{y:{ticks:{callback:function(v){return v;},maxTicksLimit:5,precision:0}}});
+      trio('bjoC1c','台あたりアウト',function(m){return m.outPT;},function(m){return m.outPT;},fmtN); });
+    if(P.c2)run('c2',function(){ var sp={}; _bjoPER.forEach(function(k){ sp[k]=_bjoSplit(C,R[k]); });
+      var mx=0; _bjoPER.forEach(function(k){ ['yo','kyu'].forEach(function(g){ var x=sp[k][g]; if(x.sC)mx=Math.max(mx,x.sIn/x.sC); if(x.aC&&!C.isAll)mx=Math.max(mx,x.aIn/x.aC); }); }); mx=mx*1.18;
+      function one(id,g,title){ var sd=_bjoPER.map(function(k){ var x=sp[k][g]; return x.sC?x.sIn/x.sC:null; }), none=sd.map(function(v,i){return v==null?i:-1;}).filter(function(i){return i>=0;});
+        var ds=[{label:'選んだ機種',data:sd,backgroundColor:_bjoPER.map(function(k){return _bjoPERC[k];}),borderRadius:3,maxBarThickness:60,order:2}];
+        if(!C.isAll)ds.push({type:'line',label:'店全体',data:_bjoPER.map(function(k){ var x=sp[k][g]; return x.aC?x.aIn/x.aC:null; }),borderColor:_bjoCol.or,backgroundColor:_bjoCol.or,borderWidth:1.5,pointRadius:2.5,order:1});
+        _bjoMk(id,'bar',_bjoPER.map(function(k){ return [_bjoPERL[k], sp[k][g].days+'日']; }),ds,{title:title,yw:40,tpb:C.isAll?6:24,pad:{top:0,right:4},y:{min:0,max:mx,ticks:{callback:manT,maxTicksLimit:5}},pl:{bjoVal:{fmt:fmtN,top:true},bjoNone:{text:'日なし',idx:none}}}); }
+      one('bjoC2a','yo','平日'); one('bjoC2b','kyu','土日祝'); });
+    if(P.c3)run('c3',function(){ var a=_bjoOverlay(C,'sIn','sC'), b=_bjoOverlay(C,'aIn','aC'); var all=[].concat(a.v.cur,a.v.wk,a.v.mo,C.isAll?[]:[].concat(b.v.cur,b.v.wk,b.v.mo)).filter(function(v){return v!=null;}); var mx=Math.max.apply(null,all)*1.1||1;
+      var lb=a.labs, L=lb.length, step=L>14?7:(L>10?2:1), pr=L<=14?2:0;
+      function dsf(x){ var ds=[]; var mxI=-1, mxV=-1; x.v.cur.forEach(function(v,i){ if(v!=null&&v>mxV){mxV=v;mxI=i;} });
+        if(R.mo.S||x===b)ds.push({label:'先月対比',data:x.v.mo,borderColor:_bjoCol.mut,backgroundColor:'#fff',borderWidth:1.5,pointRadius:pr,pointBorderColor:_bjoCol.mut,pointBackgroundColor:'#fff',tension:0,spanGaps:false,order:3,_noval:true});
+        if(R.wk.S||x===b)ds.push({label:'先週対比',data:x.v.wk,borderColor:_bjoCol.b2,backgroundColor:_bjoCol.b2,borderWidth:2,pointRadius:pr,tension:0,spanGaps:false,order:2,_noval:true});
+        ds.push({label:'オススメ期間',data:x.v.cur,borderColor:_bjoCol.b1,backgroundColor:_bjoCol.b1,borderWidth:2.5,pointRadius:pr,tension:0,spanGaps:false,order:1,_true:x.v.cur.map(function(v,i){return i===mxI?v:null;})});
+        return ds; }
+      function holItems(x,ds){ var it=[]; ds.forEach(function(d,di){ var k=d.label==='先月対比'?'mo':d.label==='先週対比'?'wk':'cur'; x.hol[k].forEach(function(i){ if(d.data[i]!=null)it.push({di:di,i:i,text:'祝',color:d.borderColor,size:9,dy:13}); }); }); return it; }
+      var xo={ticks:{callback:function(v,i){ return (step===1||i%step===0)?lb[i]:null; }}};
+      if(!C.isAll){ var da=dsf(a); _bjoMk('bjoC3a','line',lb,da,{title:'選んだ機種',legend:true,lbw:14,lbh:2,yw:44,y:{min:0,max:mx,ticks:{callback:manT,maxTicksLimit:6}},x:xo,pl:{bjoVal:{fmt:fmtN},bjoTxt:{items:holItems(a,da)}}}); }
+      var db=dsf(b); _bjoMk('bjoC3b','line',lb,db,{title:C.isAll?'店の全機種':'店全体',legend:true,lbw:14,lbh:2,yw:44,y:{min:0,max:mx,ticks:{callback:manT,maxTicksLimit:6}},x:xo,pl:{bjoVal:{fmt:fmtN},bjoTxt:{items:holItems(b,db)}}}); });
+    if(P.c4)run('c4',function(){ var dl=C.dl, N=dl.length; function inW(d,w){ return d>=w.from&&d<=w.to; }
+      var sv=dl.map(function(d){ var o=C.byDay[d]; return o&&o.sC?o.sIn/o.sC:null; }), av=dl.map(function(d){ var o=C.byDay[d]; return o&&o.aC?o.aIn/o.aC:null; });
+      var col=dl.map(function(d){ return inW(d,R.cur)?_bjoCol.b1:((inW(d,R.wk)||inW(d,R.mo))?_bjoCol.b2:_bjoCol.b3); });
+      var i0=dl.indexOf(R.cur.from), i1=dl.indexOf(R.cur.to); var band={spans:(i0>=0&&i1>=0)?[{i0:i0,i1:i1}]:[]};
+      var hm=dl.map(function(d,i){ return _bjoIsKyu(d)?i:-1; }).filter(function(i){return i>=0;});
+      var xt=function(show){ return {ticks:{display:show,callback:function(v,i){ var d=dl[i]; if(N<=21)return [_bjbFmtD(d),'('+_bjoDw(d)+')']; if(N>150)return (i%28===0)?[_bjbFmtD(d)]:null; return _bjwkD(d).getDay()===0?[_bjbFmtD(d),'(日)']:null; }},afterFit:show?undefined:function(a){ a.height=2; }}; };
+      var lastId=P.c4c?'bjoC4c':(P.c4b?'bjoC4b':'bjoC4a'), yw=46, lb={borderWidth:N>60?1:1.5,pointRadius:N>60?0:1.5,tension:0,spanGaps:false};
+      var ds1=[{label:'選んだ機種',data:sv,backgroundColor:col,borderRadius:N>60?0:2,barPercentage:.86,categoryPercentage:1,order:2}];
+      if(!C.isAll)ds1.push(Object.assign({type:'line',label:'店全体',data:av,borderColor:_bjoCol.or,backgroundColor:_bjoCol.or,order:1},lb));
+      _bjoMk('bjoC4a','bar',dl,ds1,{title:'台あたりアウト',yw:yw,pad:{top:2,right:8},y:{beginAtZero:true,ticks:{callback:manT,maxTicksLimit:5}},x:xt(lastId==='bjoC4a'),pl:{bjoBand:band,bjoMark:{idx:hm}}});
+      if(P.c4b){ var gapv=dl.map(function(d,i){ return (sv[i]!=null&&av[i]!=null)?sv[i]-av[i]:null; }); var segs=[]; _bjoPER.forEach(function(k){ var w=R[k]; if(!w.S||!w.A)return; var a0=dl.indexOf(w.from), a1=dl.indexOf(w.to); if(a0<0||a1<0)return; var v=w.S.outPT-w.A.outPT; segs.push({i0:a0,i1:a1,v:v,text:'平均 '+(v>=0?'+':'')+fmtN(v)+U}); });
+        _bjoMk('bjoC4b','bar',dl,[{data:gapv,backgroundColor:col,barPercentage:.86,categoryPercentage:1,borderRadius:N>60?0:2}],{title:'店全体との差（選んだ機種の台あたりアウト−店全体の台あたりアウト）',yw:yw,pad:{top:2,right:8},y:{grace:'12%',ticks:{callback:manT,maxTicksLimit:5}},x:xt(lastId==='bjoC4b'),pl:{bjoBand:band,bjoLine:{lines:[{axis:'y',v:0}]},bjoSeg:{segs:segs}}}); }
+      if(P.c4c){ var tai=dl.map(function(d){ var o=C.byDay[d]; return o&&o.sC?o.sC:null; }), tv=tai.filter(function(v){return v!=null;}), tmin=Math.min.apply(null,tv), tmax=Math.max.apply(null,tv);
+        var chg=tai.map(function(v,i){ if(v==null)return null; var p=i-1; while(p>=0&&tai[p]==null)p--; return (p<0||tai[p]!==v)?v:null; }); var cnt=chg.filter(function(v){return v!=null;}).length;
+        var items=[]; if(cnt<=6){ chg.forEach(function(v,i){ if(v!=null)items.push({di:0,i:i,text:v+'台',bold:true,size:10,dy:-5,align:'left',dx:2}); }); } else { var idx=chg.map(function(v,i){return v!=null?i:-1;}).filter(function(i){return i>=0;}); [idx[0],idx[idx.length-1]].forEach(function(i){ items.push({di:0,i:i,text:chg[i]+'台',bold:true,size:10,dy:-5,align:'left',dx:2}); }); }
+        var sp=Math.max(1,Math.ceil((tmax-tmin)*.4));
+        _bjoMk('bjoC4c','line',dl,[{data:tai,borderColor:_bjoCol.navy,backgroundColor:_bjoCol.navy,borderWidth:1.5,pointRadius:0,stepped:'middle',spanGaps:false}],{title:'台数',yw:yw,tpb:2,pad:{top:2,right:8},y:{min:tmin-sp,max:tmax+sp*2,ticks:{precision:0,stepSize:sp*2,callback:function(v){return v+'台';}}},x:xt(true),pl:{bjoBand:band,bjoTxt:{items:items}}}); } });
+    if(P.c5)run('c5',function(){ var keyOf=function(d){ return isHoliday(d)?7:_bjwkD(d).getDay(); }, ord=[1,2,3,4,5,6,0,7], labN=['月','火','水','木','金','土','日','祝'];
+      var agg={}; _bjoPER.forEach(function(k){ var w=R[k], b={}; for(var d=w.from; d<=w.to; d=_bjwkAddD(d,1)){ var o=C.byDay[d]; if(!o||!o.sC)continue; var kk=keyOf(d); var x=b[kk]||(b[kk]={sIn:0,sC:0,aIn:0,aC:0,n:0}); x.sIn+=o.sIn; x.sC+=o.sC; x.aIn+=o.aIn; x.aC+=o.aC; x.n++; } agg[k]=b; });
+      var use=ord.filter(function(x){ return x!==7||(agg.cur[7]&&agg.cur[7].n); });
+      var labs=use.map(function(x){ return [labN[ord.indexOf(x)], (agg.cur[x]?agg.cur[x].n:0)+'日']; });
+      var ds=_bjoPER.map(function(k){ return {label:_bjoPERL[k],data:use.map(function(x){ var b=agg[k][x]; return b&&b.sC?b.sIn/b.sC:null; }),backgroundColor:_bjoPERC[k],categoryPercentage:.8,barPercentage:.92,_noval:k!=='cur'}; });
+      if(!C.isAll)ds.push({type:'line',label:'店全体（オススメ期間）',data:use.map(function(x){ var b=agg.cur[x]; return b&&b.aC?b.aIn/b.aC:null; }),borderColor:_bjoCol.or,backgroundColor:_bjoCol.or,borderWidth:1.5,pointRadius:2.5,tension:0,spanGaps:false,_noval:true,order:0});
+      _bjoMk('bjoC5','bar',labs,ds,{legend:true,yw:44,y:{beginAtZero:true,grace:'10%',ticks:{callback:manT,maxTicksLimit:6}},pl:{bjoVal:{fmt:fmtN}}}); });
+    if(P.c6)run('c6',function(){ var dl=C.dl, N=dl.length; function inW(d,w){ return d>=w.from&&d<=w.to; }
+      var rs=dl.map(function(d){ var o=C.byDay[d]; return o&&o.sIn?(o.sIn+o.sDf)/o.sIn*100:null; }), ra=dl.map(function(d){ var o=C.byDay[d]; return o&&o.aIn?(o.aIn+o.aDf)/o.aIn*100:null; });
+      var dev=rs.concat(C.isAll?[]:ra).filter(function(v){return v!=null;}).map(function(v){return Math.abs(v-100);}).sort(function(a,b){return a-b;}); var p98=dev.length?dev[Math.min(dev.length-1,Math.floor(dev.length*.98))]:2; var RR=[2,5,10,20,50].filter(function(x){return x>=p98;})[0]||50;
+      var cl=function(v){ return v==null?null:Math.max(100-RR,Math.min(100+RR,v)); };
+      var i0=dl.indexOf(R.cur.from), i1=dl.indexOf(R.cur.to); var band={spans:(i0>=0&&i1>=0)?[{i0:i0,i1:i1}]:[]};
+      var lb={borderWidth:N>60?1:1.5,pointRadius:N>60?0:1.5,tension:0,spanGaps:false};
+      var xt=function(show){ return {ticks:{display:show,callback:function(v,i){ var d=dl[i]; if(N<=21)return [_bjbFmtD(d),'('+_bjoDw(d)+')']; return _bjwkD(d).getDay()===0?[_bjbFmtD(d),'(日)']:null; }},afterFit:show?undefined:function(a){ a.height=2; }}; };
+      var ds6=[Object.assign({type:'line',label:'選んだ機種',data:rs.map(cl),borderColor:_bjoCol.b1,backgroundColor:_bjoCol.b1,order:2},lb)]; if(!C.isAll)ds6.push(Object.assign({type:'line',label:'店全体',data:ra.map(cl),borderColor:_bjoCol.or,backgroundColor:_bjoCol.or,order:1},lb,{borderWidth:1.2}));
+      _bjoMk('bjoC6a','line',dl,ds6,{title:'出玉率（100%が基準）',yw:46,pad:{top:2,right:8},y:{min:100-RR,max:100+RR,ticks:{callback:function(v){return v+'%';},maxTicksLimit:5}},x:xt(false),pl:{bjoBand:band,bjoLine:{lines:[{axis:'y',v:100}]}}});
+      var ps=dl.map(function(d){ var o=C.byDay[d]; return o&&o.sC?o.sPr/o.sC:null; }), pa=dl.map(function(d){ var o=C.byDay[d]; return o&&o.aC?o.aPr/o.aC:null; });
+      var col=dl.map(function(d){ return inW(d,R.cur)?_bjoCol.b1:((inW(d,R.wk)||inW(d,R.mo))?_bjoCol.b2:_bjoCol.b3); });
+      var mnI=-1, mnV=0; ps.forEach(function(v,i){ if(v!=null&&v<mnV){mnV=v;mnI=i;} });
+      var ds7=[{label:'選んだ機種',data:ps,backgroundColor:col,barPercentage:.86,categoryPercentage:1,borderRadius:N>60?0:2,order:2,_true:ps.map(function(v,i){return i===mnI?v:null;})}]; if(!C.isAll)ds7.push(Object.assign({type:'line',label:'店全体',data:pa,borderColor:_bjoCol.or,backgroundColor:_bjoCol.or,order:1,_noval:true},lb));
+      _bjoMk('bjoC6b','bar',dl,ds7,{title:'台粗利（円）',yw:46,pad:{top:2,right:8},y:{grace:'12%',ticks:{callback:manT,maxTicksLimit:5}},x:xt(true),pl:{bjoBand:band,bjoLine:{lines:[{axis:'y',v:0}]},bjoVal:{fmt:function(v,ds,i){ return _bjbFmtD(dl[i])+' '+fmtN(v)+'円'; }}}}); });
+    if(P.c7)run('c7',function(){ var bins=C.bins, labs=bins.map(function(b){ return b.hol?[_bjbFmtD(b.f),'祝'+b.hol]:[_bjbFmtD(b.f)]; });
+      var spans=[]; bins.forEach(function(b,i){ if(b.inCur){ if(spans.length&&spans[spans.length-1].i1===i-1)spans[spans.length-1].i1=i; else spans.push({i0:i,i1:i}); } });
+      var hollow=bins.map(function(b){ return b.hollow?'#fff':null; });
+      var curIdx=bins.map(function(b,i){return b.inCur?i:-1;}).filter(function(i){return i>=0;}); var valIdx=curIdx.length<=3?curIdx:[curIdx[0],curIdx[curIdx.length-1]];
+      function mkT(id,title,fS,fA,yopt,extra){ var sv=bins.map(fS), av=bins.map(fA);
+        var ds=[{label:'選んだ機種',data:sv,borderColor:_bjoCol.b1,backgroundColor:_bjoCol.b1,pointBackgroundColor:hollow.map(function(h){return h||_bjoCol.b1;}),pointBorderColor:_bjoCol.b1,borderWidth:2,pointRadius:3,tension:0,spanGaps:false,order:1,_true:sv.map(function(v,i){return valIdx.indexOf(i)>=0?v:null;})}];
+        if(!C.isAll)ds.push({label:'店全体',data:av,borderColor:_bjoCol.or,backgroundColor:_bjoCol.or,pointBackgroundColor:hollow.map(function(h){return h||_bjoCol.or;}),pointBorderColor:_bjoCol.or,borderWidth:1.5,pointRadius:2,tension:0,spanGaps:false,order:2,_noval:true});
+        var items=[]; if(C.names.length===1&&C.firstSeen[C.names[0]]&&C.firstSeen[C.names[0]]>C.first){ var fs=C.firstSeen[C.names[0]]; bins.forEach(function(b,i){ if(fs>=b.f&&fs<=b.t&&sv[i]!=null)items.push({di:0,i:i,text:'初めて出た週',size:9,dy:12}); }); }
+        _bjoMk(id,'line',labs,ds,Object.assign({yw:46,pad:{top:2,right:8},x:{ticks:{display:id==='bjoC7c'},afterFit:id==='bjoC7c'?undefined:function(a){ a.height=2; }},pl:{bjoBand:{spans:spans},bjoVal:{fmt:extra&&extra.fmt},bjoLine:extra&&extra.lines?{lines:extra.lines}:{},bjoTxt:{items:items}}},yopt)); }
+      mkT('bjoC7a','台あたりアウト',function(b){return b.sC?b.sIn/b.sC:null;},function(b){return b.aC?b.aIn/b.aC:null;},{title:'台あたりアウト',legend:!C.isAll,lbw:14,lbh:2,y:{beginAtZero:true,grace:'10%',ticks:{callback:manT,maxTicksLimit:5}}},{fmt:fmtN});
+      var rr=bins.map(function(b){return b.sIn?(b.sIn+b.sDf)/b.sIn*100:null;}).concat(C.isAll?[]:bins.map(function(b){return b.aIn?(b.aIn+b.aDf)/b.aIn*100:null;})).filter(function(v){return v!=null;}); var RR=Math.max(2,Math.ceil(Math.max.apply(null,rr.map(function(v){return Math.abs(v-100);}).concat([0]))*1.2));
+      mkT('bjoC7b','出玉率',function(b){return b.sIn?(b.sIn+b.sDf)/b.sIn*100:null;},function(b){return b.aIn?(b.aIn+b.aDf)/b.aIn*100:null;},{title:'出玉率（100%が基準）',y:{min:100-RR,max:100+RR,ticks:{callback:function(v){return v.toFixed(0)+'%';},maxTicksLimit:4}}},{fmt:function(v){return v.toFixed(1)+'%';},lines:[{axis:'y',v:100}]});
+      mkT('bjoC7c','台粗利',function(b){return b.sC?b.sPr/b.sC:null;},function(b){return b.aC?b.aPr/b.aC:null;},{title:'台粗利（円）',y:{grace:'15%',ticks:{callback:manT,maxTicksLimit:4}}},{fmt:function(v){return fmtN(v)+'円';},lines:[{axis:'y',v:0}]}); });
+    if(P.c8)run('c8',function(){ var bins=C.bins, labs=bins.map(function(b){ return [_bjbFmtD(b.f)]; }); var spans=[]; bins.forEach(function(b,i){ if(b.inCur){ if(spans.length&&spans[spans.length-1].i1===i-1)spans[spans.length-1].i1=i; else spans.push({i0:i,i1:i}); } });
+      var sh=bins.map(function(b){return b.aIn?b.sIn/b.aIn*100:null;}), su=bins.map(function(b){return b.aC?b.sC/b.aC*100:null;}); var mx=Math.max.apply(null,sh.concat(su).filter(function(v){return v!=null;}).concat([1]))*1.25;
+      _bjoMk('bjoC8','line',labs,[{label:'アウト比率',data:sh,borderColor:_bjoCol.b1,backgroundColor:_bjoCol.b1,borderWidth:2,pointRadius:2.5,tension:0,spanGaps:false},{label:'設置比率',data:su,borderColor:_bjoCol.b2,backgroundColor:_bjoCol.b2,borderWidth:2,pointRadius:2.5,tension:0,spanGaps:false}],{legend:true,lbw:14,lbh:2,yw:46,pad:{top:2,right:8},y:{min:0,max:mx,ticks:{callback:function(v){return v.toFixed(0)+'%';},maxTicksLimit:5}},pl:{bjoBand:{spans:spans}}}); });
+    if(P.c9)run('c9',function(){ var gp=C.gapPast.slice().reverse(), labs=gp.map(function(g){ return [_bjbFmtD(g.f)+'〜']; }), vals=gp.map(function(g){return g.v;}); var vv=vals.map(function(v,i){return v!=null?i:-1;}).filter(function(i){return i>=0;});
+      var mxI=-1,mnI=-1; vv.forEach(function(i){ if(mxI<0||vals[i]>vals[mxI])mxI=i; if(mnI<0||vals[i]<vals[mnI])mnI=i; }); var curI=gp.length-1; var lab=vals.map(function(v,i){ return (i===curI||i===mxI||i===mnI)?v:null; });
+      _bjoMk('bjoC9','bar',labs,[{data:vals,_true:lab,backgroundColor:gp.map(function(g){return g.k===0?_bjoCol.navy:_bjoCol.b2;}),borderRadius:3,maxBarThickness:44}],{yw:46,pad:{top:4,right:8},y:{grace:'20%',ticks:{callback:function(v){return (v>0?'+':'')+v.toFixed(0)+'pt';},maxTicksLimit:5}},pl:{bjoLine:{lines:[{axis:'y',v:0}]},bjoVal:{fmt:function(v){return _bjoSign(v)+'pt';}},bjoNone:{text:'比較なし',idx:vals.map(function(v,i){return v==null?i:-1;}).filter(function(i){return i>=0;})}}}); });
+    if(P.c10)run('c10',function(){ var m10=P.m10, rows=(C.isAll?[]:[{name:'選んだ機種の合計',tot:true}]).concat(m10.map(function(m){return {name:m};}));
+      function taiTxt(m){ var c=R.cur.PM[m]; if(!c)return ''; var t=Math.round(c.avgMachines), b=R.wk.PM[m]||R.mo.PM[m]; var tb=b?Math.round(b.avgMachines):null; return (tb!=null&&tb!==t)?'（'+tb+'→'+t+'台）':'（'+t+'台）'; }
+      var labs=rows.map(function(r){ if(r.tot)return [r.name]; var nm=String(r.name), t=taiTxt(r.name); return nm.length<=10?[nm,t]:[nm.slice(0,10),_bjoShort(nm.slice(10),9)+t]; });
+      function g(k){ return rows.map(function(r){ if(r.tot){ var s=R.cur.S, b=R[k].S; return (s&&b)?_bjoPct(s.outPT,b.outPT):null; } var c=R.cur.PM[r.name], bb=R[k].PM[r.name]; return (c&&bb)?_bjoPct(c.avgIn,bb.avgIn):null; }); }
+      function gp(k){ return rows.map(function(r){ if(r.tot){ var s=R.cur.S, b=R[k].S; return (s&&b)?s.profPT-b.profPT:null; } var c=R.cur.PM[r.name], bb=R[k].PM[r.name]; return (c&&bb)?c.avgProfit-bb.avgProfit:null; }); }
+      var gw=R.wk.S?g('wk'):null, gm=R.mo.S?g('mo'):null, vals=[].concat(gw||[],gm||[]).filter(function(v){return v!=null;}); var LIM=60, mx=Math.min(LIM,Math.ceil(Math.max(10,Math.max.apply(null,vals.map(Math.abs).concat([0])))*1.35/10)*10);
+      var clamp=function(a){ return a.map(function(v){ return v==null?null:Math.max(-mx,Math.min(mx,v)); }); }, fmtP=function(v){ return _bjoSign(v)+'%'; };
+      var colr=rows.map(function(r){ return r.tot?_bjoCol.navy:_bjoCol.b1; });
+      function mkm(id,title,dat,store,showY,xopt,fmt){ var none=dat.map(function(v,i){return v==null?i:-1;}).filter(function(i){return i>=0;});
+        _bjoMk(id,'bar',labs,[{data:xopt?clamp(dat):dat,_true:dat,backgroundColor:colr,borderRadius:2,maxBarThickness:13}],{horiz:true,pad:{top:4,right:44,left:showY?0:44},title:title,x:xopt||{grace:'35%',ticks:{callback:manT,maxTicksLimit:4}},y:{ticks:{display:showY,font:{size:9.5}},afterFit:showY?function(a){ a.width=150; }:function(a){ a.width=4; }},pl:{bjoLine:{lines:[{axis:'x',v:0},{axis:'x',v:store,color:_bjoCol.or,w:1.5}].filter(function(l){return l.v!=null;})},bjoVal:{fmt:fmt},bjoNone:{text:'比較なし',idx:none}}}); }
+      var xo={min:-mx*1.35,max:mx*1.35,ticks:{callback:function(v){return (v>0?'+':'')+v+'%';},stepSize:mx/2}};
+      var sW=(R.cur.A&&R.wk.A)?_bjoPct(R.cur.A.outPT,R.wk.A.outPT):null, sM=(R.cur.A&&R.mo.A)?_bjoPct(R.cur.A.outPT,R.mo.A.outPT):null;
+      var first=true; if(gw){ mkm('bjoC10a','台あたりアウトの伸び・先週対比',gw,C.isAll?null:sW,true,xo,fmtP); first=false; } if(gm){ mkm('bjoC10b','同・先月対比',gm,C.isAll?null:sM,first,xo,fmtP); first=false; }
+      var kk=R.wk.S?'wk':'mo'; var pW=(R.cur.A&&R[kk].A)?R.cur.A.profPT-R[kk].A.profPT:null; mkm('bjoC10c','台粗利の差・'+_bjoPERL[kk],gp(kk),C.isAll?null:pW,first,null,function(v){return (v>=0?'+':'')+fmtN(v)+'円';});
+      var ln=document.getElementById('bjoC10note'); if(ln&&!C.isAll){ var parts=[]; if(gw&&sW!=null)parts.push('先週対比 '+fmtP(sW)); if(gm&&sM!=null)parts.push('先月対比 '+fmtP(sM)); if(pW!=null)parts.push('台粗利の差 '+(pW>=0?'+':'')+fmtN(pW)+'円'); ln.textContent='オレンジの線＝店全体（'+parts.join('、')+'）。'+ln.textContent; } });
+    if(P.c11)run('c11',function(){ var ms=P.c11, bins=C.bins, labs=bins.map(function(b){ return [_bjbFmtD(b.f)]; }); var spans=[]; bins.forEach(function(b,i){ if(b.inCur){ if(spans.length&&spans[spans.length-1].i1===i-1)spans[spans.length-1].i1=i; else spans.push({i0:i,i1:i}); } });
+      var per={}; ms.forEach(function(m){ per[m]=bins.map(function(b){ var x={inn:0,c:0}; for(var d=b.f; d<=b.t; d=_bjwkAddD(d,1)){ var q=C.md[m]&&C.md[m][d]; if(q){ x.inn+=q.inn; x.c+=q.c; } } return x.c?x.inn/x.c:null; }); });
+      var av=bins.map(function(b){return b.aC?b.aIn/b.aC:null;}); var mx=Math.max.apply(null,[].concat.apply(av,ms.map(function(m){return per[m];})).filter(function(v){return v!=null;}).concat([1]))*1.12;
+      var firstCur=bins.map(function(b,i){return b.inCur?i:-1;}).filter(function(i){return i>=0;})[0];
+      ms.forEach(function(m,j){ var v=per[m], tai=R.cur.PM[m]?Math.round(R.cur.PM[m].avgMachines):0; var items=[]; var fs=C.firstSeen[m]; if(fs&&fs>C.first){ bins.forEach(function(b,i){ if(fs>=b.f&&fs<=b.t&&v[i]!=null)items.push({di:0,i:i,text:'初めて出た週',size:8.5,dy:12}); }); }
+        _bjoMk('bjoC11_'+j,'line',labs,[{data:v,borderColor:_bjoCol.b1,backgroundColor:_bjoCol.b1,borderWidth:2,pointRadius:2,tension:0,spanGaps:false,_true:v.map(function(x,i){return i===firstCur?x:null;})},{data:av,borderColor:_bjoCol.or,backgroundColor:_bjoCol.or,borderWidth:1.2,pointRadius:0,tension:0,spanGaps:false,_noval:true}],{title:_bjoShort(m,18)+'（'+tai+'台）',yw:36,pad:{top:2,right:6},y:{min:0,max:mx,ticks:{callback:manT,maxTicksLimit:3}},x:{ticks:{font:{size:9},callback:function(x,i){ return (i===0||i===firstCur)?labs[i]:null; }}},pl:{bjoBand:{spans:spans},bjoVal:{fmt:fmtN},bjoTxt:{items:items}}}); }); });
+    if(P.c12)run('c12',function(){ var minOut=Math.max(3000,(R.cur.A?R.cur.A.outPT*0.35:3000)); var selSet={}; C.names.forEach(function(m){selSet[m]=1;});
+      function sc(id,k,title){ var pts=[], sel=[]; Object.keys(R.cur.PM).forEach(function(m){ var c=R.cur.PM[m], b=R[k].PM[m]; if(!c||!b||c.rate==null||b.rate==null||!b.avgIn)return; var p={x:c.rate-b.rate,y:_bjoPct(c.avgIn,b.avgIn),m:m,w:c.inmai}; if(selSet[m]&&!C.isAll)sel.push(p); else if(c.avgMachines>=3&&b.avgMachines>=3&&Math.max(c.avgIn,b.avgIn)>=minOut)pts.push(p); });
+        if(pts.length+sel.length<5){ var el=document.getElementById(id); if(el)el.parentNode.removeChild(el); return; }
+        var ax=pts.concat(sel), xs=ax.map(function(p){return Math.abs(p.x);}).sort(function(a,b){return a-b;}), ys=ax.map(function(p){return Math.abs(p.y);}).sort(function(a,b){return a-b;});
+        var q=function(a){ return a.length?a[Math.min(a.length-1,Math.floor(a.length*.95))]:0; }; var sx=Math.max.apply(null,sel.map(function(p){return Math.abs(p.x);}).concat([q(xs)])), sy=Math.max.apply(null,sel.map(function(p){return Math.abs(p.y);}).concat([q(ys)]));
+        var mxx=Math.ceil(Math.max(3,sx)*1.25/5)*5, myy=Math.ceil(Math.max(25,sy)*1.25/10)*10; var cl=function(p){ return {x:Math.max(-mxx,Math.min(mxx,p.x)),y:Math.max(-myy,Math.min(myy,p.y))}; };
+        var A=R.cur.A, B=R[k].A, st=(A&&B&&A.rate!=null&&B.rate!=null&&!C.isAll)?[{x:A.rate-B.rate,y:_bjoPct(A.outPT,B.outPT)}]:[];
+        var ds=[{label:'ほかの機種',data:pts.map(cl),backgroundColor:_bjoCol.gray,pointRadius:3,order:3},{label:'選んだ機種',data:sel.map(cl),backgroundColor:C.isAll?_bjoCol.gray:_bjoCol.navy,borderColor:'#fff',borderWidth:1.5,pointRadius:5.5,order:1},{label:'店全体',data:st.map(cl),backgroundColor:_bjoCol.or,borderColor:'#fff',borderWidth:1.5,pointRadius:7,pointStyle:'rectRot',order:2}];
+        var named=(C.isAll?pts.slice().sort(function(a,b){return b.w-a.w;}).slice(0,5):(sel.length>=7?sel.slice().sort(function(a,b){return b.w-a.w;}).slice(0,3):sel));
+        var labp={id:'bjoLab'+id,afterDatasetsDraw:function(c){ var ctx=c.ctx,xa=c.scales.x,ya=c.scales.y; ctx.save(); ctx.font='9.5px sans-serif'; var placed=[];
+          named.forEach(function(p0){ var p=cl(p0), nm=_bjoShort(p0.m,12), w=ctx.measureText(nm).width, px=xa.getPixelForValue(p.x), py=ya.getPixelForValue(p.y); var lx=Math.min(px+7,xa.right-w-2), ly=null; [py+3,py-9,py+15].forEach(function(y2){ if(ly!=null)return; if(y2<ya.top+8||y2>ya.bottom-2)return; var ok=placed.every(function(q2){ return !(Math.abs(y2-q2.y)<10&&lx<q2.x+q2.w+6&&q2.x<lx+w+6); }); if(ok)ly=y2; }); if(ly==null)return; ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText(nm,lx,ly); ctx.fillStyle=_bjoCol.ink; ctx.fillText(nm,lx,ly); placed.push({x:lx,y:ly,w:w}); });
+          if(st.length){ var p=cl(st[0]); var px=xa.getPixelForValue(p.x), py=ya.getPixelForValue(p.y); ctx.fillStyle=_bjoCol.or; ctx.lineWidth=3; ctx.strokeStyle='rgba(255,255,255,.92)'; ctx.strokeText('店全体',px+8,py+3); ctx.fillText('店全体',px+8,py+3); } ctx.restore(); }};
+        var el=document.getElementById(id); if(!el)return;
+        var ch=new Chart(el.getContext('2d'),{type:'scatter',data:{datasets:ds},plugins:[labp],options:{responsive:false,animation:false,devicePixelRatio:2,layout:{padding:{top:2,right:6}},plugins:{legend:{display:false},tooltip:{enabled:false},title:{display:true,text:title,align:'start',font:{size:11,weight:'bold'},color:_bjoCol.ink,padding:{top:2,bottom:4}}},
+          scales:{x:{min:-mxx,max:mxx,title:{display:true,text:'出玉率の変化（pt）',font:{size:9.5},color:_bjoCol.zero,padding:0},ticks:{font:{size:9},color:_bjoCol.mut,callback:function(v){return (v>0?'+':'')+v;}},grid:{color:function(c){return c.tick.value===0?_bjoCol.zero:_bjoCol.grid;}},border:{display:false}},
+                  y:{min:-myy,max:myy,title:{display:true,text:'台あたりアウトの変化（%）',font:{size:9.5},color:_bjoCol.zero,padding:0},ticks:{font:{size:9},color:_bjoCol.mut,callback:function(v){return (v>0?'+':'')+v+'%';}},grid:{color:function(c){return c.tick.value===0?_bjoCol.zero:_bjoCol.grid;}},border:{display:false}}}}});
+        _bjoCharts.push(ch); }
+      if(R.wk.S)sc('bjoC12a','wk','先週対比'); if(R.mo.S)sc('bjoC12b','mo','先月対比'); });
+    if(P.c13)run('c13',function(){ var kk=P.c13, rows=C.rows13, dm=C.dm, A0=R.cur.A, B0=R[kk].A, selSet={}; C.names.forEach(function(m){selSet[m]=1;});
+      var labs=rows.map(function(m){ var x=dm[m], tc=x.c?Math.round(x.c.count/A0.days):0, tb=x.b?Math.round(x.b.count/B0.days):0; var g=(x.c&&x.b)?_bjoPct(x.c.avgIn,x.b.avgIn):null; return [_bjoShort(m,18), tb+'→'+tc+'台'+(g!=null?'・台あたり '+_bjoSign(g,0)+'%':'')]; });
+      _bjoMk('bjoC13','bar',labs,[{data:rows.map(function(m){return dm[m].v;}),backgroundColor:rows.map(function(m){return (selSet[m]&&!C.isAll)?_bjoCol.navy:_bjoCol.b2;}),borderRadius:2,maxBarThickness:14}],{horiz:true,pad:{top:4,right:60,left:0},x:{grace:'25%',ticks:{callback:function(v){return (v>0?'+':'')+_bjoMan(v);},maxTicksLimit:6}},y:{ticks:{font:{size:9.5}},afterFit:function(a){ a.width=190; }},pl:{bjoLine:{lines:[{axis:'x',v:0}]},bjoVal:{fmt:function(v){return (v>=0?'+':'')+_bjoMan(v)+U;}}}}); });
+    if(P.c14)run('c14',function(){ var order=C.order||C.names.slice(); var kk=R.wk.S?'wk':(R.mo.S?'mo':null); var units=[]; order.forEach(function(m){ var u=Object.keys(R.cur.nos).map(function(k){return R.cur.nos[k];}).filter(function(x){return x.m===m;}).sort(function(a,b){return (parseInt(a.no,10)||0)-(parseInt(b.no,10)||0);}); if(!u.length)return; if(units.length)units.push(null); u.forEach(function(x){units.push(x);}); });
+      var labs=units.map(function(u){ return u?String(u.no):''; }), cv=units.map(function(u){ return u?u.inn/u.c:null; }), pv=units.map(function(u){ if(!u||!kk)return null; var b=R[kk].nos[u.m+'|'+u.no]; return b?b.inn/b.c:null; });
+      var vi=cv.map(function(v,i){return v!=null?i:-1;}).filter(function(i){return i>=0;}); var mxI=-1,mnI=-1; vi.forEach(function(i){ if(mxI<0||cv[i]>cv[mxI])mxI=i; if(mnI<0||cv[i]<cv[mnI])mnI=i; });
+      var ds=[{label:'オススメ期間',data:cv,backgroundColor:_bjoCol.b1,borderRadius:2,barPercentage:.8,categoryPercentage:1,order:2,_true:cv.map(function(v,i){return (i===mxI||i===mnI)?v:null;})}]; if(kk)ds.push({type:'line',label:_bjoPERL[kk],data:pv,showLine:false,pointRadius:3.5,pointBackgroundColor:_bjoCol.b2,pointBorderColor:'#fff',pointBorderWidth:1.5,order:1,_noval:true});
+      var many=units.filter(Boolean).length>24;
+      _bjoMk('bjoC14','bar',labs,ds,{legend:true,yw:46,pad:{top:4,right:8},y:{beginAtZero:true,grace:'12%',ticks:{callback:manT,maxTicksLimit:5}},x:{ticks:{font:{size:9},callback:function(v,i){ return (!many||i%2===0)?labs[i]:''; }}},pl:{bjoLine:{lines:[{axis:'y',v:R.cur.A?R.cur.A.outPT:null,color:_bjoCol.or,w:1.5,text:'店全体',tc:_bjoCol.or}].filter(function(l){return l.v!=null;})},bjoVal:{fmt:fmtN}}}); });
+  }
+  // ── 画面 ──
+  function buildOsusumeTab(panel){
+    if(!panel||document.getElementById('bjoBody'))return;
+    panel.innerHTML='<div class="bjo-form" id="bjoForm">'
+      +'<div class="bjo-h">オススメ機種の効果を見る</div>'
+      +'<p class="bjo-help">店舗：<b id="bjoStore"></b>　期間と機種を選んでください。ほかの店舗は上の店舗の選択から切り替えられます。</p>'
+      +'<label class="bjo-row"><span>開始日</span><input type="date" id="bjoFrom"></label>'
+      +'<label class="bjo-row"><span>終了日</span><input type="date" id="bjoTo"></label>'
+      +'<div class="bjo-row"><span>機種</span><div class="bjo-pick">'
+        +'<input type="text" id="bjoQ" placeholder="機種名で絞り込む（例: カバネリ）">'
+        +'<div class="bjo-acts"><button type="button" id="bjoAllOn">表示中を全部選ぶ</button><button type="button" id="bjoAllOff">全部外す</button><span id="bjoCount"></span></div>'
+        +'<div class="bjo-list" id="bjoList"></div></div></div>'
+      +'<div class="bjo-go"><button type="button" class="bjo-run" id="bjoRun">レポートを出す</button><button type="button" class="bjp-info" id="bjoPrint" style="margin-left:0;" hidden>印刷・PDF保存</button><span id="bjoMsg" class="bjo-msg"></span></div>'
+      +'</div><div class="bjwk-sheet" id="bjoSheet" hidden><div id="bjoBody"></div></div>';
+    function byId(id){ return document.getElementById(id); }
+    byId('bjoFrom').addEventListener('change',_bjoRenderList);
+    byId('bjoTo').addEventListener('change',_bjoRenderList);
+    byId('bjoQ').addEventListener('input',_bjoRenderList);
+    byId('bjoList').addEventListener('change',function(e){ var el=e.target; if(!el||el.dataset.i==null)return; var m=_bjoListNames[+el.dataset.i]; if(el.checked)_bjoSel[m]=1; else delete _bjoSel[m]; _bjoCountUpd(); });
+    byId('bjoAllOn').addEventListener('click',function(){ _bjoListNames.forEach(function(m){ _bjoSel[m]=1; }); _bjoRenderList(); });
+    byId('bjoAllOff').addEventListener('click',function(){ _bjoSel={}; _bjoRenderList(); });
+    byId('bjoRun').addEventListener('click',_bjoRun);
+    byId('bjoPrint').addEventListener('click',function(){ setTimeout(function(){ window.print(); },60); });
+  }
+  function _bjoCountUpd(){ var el=document.getElementById('bjoCount'); if(el){ var n=Object.keys(_bjoSel).length; el.textContent=n?n+'機種を選んでいます':''; } }
+  function _bjoRenderList(){
+    var box=document.getElementById('bjoList'); if(!box)return;
+    var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
+    var from=document.getElementById('bjoFrom').value, to=document.getElementById('bjoTo').value;
+    var q=(document.getElementById('bjoQ').value||'').normalize('NFKC').toLowerCase().trim();
+    var agg={};
+    for(var i=0;i<recs.length;i++){ var r=recs[i], m=r['機種名'], d=r.date; if(!m||!d)continue; if(from&&d<from)continue; if(to&&d>to)continue;
+      var o=agg[m]||(agg[m]={c:0,inn:0,days:{}}); o.c++; o.inn+=r['IN枚数']||0; o.days[d]=1; }
+    var names=Object.keys(agg).filter(function(m){ return !q||m.normalize('NFKC').toLowerCase().indexOf(q)>=0; });
+    names.sort(function(a,b){ return ((_bjoSel[b]?1:0)-(_bjoSel[a]?1:0))||(agg[b].inn-agg[a].inn)||(a<b?-1:1); });
+    _bjoListNames=names;
+    box.innerHTML=names.length?names.map(function(m,i){ var o=agg[m], t=Math.round(o.c/Object.keys(o.days).length);
+      return '<label><input type="checkbox" data-i="'+i+'"'+(_bjoSel[m]?' checked':'')+'> '+_bjEsc(m)+'<small>'+t+'台</small></label>'; }).join('')
+      :'<div class="bjo-none" style="padding:8px;">'+((from||to)?'この期間に当てはまる機種がありません。':'機種がありません。')+'</div>';
+    _bjoCountUpd();
+  }
+  function _bjoOpen(){
+    var f=document.getElementById('bjoFrom'), t=document.getElementById('bjoTo'); if(!f||!t)return;
+    var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
+    var st0=(typeof getActiveStore==='function')?getActiveStore():null, se=document.getElementById('bjoStore'); if(se)se.textContent=(st0&&st0.name)||'';
+    if(!f.value&&!t.value&&recs.length){ var last=''; for(var i=0;i<recs.length;i++){ if(recs[i].date>last)last=recs[i].date; }
+      if(last){ t.value=last; f.value=_bjwkAddD(last,-6); } }
+    _bjoRenderList();
+    if(_bjoShown)_bjoRun();    // 店舗を変えたとき・タブに戻ったときは、同じ条件で出し直す
+  }
+  function _bjoMsg(t){ var el=document.getElementById('bjoMsg'); if(el)el.textContent=t||''; }
+  function _bjoRun(){
+    var from=document.getElementById('bjoFrom').value, to=document.getElementById('bjoTo').value;
+    var sheet=document.getElementById('bjoSheet'), body=document.getElementById('bjoBody'), pr=document.getElementById('bjoPrint');
+    function stop(t){ _bjoMsg(t); sheet.hidden=true; pr.hidden=true; _bjoShown=false; _bjoDestroy(); }
+    if(!from||!to)return stop('開始日と終了日を入れてください');
+    if(from>to)return stop('開始日が終了日より後になっています');
+    var recs=(typeof loadAllData==='function')?(loadAllData()||[]):[];
+    var have={}, last=''; for(var i=0;i<recs.length;i++){ var r=recs[i]; if(r.date>last)last=r.date; if(r['機種名']&&r.date>=from&&r.date<=to)have[r['機種名']]=1; }
+    if(last&&from>last)return stop('選んだ期間のデータはまだありません（データは'+_bjbFmtD(last)+'までです）');
+    var names=Object.keys(_bjoSel).filter(function(m){ return have[m]; }).sort();
+    if(!names.length)return stop(Object.keys(_bjoSel).length?'選んだ機種は、この店舗のこの期間にありません':'機種を選んでください');
+    var C=_bjoCompute(recs,from,to,names);
+    if(C.err)return stop(C.err);
+    var st=(typeof getActiveStore==='function')?getActiveStore():null;
+    _bjoDestroy();
+    body.innerHTML=_bjoReportHtml(C,(st&&st.name)||'この店舗');
+    sheet.hidden=false; pr.hidden=false; _bjoMsg(''); _bjoShown=true;
+    _bjoDrawAll(C);
+    window._bjoLast=C;
+  }
 
   // ===== レポート: 増減台・移動の週次レポート β（#R9。増台/減台/移動を分離・総アウト前後比較。週=月〜日・直近12週・全履歴） =====
   var _bjweTypedKey='', _bjweChkOff=null;
@@ -19697,6 +20188,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     // ⑦ AIの朝礼（偵察レポート・遅延生成）
     try{ buildBriefingTab(panels.briefing); }catch(e){ console.error('buildBriefingTab', e); }
     try{ if(panels.weekly) buildWeeklyTab(panels.weekly); }catch(e){ console.error('buildWeeklyTab', e); }
+    try{ if(panels.osusume) buildOsusumeTab(panels.osusume); }catch(e){ console.error('buildOsusumeTab', e); }
     try{ if(panels.tune) buildTuneTab(panels.tune); }catch(e){ console.error('buildTuneTab', e); }
     try{ _bjtNotice(); }catch(e){}   // 補正が効いていれば、どのタブにいても分かるように上に出す
     var _psw=document.querySelector('.pin-section-wrapper'); if(_psw&&_psw.parentNode) _psw.parentNode.removeChild(_psw);  // ピンポイント分析＋ダーク帯を削除
@@ -20035,7 +20527,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
   function _bjUpdateContext(){
     var el=document.getElementById('bjHeaderCtx'); if(!el) { _bjSyncHeaderH(); return; }
     var room=window._bjRoom||(function(){var a=document.querySelector('#bjTabsNav a.on');return a?a.dataset.r:'basic';})();
-    if(room==='comp'||room==='payout'){ el.innerHTML=''; el.style.display='none'; return; }   // コンパリゾン/出玉配分は独自UI
+    if(room==='comp'||room==='payout'||room==='osusume'){ el.innerHTML=''; el.style.display='none'; return; }   // コンパリゾン/出玉配分/オススメ機種は独自UI
     el.style.display='';
     function fmt(v){ return v?v.replace(/-/g,'/'):''; }
     var mf=document.getElementById('modelFilter');
@@ -20196,6 +20688,7 @@ function _buildStoreCmpAdviceHTML(keyA, keyB, nameA, nameB) {
     try{ _bjtNotice(); }catch(e){}
     if(window._bjRoom==='tune'){ try{ _bjtRender(); }catch(e){} }        // 「表示中の店への影響」カードを描き直す
     if(window._bjRoom==='weekly'){ _bjShowLoading(); setTimeout(function(){ try{ _bjwkRender(); }catch(e){} finally { _bjHideLoading(); } },60); }
+    if(window._bjRoom==='osusume'){ try{ _bjoOpen(); }catch(e){ console.error('osusume', e); } }
     // レポートを見たまま店舗を切り替えると、rival本体は描き直るが週次イベント(万枚)の中身が空のままになる
     // (中身はタブを開き直した時にしか描かれない)ため、ここでも描き直す(2026-09-07修正)
     if(window._bjRoom==='report'||window._bjRoom==='post'){ setTimeout(function(){ try{ _bjwrRender(); }catch(e){ console.error('bjwr', e); } try{ _bjweRender(); }catch(e){ console.error('bjwe', e); } },200); }
